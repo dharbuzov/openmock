@@ -69,3 +69,26 @@ cd openmock
 
 npm install
 npm run dev
+```
+
+## Application skeleton
+
+The current implementation is a routing and architecture demo. AI, voice,
+authentication, storage, scoring, and editable workspaces are not implemented.
+
+- `problems/`: community-owned Markdown content with validated YAML frontmatter.
+- `src/app/`: server-rendered pages and the thin interview API route.
+- `src/components/`: interview panels, shared header, and shadcn UI primitives.
+- `src/lib/`: problem loading, the stateless dummy interview engine, and future AI/voice contracts.
+
+Try `/` → `/practice` → `/interview/demo-two-sum` → `/results/demo-two-sum`.
+All problem links use deterministic `demo-<problem-id>` IDs. Reloading rebuilds
+the dummy object; completion only produces a results view and is not persisted.
+Unknown IDs return 404. Problem bodies are displayed as plain Markdown in this skeleton.
+
+`POST /api/interview` accepts JSON such as `{"problemId":"two-sum"}` and returns
+a dummy interview with status 201. Invalid JSON or missing/invalid `problemId`
+returns 400; unknown problems return 404. The UI uses direct links to the same
+demo engine, so it does not need client-side session state.
+
+Run checks with `npm run lint` and `npm run build` (includes TypeScript checking).
