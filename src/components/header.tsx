@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
+import { SettingsButton } from "@/components/settings-provider";
 
 export function Header() {
   return (
@@ -9,6 +10,7 @@ export function Header() {
         <nav aria-label="Main navigation" className="flex items-center gap-3 sm:gap-5">
           <a href="https://github.com/dharbuzov/openmock" className={buttonVariants({ variant: "ghost", size: "sm" })}>GitHub</a>
           <Link href="/practice" className={buttonVariants({ variant: "outline", size: "sm" })}>Practice</Link>
+          <SettingsButton />
         </nav>
       </div>
     </header>

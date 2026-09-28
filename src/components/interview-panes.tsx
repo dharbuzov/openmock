@@ -75,7 +75,7 @@ export function InterviewPanes({ problem, workspace, interviewer }: {
             title="Drag to resize. Double-click to reset layout."
             disableDoubleClick
             onDoubleClick={resetLayout}
-            className="z-10 cursor-col-resize bg-border data-[separator=hover]:bg-neutral-400 data-[separator=active]:bg-neutral-600 max-xl:hidden"
+            className="z-10 cursor-col-resize bg-border data-[separator=hover]:bg-muted-foreground data-[separator=active]:bg-foreground max-xl:hidden"
           />}
           <ResizablePanel
             id={value}

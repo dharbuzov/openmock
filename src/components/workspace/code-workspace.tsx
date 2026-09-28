@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
-import { Play } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useInterviewCode } from "@/components/interview-code-context";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { codeLanguages, defaultCodeLanguage, type CodeLanguageId } from "@/lib/code/languages";
 
@@ -15,11 +15,16 @@ const Editor = dynamic(() => import("@monaco-editor/react").then((module) => mod
 });
 
 export function CodeWorkspace({ starterCode }: { starterCode: string }) {
-  const [runRequested, setRunRequested] = useState(false);
+  const { resolvedTheme } = useTheme();
+  const codeRef = useInterviewCode();
   const [language, setLanguage] = useState<(typeof codeLanguages)[number]>(defaultCodeLanguage);
   const [buffers, setBuffers] = useState<Partial<Record<CodeLanguageId, string>>>(() => ({
     java: starterCode || defaultCodeLanguage.starterCode,
   }));
+  const content = buffers[language.id] ?? language.starterCode;
+  useEffect(() => {
+    codeRef.current = { language: language.label, content };
+  }, [codeRef, language.label, content]);
 
   return (
     <section aria-label="Coding workspace" className="flex h-full min-h-0 flex-col">
@@ -37,18 +42,15 @@ export function CodeWorkspace({ starterCode }: { starterCode: string }) {
               </SelectGroup>
             </SelectContent>
           </Select>
-          <Button size="sm" variant="outline" onClick={() => setRunRequested(true)} title="Preview only; execution is not connected">
-            <Play aria-hidden="true" data-icon="inline-start" />Run
-          </Button>
         </div>
       </div>
       <div className="min-h-0 flex-1">
         <Editor
           height="100%"
           language={language.monacoLanguage}
-          value={buffers[language.id] ?? language.starterCode}
+          value={content}
           onChange={(value) => setBuffers((current) => ({ ...current, [language.id]: value ?? "" }))}
-          theme="vs"
+          theme={resolvedTheme === "dark" ? "vs-dark" : "vs"}
           loading={<p role="status" className="p-4 text-sm text-muted-foreground">Loading editor…</p>}
           options={{
             ariaLabel: `${language.label} solution editor`,
@@ -72,16 +74,6 @@ export function CodeWorkspace({ starterCode }: { starterCode: string }) {
           }}
         />
       </div>
-      <section aria-labelledby="test-results-heading" className="flex h-40 shrink-0 flex-col border-t">
-        <div className="flex h-10 shrink-0 items-center justify-between border-b px-4">
-          <h3 id="test-results-heading" className="text-xs font-medium">Test Results</h3>
-          <span className="text-xs text-muted-foreground">Preview</span>
-        </div>
-        <div role="status" className="flex flex-col gap-2 overflow-y-auto p-4 text-xs leading-5">
-          <p className="font-mono">{runRequested ? "Run requested — execution unavailable." : "No tests run."}</p>
-          <p className="text-muted-foreground">Execution is not connected yet. Your code is editable, but Run does not compile or evaluate it.</p>
-        </div>
-      </section>
     </section>
   );
 }

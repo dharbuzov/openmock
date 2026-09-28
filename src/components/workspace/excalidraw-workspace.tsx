@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useTheme } from "next-themes";
 import "@excalidraw/excalidraw/index.css";
 
 const Excalidraw = dynamic(
@@ -12,10 +13,11 @@ const Excalidraw = dynamic(
 );
 
 export function ExcalidrawWorkspace() {
+  const { resolvedTheme } = useTheme();
   return (
     <section aria-label="Excalidraw workspace" className="system-design-canvas h-full min-h-0 w-full">
       <Excalidraw
-        theme="light"
+        theme={resolvedTheme === "dark" ? "dark" : "light"}
         autoFocus={false}
         handleKeyboardGlobally={false}
         initialData={{ appState: { viewBackgroundColor: "#ffffff" } }}

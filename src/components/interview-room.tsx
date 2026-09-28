@@ -5,6 +5,8 @@ import { Workspace } from "@/components/workspace/workspace";
 import { AIInterviewer } from "@/components/ai-interviewer";
 import { InterviewPanes } from "@/components/interview-panes";
 import type { Interview } from "@/lib/interview/types";
+import { SettingsButton } from "@/components/settings-provider";
+import { InterviewCodeProvider } from "@/components/interview-code-context";
 
 export function InterviewRoom({ interview }: { interview: Interview }) {
   return (
@@ -15,15 +17,16 @@ export function InterviewRoom({ interview }: { interview: Interview }) {
           <h1 className="truncate border-l pl-4 text-sm font-medium" title={interview.problem.title}>{interview.problem.title}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-4">
+          <SettingsButton />
           <span aria-label="Elapsed time: 24 minutes, 31 seconds, sample value" className="hidden font-mono text-xs tabular-nums sm:inline">24:31</span>
           <Link href={`/results/${interview.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>Finish</Link>
         </div>
       </header>
-      <InterviewPanes
+      <InterviewCodeProvider key={interview.id}><InterviewPanes
         problem={<ProblemPanel problem={interview.problem} />}
         workspace={<Workspace key={interview.id} problem={interview.problem} />}
-        interviewer={<AIInterviewer problemType={interview.problem.type} />}
-      />
+        interviewer={<AIInterviewer problem={interview.problem} />}
+      /></InterviewCodeProvider>
     </main>
   );
 }
