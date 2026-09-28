@@ -7,19 +7,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { useOpenSettings } from "@/components/settings-provider";
 import { useInterviewCode } from "@/components/interview-code-context";
 import { useInterviewSession } from "@/components/interview-session-context";
+import { useInterviewDiagram } from "@/components/interview-diagram-context";
 import { readSettings } from "@/lib/settings/storage";
 import { isCloudSettings } from "@/lib/settings/types";
 import type { Problem } from "@/lib/problems/types";
 import type { AIMessage } from "@/lib/ai/provider";
 
 export function AIInterviewer({ problem }: { problem: Problem }) {
-  const { messages, setMessages } = useInterviewSession();
+  const { messages, setMessages, systemDesignState, setSystemDesignState } = useInterviewSession();
+  const { captureCurrentArchitecture } = useInterviewDiagram();
   const [answer, setAnswer] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const controller = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const code = useInterviewCode();
+  const lastArchitectureSnapshot = useRef<ReturnType<typeof captureCurrentArchitecture> | null>(null);
   const openSettings = useOpenSettings();
   useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => { end.current?.scrollIntoView({ block: "nearest" }); }, [messages, pending, error]);
@@ -32,14 +35,29 @@ export function AIInterviewer({ problem }: { problem: Problem }) {
     controller.current = request;
     const next: AIMessage[] = retry ? messages : [...messages, { role: "user", content: answer.trim() }];
     const codeSnapshot = problem.type === "dsa" && code.current ? { ...code.current } : undefined;
+    if (problem.type === "system-design" && !retry) {
+      lastArchitectureSnapshot.current = captureCurrentArchitecture();
+    }
+    const architectureSnapshot = problem.type === "system-design"
+      ? lastArchitectureSnapshot.current ?? captureCurrentArchitecture()
+      : undefined;
     setMessages(next);
     if (!retry) setAnswer("");
     setError("");
     setPending(true);
     try {
       const { generateInterviewResponse } = await import("@/lib/ai/provider");
-      const content = await generateInterviewResponse(settings, { problem, messages: next, code: codeSnapshot }, request.signal);
-      if (!request.signal.aborted) setMessages([...next, { role: "assistant", content }]);
+      const result = await generateInterviewResponse(settings, {
+        problem,
+        messages: next,
+        code: codeSnapshot,
+        systemDesignState: systemDesignState ?? undefined,
+        architectureDiagram: architectureSnapshot,
+      }, request.signal);
+      if (!request.signal.aborted) {
+        setMessages([...next, { role: "assistant", content: result.content }]);
+        if (result.systemDesignState) setSystemDesignState(result.systemDesignState);
+      }
     } catch {
       if (!request.signal.aborted) setError("Could not reach the interviewer. Check your AI settings and try again.");
     } finally {

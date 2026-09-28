@@ -1,7 +1,7 @@
 import { interviewEvaluationSchema, type InterviewEvaluation } from "../ai/evaluation";
 
 function storageKey(interviewId: string): string {
-  return `openmock:interview-evaluation:v1:${interviewId}`;
+  return `openmock:interview-evaluation:v2:${interviewId}`;
 }
 
 export function saveEvaluation(interviewId: string, evaluation: InterviewEvaluation): void {

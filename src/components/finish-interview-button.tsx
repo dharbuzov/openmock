@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useInterviewCode } from "@/components/interview-code-context";
 import { useInterviewSession } from "@/components/interview-session-context";
+import { useInterviewDiagram } from "@/components/interview-diagram-context";
 import { useOpenSettings } from "@/components/settings-provider";
 import { readSettings } from "@/lib/settings/storage";
 import { isCloudSettings } from "@/lib/settings/types";
@@ -14,7 +15,8 @@ export function FinishInterviewButton({ interviewId, problem }: { interviewId: s
   const router = useRouter();
   const openSettings = useOpenSettings();
   const code = useInterviewCode();
-  const { messages } = useInterviewSession();
+  const { messages, systemDesignState } = useInterviewSession();
+  const { captureCurrentArchitecture } = useInterviewDiagram();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const controller = useRef<AbortController | null>(null);
@@ -44,7 +46,13 @@ export function FinishInterviewButton({ interviewId, problem }: { interviewId: s
         import("@/lib/interview/evaluation-storage"),
       ]);
       const codeSnapshot = problem.type === "dsa" && code.current ? { ...code.current } : undefined;
-      const evaluation = await evaluateInterview(settings, { problem, messages, code: codeSnapshot }, request.signal);
+      const evaluation = await evaluateInterview(settings, {
+        problem,
+        messages,
+        code: codeSnapshot,
+        systemDesignState: systemDesignState ?? undefined,
+        architectureDiagram: problem.type === "system-design" ? captureCurrentArchitecture() : undefined,
+      }, request.signal);
       saveEvaluation(interviewId, evaluation);
       router.push(`/results/${interviewId}`);
     } catch {
