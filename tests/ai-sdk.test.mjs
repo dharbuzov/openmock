@@ -77,6 +77,7 @@ function systemState(overrides = {}) {
     phase: "clarification",
     coveredTopics: [],
     establishedRequirements: [],
+    assumptions: [],
     decisions: [],
     unresolvedQuestions: [],
     challengeAreas: [],
@@ -219,6 +220,7 @@ test("system design receives centralized instructions and excludes DSA code", as
 test("system design state preserves requirements and decisions while phase can move non-sequentially", () => {
   const previous = systemState({
     establishedRequirements: [{ statement: "Redirects must remain available", evidenceCandidateMessageIndex: 0 }],
+    assumptions: [{ statement: "Traffic is globally distributed", evidenceCandidateMessageIndex: 0 }],
     decisions: [{ statement: "Keep analytics off the redirect path", rationale: "Protect latency", evidenceCandidateMessageIndex: 1 }],
   });
   const proposed = systemState({
@@ -229,6 +231,7 @@ test("system design state preserves requirements and decisions while phase can m
   const merged = mergeSystemDesignState(previous, proposed, 2);
   assert.equal(merged.phase, "reliability");
   assert.deepEqual(merged.establishedRequirements, previous.establishedRequirements);
+  assert.deepEqual(merged.assumptions, previous.assumptions);
   assert.deepEqual(merged.decisions, previous.decisions);
   assert.deepEqual(merged.challengeAreas, ["analytics queue backpressure"]);
 });
@@ -258,6 +261,15 @@ test("multiple architecture components remain separate nodes", () => {
     { id: "region", type: "frame" },
   ]);
   assert.equal(diagram.nodes[3].label, "EU region");
+});
+
+test("unlabeled architecture node normalizes without crashing", () => {
+  assert.deepEqual(normalizeExcalidrawScene([
+    sceneElement("unlabeled", "rectangle"),
+  ]), {
+    nodes: [{ id: "unlabeled", type: "rectangle" }],
+    edges: [],
+  });
 });
 
 test("arrow bindings become directed edges with bound labels", () => {
@@ -378,6 +390,7 @@ test("System Design request contains only the latest normalized architecture con
   assert.match(serialized, /currentArchitectureDiagram/);
   assert.match(serialized, /API Gateway/);
   assert.match(serialized, /Redis/);
+  assert.match(serialized, /I put Redis in front of the database/);
   assert.ok(!serialized.includes("strokeColor"));
   assert.ok(!serialized.includes("data:image"));
   assert.equal(result.content, "What happens when Redis is unavailable?");
@@ -397,6 +410,20 @@ test("OpenAI, Anthropic, and Ollama receive identical architecture context", asy
   }
   assert.equal(prompts[0], prompts[1]);
   assert.equal(prompts[1], prompts[2]);
+});
+
+test("DSA request ignores System Design architecture context and preserves Monaco code", async () => {
+  const model = new MockLanguageModelV3({ doGenerate: mockResult("What is the space complexity?") });
+  await generateInterviewResponseWithModel(model, {
+    problem: { title: "Two Sum", type: "dsa", content: "Return indices" },
+    messages: [{ role: "user", content: "I use a hash map." }],
+    code: { language: "TypeScript", content: "const seen = new Map();" },
+    architectureDiagram,
+  });
+  const serialized = JSON.stringify(model.doGenerateCalls[0].prompt);
+  assert.match(serialized, /const seen = new Map/);
+  assert.ok(!serialized.includes("currentArchitectureDiagram"));
+  assert.ok(!serialized.includes("API Gateway"));
 });
 
 test("provider failures are converted to safe application errors", async () => {
@@ -491,6 +518,7 @@ test("system design evaluation receives progress and returns grounded qualitativ
   const state = systemState({
     phase: "wrap_up",
     establishedRequirements: [{ statement: "Redirect p99 below 100 ms", evidenceCandidateMessageIndex: 0 }],
+    assumptions: [{ statement: "Traffic is read-heavy", evidenceCandidateMessageIndex: 0 }],
     decisions: [{ statement: "Async analytics queue", rationale: "Protect redirect latency", evidenceCandidateMessageIndex: 1 }],
   });
   const category = (level, summary, observation, sourceIndex = 0) => ({
@@ -535,6 +563,7 @@ test("system design evaluation receives progress and returns grounded qualitativ
   assert.equal(evaluation.keyMoments[0].evidence[0].sourceIndex, 1);
   const call = model.doGenerateCalls[0];
   assert.match(JSON.stringify(call.prompt), /Async analytics queue/);
+  assert.match(JSON.stringify(call.prompt), /Traffic is read-heavy/);
   assert.match(JSON.stringify(call.prompt), /API Gateway/);
   assert.equal(call.responseFormat.type, "json");
   assert.ok(!("overallScore" in evaluation));

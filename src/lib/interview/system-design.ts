@@ -26,6 +26,7 @@ export const systemDesignStateSchema = z.object({
   phase: z.enum(systemDesignPhases),
   coveredTopics: z.array(z.string().min(1).max(120)).max(30),
   establishedRequirements: z.array(evidencedStatementSchema).max(24),
+  assumptions: z.array(evidencedStatementSchema).max(24),
   decisions: z.array(decisionSchema).max(24),
   unresolvedQuestions: z.array(z.string().min(1).max(240)).max(16),
   challengeAreas: z.array(z.string().min(1).max(240)).max(16),
@@ -44,6 +45,7 @@ export function createInitialSystemDesignState(): SystemDesignState {
     phase: "clarification",
     coveredTopics: [],
     establishedRequirements: [],
+    assumptions: [],
     decisions: [],
     unresolvedQuestions: [],
     challengeAreas: [],
@@ -83,6 +85,11 @@ export function mergeSystemDesignState(
     establishedRequirements: mergeByStatement(
       previous.establishedRequirements,
       proposed.establishedRequirements.filter(hasValidEvidence),
+      24,
+    ),
+    assumptions: mergeByStatement(
+      previous.assumptions,
+      proposed.assumptions.filter(hasValidEvidence),
       24,
     ),
     decisions: mergeByStatement(previous.decisions, proposed.decisions.filter(hasValidEvidence), 24),

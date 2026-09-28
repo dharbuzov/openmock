@@ -100,7 +100,8 @@ Consider approach, correctness reasoning, complexity, edge cases, and the curren
 
 const SYSTEM_DESIGN_EVALUATOR_PROMPT = `Evaluate Requirements & Scope, Architecture, Data & State, Scalability,
 Reliability, Trade-offs, and Communication using qualitative levels only. Use the conversation and internal progress
-state to locate evidence, but never treat an internal state summary as stronger evidence than the candidate message it cites.
+state—including established requirements, assumptions, and decisions—to locate evidence, but never treat an internal state
+summary as stronger evidence than the candidate message it cites.
 Identify grounded strength, improvement, and trade-off moments. Only cite diagram evidence when a node, label, or connection
 in the normalized current architecture graph directly supports the observation. Do not create a numeric overall score.`;
 
