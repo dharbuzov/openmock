@@ -8,7 +8,7 @@ export default async function PracticePage() {
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-12">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold tracking-tight">Practice</h1>
-        <p className="text-sm text-muted-foreground">Choose a problem to open a demo interview.</p>
+        <p className="text-sm text-muted-foreground">Choose a problem to start an interview.</p>
       </div>
       <ul className="divide-y border-y">
         {problems.map((problem) => (
@@ -18,7 +18,7 @@ export default async function PracticePage() {
               <p className="font-mono text-xs text-muted-foreground">{problem.type} / {problem.level}</p>
               <p className="text-xs text-muted-foreground">{problem.tags.join(" · ")}</p>
             </div>
-            <Link href={`/interview/demo-${problem.id}`} aria-label={`Start ${problem.title}`} className={buttonVariants({ variant: "outline", size: "sm" })}>Start interview</Link>
+            <Link href={`/interview/${problem.id}`} aria-label={`Start ${problem.title}`} className={buttonVariants({ variant: "outline", size: "sm" })}>Start interview</Link>
           </li>
         ))}
       </ul>

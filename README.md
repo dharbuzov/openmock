@@ -71,24 +71,27 @@ npm install
 npm run dev
 ```
 
-## Application skeleton
+## Application architecture
 
-The current implementation is a routing and architecture demo. AI, voice,
-authentication, storage, scoring, and editable workspaces are not implemented.
+The current implementation supports browser-configured BYOK AI providers,
+interactive DSA and System Design workspaces, adaptive interview turns, and
+structured evidence-based evaluation. Voice, authentication, databases, and
+code execution are intentionally out of scope.
 
 - `problems/`: community-owned Markdown content with validated YAML frontmatter.
 - `src/app/`: server-rendered pages and the thin interview API route.
 - `src/components/`: interview panels, shared header, and shadcn UI primitives.
-- `src/lib/`: problem loading, the stateless dummy interview engine, and future AI/voice contracts.
+- `src/lib/interview/engine.ts`: application-level interview lifecycle orchestration.
+- `src/lib/ai/`: provider/model resolution, prompts, generation, and structured evaluation.
+- `src/lib/diagram/`: normalized architecture snapshots from the System Design canvas.
 
-Try `/` → `/practice` → `/interview/demo-two-sum` → `/results/demo-two-sum`.
-All problem links use deterministic `demo-<problem-id>` IDs. Reloading rebuilds
-the dummy object; completion only produces a results view and is not persisted.
-Unknown IDs return 404. Problem bodies are displayed as plain Markdown in this skeleton.
+Try `/` → `/practice` → `/interview/two-sum` → `/results/two-sum`.
+Interview IDs currently match problem IDs because persistent multi-session storage
+is not part of this version. Completed evaluations are retained in browser session
+storage and contain no provider credentials. Unknown IDs return 404.
 
 `POST /api/interview` accepts JSON such as `{"problemId":"two-sum"}` and returns
-a dummy interview with status 201. Invalid JSON or missing/invalid `problemId`
-returns 400; unknown problems return 404. The UI uses direct links to the same
-demo engine, so it does not need client-side session state.
+an initialized interview with status 201. Invalid JSON or missing/invalid
+`problemId` returns 400; unknown problems return 404.
 
-Run checks with `npm run lint` and `npm run build` (includes TypeScript checking).
+Run checks with `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`.

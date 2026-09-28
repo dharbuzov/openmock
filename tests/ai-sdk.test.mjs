@@ -586,8 +586,8 @@ test("serialized evaluation state contains feedback but never provider credentia
       tradeoffs: { score: 2, summary: "Missing.", evidence: [{ source: "candidate-message", sourceIndex: 0, observation: "No alternatives compared." }] },
     },
   };
-  saveEvaluation("demo-two-sum", evaluation);
-  const serialized = readEvaluationValue("demo-two-sum");
+  saveEvaluation("two-sum", evaluation);
+  const serialized = readEvaluationValue("two-sum");
   assert.deepEqual(parseEvaluation(serialized), evaluation);
   assert.ok(!serialized.includes("apiKey"));
   delete globalThis.sessionStorage;

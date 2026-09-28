@@ -2,6 +2,7 @@ import { generateText, Output, type LanguageModel } from "ai";
 import type { AISettings } from "../settings/types";
 import type { Problem } from "../problems/types";
 import type { ArchitectureDiagram } from "../diagram/types";
+import type { InterviewMessage } from "../interview/types";
 import {
   createInitialSystemDesignState,
   mergeSystemDesignState,
@@ -11,14 +12,9 @@ import {
 import { getLanguageModel, AIConfigurationError } from "./model";
 import { interviewerSystemPrompt, interviewContext } from "./prompts";
 
-export interface AIMessage {
-  role: "user" | "assistant";
-  content: string;
-}
-
 export interface AIRequest {
   problem: Pick<Problem, "title" | "type" | "content">;
-  messages: AIMessage[];
+  messages: InterviewMessage[];
   code?: { language: string; content: string };
   systemDesignState?: SystemDesignState;
   architectureDiagram?: ArchitectureDiagram;

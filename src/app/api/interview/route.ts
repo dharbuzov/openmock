@@ -1,4 +1,5 @@
-import { createInterview } from "@/lib/interview/engine";
+import { startInterview } from "@/lib/interview/engine";
+import { getProblem } from "@/lib/problems/loader";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -10,7 +11,7 @@ export async function POST(request: Request) {
   if (!body || typeof body !== "object" || !("problemId" in body) || typeof body.problemId !== "string" || !body.problemId.trim()) {
     return Response.json({ error: "problemId must be a non-empty string." }, { status: 400 });
   }
-  const interview = await createInterview(body.problemId);
-  if (!interview) return Response.json({ error: "Problem not found." }, { status: 404 });
-  return Response.json(interview, { status: 201 });
+  const problem = await getProblem(body.problemId);
+  if (!problem) return Response.json({ error: "Problem not found." }, { status: 404 });
+  return Response.json(startInterview(problem), { status: 201 });
 }

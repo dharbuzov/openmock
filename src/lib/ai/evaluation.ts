@@ -4,8 +4,8 @@ import type { AISettings } from "../settings/types";
 import type { Problem } from "../problems/types";
 import type { ArchitectureDiagram } from "../diagram/types";
 import type { SystemDesignState } from "../interview/system-design";
+import type { InterviewMessage } from "../interview/types";
 import { getLanguageModel, AIConfigurationError } from "./model";
-import type { AIMessage } from "./provider";
 
 const evidenceSchema = z.object({
   source: z.enum(["candidate-message", "code", "diagram"]),
@@ -75,7 +75,7 @@ export type InterviewEvaluation = z.infer<typeof interviewEvaluationSchema>;
 
 export interface EvaluationRequest {
   problem: Pick<Problem, "title" | "type" | "content">;
-  messages: AIMessage[];
+  messages: InterviewMessage[];
   code?: { language: string; content: string };
   systemDesignState?: SystemDesignState;
   architectureDiagram?: ArchitectureDiagram;

@@ -13,7 +13,7 @@ import { InterviewDiagramProvider } from "@/components/interview-diagram-context
 export function InterviewRoom({ interview }: { interview: Interview }) {
   return (
     <InterviewCodeProvider key={interview.id}>
-      <InterviewSessionProvider problem={interview.problem}>
+      <InterviewSessionProvider initialInterview={interview}>
         <InterviewDiagramProvider>
           <main data-interview-room className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background">
             <header className="flex h-[50px] shrink-0 items-center justify-between gap-4 border-b px-4">
@@ -24,13 +24,13 @@ export function InterviewRoom({ interview }: { interview: Interview }) {
               <div className="flex shrink-0 items-center gap-4">
                 <SettingsButton />
                 <span aria-label="Elapsed time: 24 minutes, 31 seconds, sample value" className="hidden font-mono text-xs tabular-nums sm:inline">24:31</span>
-                <FinishInterviewButton interviewId={interview.id} problem={interview.problem} />
+                <FinishInterviewButton />
               </div>
             </header>
             <InterviewPanes
               problem={<ProblemPanel problem={interview.problem} />}
               workspace={<Workspace key={interview.id} problem={interview.problem} />}
-              interviewer={<AIInterviewer problem={interview.problem} />}
+              interviewer={<AIInterviewer />}
             />
           </main>
         </InterviewDiagramProvider>

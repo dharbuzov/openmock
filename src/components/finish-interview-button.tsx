@@ -9,13 +9,13 @@ import { useInterviewDiagram } from "@/components/interview-diagram-context";
 import { useOpenSettings } from "@/components/settings-provider";
 import { readSettings } from "@/lib/settings/storage";
 import { isCloudSettings } from "@/lib/settings/types";
-import type { Problem } from "@/lib/problems/types";
 
-export function FinishInterviewButton({ interviewId, problem }: { interviewId: string; problem: Problem }) {
+export function FinishInterviewButton() {
   const router = useRouter();
   const openSettings = useOpenSettings();
   const code = useInterviewCode();
-  const { messages, systemDesignState } = useInterviewSession();
+  const { interview, setInterview } = useInterviewSession();
+  const { problem, messages } = interview;
   const { captureCurrentArchitecture } = useInterviewDiagram();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -41,20 +41,13 @@ export function FinishInterviewButton({ interviewId, problem }: { interviewId: s
     setPending(true);
     setError("");
     try {
-      const [{ evaluateInterview }, { saveEvaluation }] = await Promise.all([
-        import("@/lib/ai/evaluation"),
-        import("@/lib/interview/evaluation-storage"),
-      ]);
-      const codeSnapshot = problem.type === "dsa" && code.current ? { ...code.current } : undefined;
-      const evaluation = await evaluateInterview(settings, {
-        problem,
-        messages,
-        code: codeSnapshot,
-        systemDesignState: systemDesignState ?? undefined,
-        architectureDiagram: problem.type === "system-design" ? captureCurrentArchitecture() : undefined,
-      }, request.signal);
-      saveEvaluation(interviewId, evaluation);
-      router.push(`/results/${interviewId}`);
+      const { finishInterview } = await import("@/lib/interview/engine");
+      const workspaceSnapshot = problem.type === "system-design"
+        ? { kind: "system-design" as const, architectureDiagram: captureCurrentArchitecture() }
+        : { kind: "dsa" as const, code: code.current ? { ...code.current } : undefined };
+      const finished = await finishInterview(settings, interview, workspaceSnapshot, request.signal);
+      setInterview(finished.interview);
+      router.push(`/results/${finished.interview.id}`);
     } catch {
       if (!request.signal.aborted) setError("Evaluation failed. Check your AI settings and try again.");
     } finally {
