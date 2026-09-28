@@ -128,3 +128,31 @@
     @apply font-sans;
   }
 }
+
+/* The interview room replaces the site header with its own topbar. */
+body:has([data-interview-room]) > header {
+  display: none;
+}
+
+/* Keep Excalidraw's native controls; theme them through its CSS variables. */
+.system-design-canvas .excalidraw {
+  --ui-font: var(--font-geist-sans), sans-serif;
+  --color-primary: #333333;
+  --color-primary-darker: #222222;
+  --color-primary-darkest: #111111;
+  --color-primary-light: #eeeeee;
+  --color-primary-light-darker: #e5e5e5;
+  --color-primary-hover: #444444;
+  --color-brand-hover: #444444;
+  --color-brand-active: #222222;
+  --color-selection: #444444;
+  --color-on-primary-container: #222222;
+  --color-surface-primary-container: #e5e5e5;
+  --color-surface-high: #f0f0f0;
+  --color-surface-mid: #f7f7f7;
+  --color-surface-low: #f5f5f5;
+  --color-slider-track: #dddddd;
+  --shadow-island: 0 0 0 1px #eaeaea;
+  --border-radius-lg: 4px;
+  --border-radius-md: 4px;
+}

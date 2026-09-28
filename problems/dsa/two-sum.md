@@ -6,6 +6,14 @@ tags:
 - hash-map
 title: Two Sum
 type: dsa
+language: java
+starterCode: |
+  class Solution {
+      public int[] twoSum(int[] nums, int target) {
+          // Write your solution here.
+          throw new UnsupportedOperationException("Not implemented");
+      }
+  }
 ---
 
 # Two Sum

@@ -1,27 +1,29 @@
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { ProblemPanel } from "@/components/problem-panel";
-import { Whiteboard } from "@/components/whiteboard";
+import { Workspace } from "@/components/workspace/workspace";
 import { AIInterviewer } from "@/components/ai-interviewer";
+import { InterviewPanes } from "@/components/interview-panes";
 import type { Interview } from "@/lib/interview/types";
 
 export function InterviewRoom({ interview }: { interview: Interview }) {
-  const minutes = String(Math.floor(interview.elapsedSeconds / 60)).padStart(2, "0");
-  const seconds = String(interview.elapsedSeconds % 60).padStart(2, "0");
   return (
-    <main className="flex flex-1 flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b px-6 py-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-medium tracking-tight">{interview.problem.title}</h1>
-          <p className="font-mono text-xs text-muted-foreground">{interview.id} · {interview.status} · {interview.currentStage} · {minutes}:{seconds} (demo)</p>
+    <main data-interview-room className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background">
+      <header className="flex h-[50px] shrink-0 items-center justify-between gap-4 border-b px-4">
+        <div className="flex min-w-0 items-center gap-4">
+          <Link href="/" className="shrink-0 text-sm font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-4">OpenMock</Link>
+          <h1 className="truncate border-l pl-4 text-sm font-medium" title={interview.problem.title}>{interview.problem.title}</h1>
         </div>
-        <Link href={`/results/${interview.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>Finish demo interview</Link>
-      </div>
-      <div className="grid flex-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,5fr)_minmax(0,3fr)]">
-        <ProblemPanel problem={interview.problem} />
-        <Whiteboard />
-        <AIInterviewer messages={interview.messages} />
-      </div>
+        <div className="flex shrink-0 items-center gap-4">
+          <span aria-label="Elapsed time: 24 minutes, 31 seconds, sample value" className="hidden font-mono text-xs tabular-nums sm:inline">24:31</span>
+          <Link href={`/results/${interview.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>Finish</Link>
+        </div>
+      </header>
+      <InterviewPanes
+        problem={<ProblemPanel problem={interview.problem} />}
+        workspace={<Workspace key={interview.id} problem={interview.problem} />}
+        interviewer={<AIInterviewer problemType={interview.problem.type} />}
+      />
     </main>
   );
 }

@@ -20,5 +20,12 @@ export function parseProblemMetadata(value: unknown): ProblemMetadata {
   if (!Array.isArray(tags) || !tags.every((tag) => typeof tag === "string" && tag.trim())) {
     throw new Error("tags must be an array of non-empty strings.");
   }
-  return { id, title: title.trim(), type, level: level.trim(), tags };
+  const { language, starterCode } = value as Record<string, unknown>;
+  if (type === "dsa" && (language !== "java" || typeof starterCode !== "string" || !starterCode.trim())) {
+    throw new Error("DSA problems require language: java and non-empty starterCode.");
+  }
+  return {
+    id, title: title.trim(), type, level: level.trim(), tags,
+    ...(type === "dsa" ? { language: "java" as const, starterCode: starterCode as string } : {}),
+  };
 }

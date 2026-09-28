@@ -6,6 +6,8 @@ export interface ProblemMetadata {
   type: ProblemType;
   level: string;
   tags: string[];
+  language?: "java";
+  starterCode?: string;
 }
 
 export interface Problem extends ProblemMetadata {

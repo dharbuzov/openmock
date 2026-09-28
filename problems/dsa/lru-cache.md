@@ -3,6 +3,21 @@ id: lru-cache
 title: LRU Cache
 type: dsa
 level: medium
+language: java
+starterCode: |
+  class LRUCache {
+      public LRUCache(int capacity) {
+          // Initialize your cache here.
+      }
+
+      public int get(int key) {
+          throw new UnsupportedOperationException("Not implemented");
+      }
+
+      public void put(int key, int value) {
+          // Update your cache here.
+      }
+  }
 tags:
   - hash-map
   - linked-list
