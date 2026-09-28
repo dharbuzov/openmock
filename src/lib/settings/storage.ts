@@ -98,6 +98,14 @@ export function saveSettings(settings: AISettings): void {
   const preferences = readPreferences();
   preferences.provider = settings.provider;
 
+  if (settings.provider !== "openai") {
+    const rememberOpenAIKey = preferences.openai?.rememberApiKey === true;
+    const legacyStorage = rememberOpenAIKey ? window.localStorage : window.sessionStorage;
+    const legacyKey = legacyStorage.getItem(legacyApiKeyStorageKey);
+    const migratedKey = apiKeyStorageKey("openai");
+    if (legacyKey && !legacyStorage.getItem(migratedKey)) legacyStorage.setItem(migratedKey, legacyKey);
+  }
+
   if (settings.provider === "ollama") {
     preferences.ollama = { baseUrl: settings.baseUrl.trim(), model: settings.model };
   } else {

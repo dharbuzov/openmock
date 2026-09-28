@@ -1,7 +1,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOllama } from "ollama-ai-provider-v2";
-import type { LanguageModel } from "ai";
+import { defaultSettingsMiddleware, wrapLanguageModel, type LanguageModel } from "ai";
 import type { AISettings } from "../settings/types";
 import { normalizeOllamaBaseUrl } from "./ollama";
 
@@ -18,7 +18,12 @@ export function getLanguageModel(settings: AISettings): LanguageModel {
   switch (settings.provider) {
     case "openai": {
       if (!settings.apiKey.trim()) throw new AIConfigurationError("Enter an OpenAI API key before continuing.");
-      return createOpenAI({ apiKey: settings.apiKey.trim() })(settings.model);
+      return wrapLanguageModel({
+        model: createOpenAI({ apiKey: settings.apiKey.trim() })(settings.model),
+        middleware: defaultSettingsMiddleware({
+          settings: { providerOptions: { openai: { store: false } } },
+        }),
+      });
     }
     case "anthropic": {
       if (!settings.apiKey.trim()) throw new AIConfigurationError("Enter an Anthropic API key before continuing.");

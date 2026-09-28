@@ -32,6 +32,15 @@ const {
   generateInterviewResponseWithModel,
 } = load("../src/lib/ai/provider.ts");
 const { listOllamaModels } = load("../src/lib/ai/ollama.ts");
+const {
+  EvaluationError,
+  evaluateInterviewWithModel,
+} = load("../src/lib/ai/evaluation.ts");
+const {
+  parseEvaluation,
+  readEvaluationValue,
+  saveEvaluation,
+} = load("../src/lib/interview/evaluation-storage.ts");
 
 function storage() {
   const entries = new Map();
@@ -181,4 +190,76 @@ test("Ollama model discovery uses the browser-configured URL and handles failure
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("finish evaluation uses validated structured output and supplied evidence", async () => {
+  const structured = {
+    overallScore: 99,
+    hiringSignal: "yes",
+    summary: "The candidate gave a sound approach with clear reasoning.",
+    strengths: ["Connected the hash map to lookup complexity."],
+    improvements: ["Discuss duplicate-value edge cases explicitly."],
+    insufficientEvidence: ["The conversation did not cover testing."],
+    categories: {
+      problemSolving: { score: 4, summary: "Sound approach.", evidence: [{ source: "candidate-message", sourceIndex: 0, observation: "Candidate proposed a hash map." }] },
+      communication: { score: 3, summary: "Mostly clear.", evidence: [{ source: "candidate-message", sourceIndex: 0, observation: "Candidate explained the lookup goal." }] },
+      technicalDepth: { score: 4, summary: "Good complexity reasoning.", evidence: [{ source: "code", sourceIndex: 0, observation: "The code creates a Map." }] },
+      tradeoffs: { score: 2, summary: "Limited trade-off discussion.", evidence: [{ source: "candidate-message", sourceIndex: 0, observation: "No alternative approach was compared." }] },
+    },
+  };
+  const model = new MockLanguageModelV3({
+    provider: "test",
+    modelId: "evaluation-model",
+    doGenerate: mockResult(JSON.stringify(structured)),
+  });
+  const code = { language: "TypeScript", content: "const seen = new Map<number, number>();" };
+  const evaluation = await evaluateInterviewWithModel(model, {
+    problem: { title: "Two Sum", type: "dsa", content: "Return two matching indices." },
+    messages: [{ role: "user", content: "I use a hash map for constant-time lookup." }],
+    code,
+  });
+
+  assert.equal(evaluation.overallScore, 65);
+  assert.equal(evaluation.hiringSignal, "yes");
+  const call = model.doGenerateCalls[0];
+  const prompt = JSON.stringify(call.prompt);
+  assert.match(prompt, /constant-time lookup/);
+  assert.match(prompt, /new Map/);
+  assert.equal(call.responseFormat.type, "json");
+  assert.ok(call.responseFormat.schema);
+});
+
+test("invalid evaluation output fails safely", async () => {
+  const secret = "provider-secret-details";
+  const model = new MockLanguageModelV3({ doGenerate: mockResult(JSON.stringify({ error: secret })) });
+  await assert.rejects(
+    evaluateInterviewWithModel(model, {
+      problem: { title: "Two Sum", type: "dsa", content: "Problem" },
+      messages: [{ role: "user", content: "Answer" }],
+    }),
+    (error) => error instanceof EvaluationError && !error.message.includes(secret),
+  );
+});
+
+test("serialized evaluation state contains feedback but never provider credentials", () => {
+  globalThis.sessionStorage = storage();
+  const evaluation = {
+    overallScore: 50,
+    hiringSignal: "mixed",
+    summary: "Limited evidence.",
+    strengths: ["Attempted a solution."],
+    improvements: ["Explain complexity."],
+    insufficientEvidence: ["No edge-case discussion."],
+    categories: {
+      problemSolving: { score: 3, summary: "Some progress.", evidence: [{ source: "candidate-message", sourceIndex: 0, observation: "Proposed an approach." }] },
+      communication: { score: 3, summary: "Understandable.", evidence: [{ source: "candidate-message", sourceIndex: 0, observation: "Explained one step." }] },
+      technicalDepth: { score: 2, summary: "Shallow.", evidence: [{ source: "candidate-message", sourceIndex: 0, observation: "No complexity analysis." }] },
+      tradeoffs: { score: 2, summary: "Missing.", evidence: [{ source: "candidate-message", sourceIndex: 0, observation: "No alternatives compared." }] },
+    },
+  };
+  saveEvaluation("demo-two-sum", evaluation);
+  const serialized = readEvaluationValue("demo-two-sum");
+  assert.deepEqual(parseEvaluation(serialized), evaluation);
+  assert.ok(!serialized.includes("apiKey"));
+  delete globalThis.sessionStorage;
 });

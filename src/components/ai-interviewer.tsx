@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useOpenSettings } from "@/components/settings-provider";
 import { useInterviewCode } from "@/components/interview-code-context";
+import { useInterviewSession } from "@/components/interview-session-context";
 import { readSettings } from "@/lib/settings/storage";
 import { isCloudSettings } from "@/lib/settings/types";
 import type { Problem } from "@/lib/problems/types";
 import type { AIMessage } from "@/lib/ai/provider";
 
 export function AIInterviewer({ problem }: { problem: Problem }) {
-  const [messages, setMessages] = useState<AIMessage[]>([]);
+  const { messages, setMessages } = useInterviewSession();
   const [answer, setAnswer] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");

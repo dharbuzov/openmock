@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { buttonVariants } from "@/components/ui/button";
 import { ProblemPanel } from "@/components/problem-panel";
 import { Workspace } from "@/components/workspace/workspace";
 import { AIInterviewer } from "@/components/ai-interviewer";
@@ -7,9 +6,13 @@ import { InterviewPanes } from "@/components/interview-panes";
 import type { Interview } from "@/lib/interview/types";
 import { SettingsButton } from "@/components/settings-provider";
 import { InterviewCodeProvider } from "@/components/interview-code-context";
+import { InterviewSessionProvider } from "@/components/interview-session-context";
+import { FinishInterviewButton } from "@/components/finish-interview-button";
 
 export function InterviewRoom({ interview }: { interview: Interview }) {
   return (
+    <InterviewCodeProvider key={interview.id}>
+      <InterviewSessionProvider>
     <main data-interview-room className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background">
       <header className="flex h-[50px] shrink-0 items-center justify-between gap-4 border-b px-4">
         <div className="flex min-w-0 items-center gap-4">
@@ -19,14 +22,16 @@ export function InterviewRoom({ interview }: { interview: Interview }) {
         <div className="flex shrink-0 items-center gap-4">
           <SettingsButton />
           <span aria-label="Elapsed time: 24 minutes, 31 seconds, sample value" className="hidden font-mono text-xs tabular-nums sm:inline">24:31</span>
-          <Link href={`/results/${interview.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>Finish</Link>
+          <FinishInterviewButton interviewId={interview.id} problem={interview.problem} />
         </div>
       </header>
-      <InterviewCodeProvider key={interview.id}><InterviewPanes
+      <InterviewPanes
         problem={<ProblemPanel problem={interview.problem} />}
         workspace={<Workspace key={interview.id} problem={interview.problem} />}
         interviewer={<AIInterviewer problem={interview.problem} />}
-      /></InterviewCodeProvider>
+      />
     </main>
+      </InterviewSessionProvider>
+    </InterviewCodeProvider>
   );
 }
