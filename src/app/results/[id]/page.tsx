@@ -1,17 +1,13 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { buttonVariants } from "@/components/ui/button";
 import { InterviewResults } from "@/components/interview-results";
-import { getProblem } from "@/lib/problems/loader";
 
 export default async function ResultsPage({ params }: PageProps<"/results/[id]">) {
   const { id } = await params;
-  const problem = await getProblem(id);
-  if (!problem) notFound();
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-12">
       <h1 className="text-3xl font-semibold tracking-tight">Interview results</h1>
-      <p className="text-sm text-muted-foreground">Evidence-based feedback for {problem.title}, generated with your selected AI provider.</p>
+      <p className="text-sm text-muted-foreground">Evidence-based feedback generated with your selected AI provider.</p>
       <dl className="grid grid-cols-[auto_1fr] gap-x-8 gap-y-4 border-y py-6 text-sm">
         <dt className="text-muted-foreground">Interview</dt><dd className="break-all font-mono">{id}</dd>
         <dt className="text-muted-foreground">Status</dt><dd>completed</dd>
@@ -19,7 +15,6 @@ export default async function ResultsPage({ params }: PageProps<"/results/[id]">
       <InterviewResults interviewId={id} />
       <div className="flex flex-wrap gap-3">
         <Link href="/practice" className={buttonVariants()}>Choose another problem</Link>
-        <Link href={`/interview/${id}`} className={buttonVariants({ variant: "outline" })}>Start again</Link>
       </div>
     </main>
   );

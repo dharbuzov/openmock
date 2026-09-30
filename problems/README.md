@@ -11,8 +11,8 @@ Add frontmatter:
 ---
 id: message-broker
 title: Design a Message Broker
-type: system-design
-level: senior
+interview: system-design
+complexity: medium
 tags:
 - distributed-systems
 ---
@@ -22,8 +22,10 @@ Then write the problem using Markdown and open a pull request.
 
 The application recursively discovers `.md` files here, excluding `README.md`.
 Each file must have a unique lowercase, hyphen-separated `id`, a non-empty
-`title` and `level`, a `type` of `dsa` or `system-design`, a string array of
-`tags`, and a non-empty Markdown body. Invalid content reports its file path.
+`title`, an interview definition id, a `complexity` of `low`, `medium`, or
+`high`, and a non-empty Markdown body. `categories`, `topics`, `companies`,
+and `tags` are optional and default to empty arrays. Invalid content reports
+its file path. Legacy `type`/`level` frontmatter remains readable during migration.
 The Markdown files are the only problem catalog; no TypeScript registration is needed.
 
 DSA problems also require `language: java` and a `starterCode: |` YAML block

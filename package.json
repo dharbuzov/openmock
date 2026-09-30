@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node tests/ai-sdk.test.mjs && node tests/interview-engine.test.mjs"
+    "test": "node tests/all.test.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.125",

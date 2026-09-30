@@ -10,11 +10,11 @@ import { useInterviewSession } from "@/components/interview-session-context";
 import { useInterviewDiagram } from "@/components/interview-diagram-context";
 import { readSettings } from "@/lib/settings/storage";
 import { isCloudSettings } from "@/lib/settings/types";
-import type { InterviewWorkspaceSnapshot } from "@/lib/interview/types";
+import type { WorkspaceSnapshot } from "@/lib/interview/types";
 
 export function AIInterviewer() {
-  const { interview, setInterview } = useInterviewSession();
-  const { problem, messages } = interview;
+  const { interview, setInterview, problem, definition } = useInterviewSession();
+  const { messages } = interview;
   const { captureCurrentArchitecture } = useInterviewDiagram();
   const [answer, setAnswer] = useState("");
   const [pending, setPending] = useState(false);
@@ -22,7 +22,7 @@ export function AIInterviewer() {
   const controller = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const code = useInterviewCode();
-  const lastWorkspaceSnapshot = useRef<InterviewWorkspaceSnapshot | null>(null);
+  const lastWorkspaceSnapshot = useRef<WorkspaceSnapshot | null>(null);
   const openSettings = useOpenSettings();
   useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => { end.current?.scrollIntoView({ block: "nearest" }); }, [messages, pending, error]);
@@ -36,17 +36,20 @@ export function AIInterviewer() {
     const { acceptCandidateMessage, processCandidateMessage } = await import("@/lib/interview/engine");
     const next = retry ? interview : acceptCandidateMessage(interview, answer);
     if (!retry) {
-      lastWorkspaceSnapshot.current = problem.type === "system-design"
-        ? { kind: "system-design", architectureDiagram: captureCurrentArchitecture() }
-        : { kind: "dsa", code: code.current ? { ...code.current } : undefined };
+      switch (definition.workspace) {
+        case "diagram": lastWorkspaceSnapshot.current = { type: "diagram", diagram: captureCurrentArchitecture() }; break;
+        case "code": lastWorkspaceSnapshot.current = { type: "code", ...(code.current ?? { language: "text", filename: "solution.txt", code: "" }) }; break;
+        case "project": lastWorkspaceSnapshot.current = { type: "project", files: [] }; break;
+        case "none": lastWorkspaceSnapshot.current = { type: "none" }; break;
+      }
     }
-    const workspaceSnapshot = lastWorkspaceSnapshot.current ?? interview.workspaceSnapshot;
+    const workspaceSnapshot = lastWorkspaceSnapshot.current ?? undefined;
     setInterview(next);
     if (!retry) setAnswer("");
     setError("");
     setPending(true);
     try {
-      const result = await processCandidateMessage(settings, next, workspaceSnapshot, request.signal);
+      const result = await processCandidateMessage(settings, next, problem, definition, workspaceSnapshot, request.signal);
       if (!request.signal.aborted) {
         setInterview(result);
       }
@@ -65,13 +68,13 @@ export function AIInterviewer() {
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
         {messages.length === 0 && <div className="flex flex-col gap-3">
-          <p className="text-sm leading-6 text-muted-foreground">{problem.type === "dsa" ? "Walk me through your initial approach, or introduce yourself to begin the interview." : "Tell me which requirements you would clarify first, or introduce yourself to begin the interview."}</p>
+          <p className="text-sm leading-6 text-muted-foreground">Begin by walking me through your initial approach, or introduce yourself.</p>
           <Button variant="outline" size="sm" onClick={openSettings}>Configure AI provider</Button>
         </div>}
         <ol aria-label="Interview conversation" aria-live="polite" className="flex flex-col gap-7">
-          {messages.map((message, index) => (
-            <li key={index} className={message.role === "user" ? "border-l-2 pl-3" : undefined}>
-              <p className="mb-2 text-xs font-medium">{message.role === "user" ? "You" : "AI Interviewer"}</p>
+          {messages.map((message) => (
+            <li key={message.id} className={message.role === "candidate" ? "border-l-2 pl-3" : undefined}>
+              <p className="mb-2 text-xs font-medium">{message.role === "candidate" ? "You" : "AI Interviewer"}</p>
               <p className="whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{message.content}</p>
             </li>
           ))}

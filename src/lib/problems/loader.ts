@@ -2,8 +2,7 @@ import "server-only";
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import { load, JSON_SCHEMA } from "js-yaml";
-import { parseProblemMetadata } from "./schema";
+import { parseProblemDocument } from "./schema";
 import type { Problem } from "./types";
 
 async function discoverFiles(directory: string): Promise<string[]> {
@@ -20,12 +19,7 @@ async function discoverFiles(directory: string): Promise<string[]> {
 
 async function loadProblem(filename: string): Promise<Problem> {
   try {
-    const source = (await readFile(filename, "utf8")).replace(/^\uFEFF/, "");
-    const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/.exec(source);
-    if (!match) throw new Error("Missing YAML frontmatter.");
-    const metadata = parseProblemMetadata(load(match[1], { schema: JSON_SCHEMA }));
-    if (!match[2].trim()) throw new Error("Problem body must not be empty.");
-    return { ...metadata, content: match[2].trim() };
+    return parseProblemDocument(await readFile(filename, "utf8"));
   } catch (error) {
     throw new Error(`Invalid problem ${path.relative(process.cwd(), filename)}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
   }

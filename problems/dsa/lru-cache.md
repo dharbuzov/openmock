@@ -1,8 +1,8 @@
 ---
 id: lru-cache
 title: LRU Cache
-type: dsa
-level: medium
+interview: dsa
+complexity: medium
 language: java
 starterCode: |
   class LRUCache {

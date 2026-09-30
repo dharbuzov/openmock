@@ -1,27 +1,22 @@
-import { interviewEvaluationSchema, type InterviewEvaluation } from "../ai/evaluation";
+import { interviewResultSchema } from "../ai/evaluation";
+import type { InterviewResult } from "./types";
 
 function storageKey(interviewId: string): string {
-  return `openmock:interview-evaluation:v2:${interviewId}`;
+  return `openmock:interview-result:v3:${interviewId}`;
 }
 
-export function saveEvaluation(interviewId: string, evaluation: InterviewEvaluation): void {
-  sessionStorage.setItem(storageKey(interviewId), JSON.stringify(evaluation));
+export function saveEvaluation(evaluation: InterviewResult): void {
+  sessionStorage.setItem(storageKey(evaluation.interviewId), JSON.stringify(evaluation));
 }
 
 export function readEvaluationValue(interviewId: string): string | null {
-  try {
-    return sessionStorage.getItem(storageKey(interviewId));
-  } catch {
-    return null;
-  }
+  try { return sessionStorage.getItem(storageKey(interviewId)); } catch { return null; }
 }
 
-export function parseEvaluation(value: string | null): InterviewEvaluation | null {
+export function parseEvaluation(value: string | null): InterviewResult | null {
   if (!value) return null;
   try {
-    const parsed = interviewEvaluationSchema.safeParse(JSON.parse(value));
+    const parsed = interviewResultSchema.safeParse(JSON.parse(value));
     return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }

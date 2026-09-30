@@ -1,12 +1,12 @@
 export type DiagramNode = {
   id: string;
-  type: "rectangle" | "ellipse" | "diamond" | "frame";
+  type: string;
   label?: string;
 };
 
 export type DiagramEdge = {
   id: string;
-  type: "arrow" | "line";
+  type: string;
   from?: string;
   to?: string;
   label?: string;

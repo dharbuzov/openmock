@@ -1,0 +1,8 @@
+import "../src/lib/problems/schema.test.mjs";
+import "../src/lib/diagram/normalize-excalidraw.test.mjs";
+import "../src/lib/interview/engine.test.mjs";
+import "../src/lib/interview/engine-validation.test.mjs";
+import "../src/lib/interview/engine-finish.test.mjs";
+import "../src/lib/interview/evaluation-storage.test.mjs";
+import "./ai-sdk.test.mjs";
+import "../src/components/finish-interview-button.test.mjs";

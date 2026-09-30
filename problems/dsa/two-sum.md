@@ -1,11 +1,11 @@
 ---
 id: two-sum
-level: easy
+complexity: low
 tags:
 - array
 - hash-map
 title: Two Sum
-type: dsa
+interview: dsa
 language: java
 starterCode: |
   class Solution {

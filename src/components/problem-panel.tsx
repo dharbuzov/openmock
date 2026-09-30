@@ -54,7 +54,7 @@ export function ProblemPanel({ problem }: { problem: Problem }) {
     <section aria-labelledby="problem-heading" className="flex h-full min-h-0 flex-col">
       <div className="flex h-11 shrink-0 items-center justify-between border-b px-4">
         <h2 id="problem-heading" className="text-xs font-medium">Problem</h2>
-        <span className="font-mono text-xs text-muted-foreground">{problem.level}</span>
+        <span className="font-mono text-xs text-muted-foreground">{problem.complexity}</span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
         <MarkdownContent content={problem.content} />

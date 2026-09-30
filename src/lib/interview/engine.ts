@@ -1,151 +1,102 @@
-import type {
-  EvaluationRequest,
-  InterviewEvaluation,
-} from "../ai/evaluation";
-import type {
-  AIRequest,
-  InterviewTurnResult,
-} from "../ai/provider";
 import type { Problem } from "../problems/types";
 import type { AISettings } from "../settings/types";
-import {
-  createInitialSystemDesignState,
-  systemDesignOpening,
-} from "./system-design";
-import type {
-  Interview,
-  InterviewWorkspaceSnapshot,
-} from "./types";
+import { requireInterviewDefinition } from "./definitions";
+import type { Interview, InterviewContext, InterviewDefinition, InterviewLevelId, InterviewMode, InterviewResult, InterviewTurn, WorkspaceSnapshot, WorkspaceType } from "./types";
 
-function initialWorkspace(problem: Problem): InterviewWorkspaceSnapshot {
-  return problem.type === "system-design"
-    ? { kind: "system-design", architectureDiagram: { nodes: [], edges: [] } }
-    : { kind: "dsa" };
-}
+const newId = () => crypto.randomUUID();
+const now = () => new Date().toISOString();
 
-function currentWorkspace(
-  interview: Interview,
-  snapshot?: InterviewWorkspaceSnapshot,
-): InterviewWorkspaceSnapshot {
-  if (!snapshot) return interview.workspaceSnapshot;
-  if (snapshot.kind !== interview.problem.type) {
-    throw new Error("The workspace snapshot does not match the interview type.");
+function assertDefinition(interview: Interview, definition: InterviewDefinition): void {
+  if (interview.definition.id !== definition.id || interview.definition.version !== definition.version || interview.definition.revision !== definition.revision) {
+    throw new Error("The interview definition does not match the started interview.");
   }
-  return snapshot;
 }
 
-export function startInterview(problem: Problem): Interview {
-  const isSystemDesign = problem.type === "system-design";
+function currentWorkspace(definition: InterviewDefinition, snapshot?: WorkspaceSnapshot): WorkspaceSnapshot {
+  const workspace = snapshot ?? emptyWorkspaceSnapshot(definition.workspace);
+  if (workspace.type !== definition.workspace) throw new Error("The workspace snapshot does not match the interview definition.");
+  return workspace;
+}
+
+export function emptyWorkspaceSnapshot(type: WorkspaceType): WorkspaceSnapshot {
+  switch (type) {
+    case "diagram": return { type, diagram: { nodes: [], edges: [] } };
+    case "code": return { type, language: "text", filename: "solution.txt", code: "" };
+    case "project": return { type, files: [] };
+    case "none": return { type };
+  }
+}
+
+export function startInterview(problem: Problem, options: {
+  definition?: InterviewDefinition; targetLevel: InterviewLevelId; mode: InterviewMode;
+}): Interview {
+  const definition = options.definition ?? requireInterviewDefinition(problem.interview);
+  if (problem.interview !== definition.id) throw new Error("The problem does not match the interview definition.");
+  const { targetLevel, mode } = options;
+  const firstStage = definition.stages[0]?.id;
+  if (!firstStage) throw new Error("Interview definitions require at least one stage.");
+  if (!definition.levels.some(({ id }) => id === targetLevel)) throw new Error("Unsupported target level.");
+  if (!definition.modes.includes(mode)) throw new Error("Unsupported interview mode.");
+  const startedAt = now();
   return {
-    id: problem.id,
-    problem,
-    status: "in-progress",
-    messages: isSystemDesign
-      ? [{ role: "assistant", content: systemDesignOpening(problem) }]
-      : [],
-    systemDesignState: isSystemDesign ? createInitialSystemDesignState() : null,
-    workspaceSnapshot: initialWorkspace(problem),
+    id: newId(), problemId: problem.id,
+    definition: { id: definition.id, version: definition.version, revision: definition.revision },
+    targetLevel, mode, status: "in-progress",
+    stage: { current: firstStage, completed: [], startedAt },
+    messages: [], observations: [], startedAt,
   };
 }
 
 export function acceptCandidateMessage(interview: Interview, content: string): Interview {
   const message = content.trim();
   if (interview.status !== "in-progress" || !message) return interview;
+  return { ...interview, messages: [...interview.messages, {
+    id: newId(), role: "candidate", content: message, stage: interview.stage.current, createdAt: now(),
+  }] };
+}
+
+export function buildInterviewContext(interview: Interview, problem: Problem, definition: InterviewDefinition, snapshot?: WorkspaceSnapshot): InterviewContext {
+  assertDefinition(interview, definition);
+  if (interview.problemId !== problem.id || problem.interview !== definition.id) throw new Error("The problem does not match the interview definition.");
+  return { interview, problem, definition, workspace: currentWorkspace(definition, snapshot) };
+}
+
+export function applyInterviewTurn(interview: Interview, definition: InterviewDefinition, turn: InterviewTurn): Interview {
+  assertDefinition(interview, definition);
+  const currentStage = interview.stage.current;
+  const stageIndex = definition.stages.findIndex(({ id }) => id === currentStage);
+  if (stageIndex < 0) throw new Error(`Unknown current stage: ${currentStage}`);
+  const createdAt = now();
+  const validCompetencies = new Set(definition.evaluation.competencies.map(({ id }) => id));
+  const observations = turn.observations.map((observation) => {
+    if (observation.competencyId && !validCompetencies.has(observation.competencyId)) {
+      throw new Error(`Unknown competency: ${observation.competencyId}`);
+    }
+    return { ...observation, id: observation.id || newId(), stage: currentStage };
+  });
+  const completed = turn.stageComplete ? [...new Set([...interview.stage.completed, currentStage])] : interview.stage.completed;
+  const nextStage = turn.stageComplete ? definition.stages[stageIndex + 1]?.id ?? currentStage : currentStage;
   return {
     ...interview,
-    messages: [...interview.messages, { role: "user", content: message }],
+    messages: [...interview.messages, { id: newId(), role: "interviewer", content: turn.message.trim(), stage: currentStage, createdAt }],
+    observations: [...interview.observations, ...observations],
+    stage: { current: nextStage, completed, startedAt: nextStage === interview.stage.current ? interview.stage.startedAt : createdAt },
   };
 }
 
-export function buildInterviewContext(
-  interview: Interview,
-  snapshot?: InterviewWorkspaceSnapshot,
-): AIRequest {
-  const workspace = currentWorkspace(interview, snapshot);
-  return {
-    problem: interview.problem,
-    messages: interview.messages,
-    ...(workspace.kind === "dsa" && workspace.code ? { code: workspace.code } : {}),
-    ...(workspace.kind === "system-design" ? {
-      systemDesignState: interview.systemDesignState ?? undefined,
-      architectureDiagram: workspace.architectureDiagram,
-    } : {}),
-  };
-}
-
-function applyInterviewTurn(
-  interview: Interview,
-  workspaceSnapshot: InterviewWorkspaceSnapshot,
-  result: InterviewTurnResult,
-): Interview {
-  return {
-    ...interview,
-    messages: [...interview.messages, { role: "assistant", content: result.content }],
-    systemDesignState: result.systemDesignState ?? interview.systemDesignState,
-    workspaceSnapshot,
-  };
-}
-
-export async function processCandidateMessage(
-  settings: AISettings,
-  interview: Interview,
-  snapshot?: InterviewWorkspaceSnapshot,
-  signal?: AbortSignal,
-): Promise<Interview> {
-  if (interview.status !== "in-progress" || interview.messages.at(-1)?.role !== "user") {
-    return interview;
-  }
+export async function processCandidateMessage(settings: AISettings, interview: Interview, problem: Problem, definition: InterviewDefinition, snapshot?: WorkspaceSnapshot, signal?: AbortSignal): Promise<Interview> {
+  if (interview.status !== "in-progress" || interview.messages.at(-1)?.role !== "candidate") return interview;
   const { generateInterviewResponse } = await import("../ai/provider");
-  const workspaceSnapshot = currentWorkspace(interview, snapshot);
-  const result = await generateInterviewResponse(
-    settings,
-    buildInterviewContext(interview, workspaceSnapshot),
-    signal,
-  );
-  return applyInterviewTurn(interview, workspaceSnapshot, result);
+  const turn = await generateInterviewResponse(settings, buildInterviewContext(interview, problem, definition, snapshot), signal);
+  return applyInterviewTurn(interview, definition, turn);
 }
 
-export function buildEvaluationContext(
-  interview: Interview,
-  snapshot?: InterviewWorkspaceSnapshot,
-): EvaluationRequest {
-  return buildInterviewContext(interview, snapshot);
-}
+export interface FinishedInterview { interview: Interview; evaluation: InterviewResult }
 
-export interface FinishedInterview {
-  interview: Interview;
-  evaluation: InterviewEvaluation;
-}
-
-function completedInterview(
-  interview: Interview,
-  workspaceSnapshot: InterviewWorkspaceSnapshot,
-  evaluation: InterviewEvaluation,
-): FinishedInterview {
-  return {
-    interview: { ...interview, status: "completed", workspaceSnapshot },
-    evaluation,
-  };
-}
-
-export async function finishInterview(
-  settings: AISettings,
-  interview: Interview,
-  snapshot?: InterviewWorkspaceSnapshot,
-  signal?: AbortSignal,
-): Promise<FinishedInterview> {
-  if (interview.status !== "in-progress") {
-    throw new Error("Only an in-progress interview can be finished.");
-  }
+export async function finishInterview(settings: AISettings, interview: Interview, problem: Problem, definition: InterviewDefinition, snapshot?: WorkspaceSnapshot, signal?: AbortSignal): Promise<FinishedInterview> {
+  if (interview.status !== "in-progress") throw new Error("Only an in-progress interview can be finished.");
   const { evaluateInterview } = await import("../ai/evaluation");
-  const workspaceSnapshot = currentWorkspace(interview, snapshot);
-  const evaluation = await evaluateInterview(
-    settings,
-    buildEvaluationContext(interview, workspaceSnapshot),
-    signal,
-  );
-  const finished = completedInterview(interview, workspaceSnapshot, evaluation);
-  const { saveEvaluation } = await import("./evaluation-storage");
-  saveEvaluation(finished.interview.id, finished.evaluation);
-  return finished;
+  const evaluation = await evaluateInterview(settings, buildInterviewContext(interview, problem, definition, snapshot), signal);
+  const finished = { ...interview, status: "completed" as const, completedAt: now(), endReason: "candidate-finished" as const };
+  return { interview: finished, evaluation };
 }

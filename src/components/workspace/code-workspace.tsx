@@ -23,8 +23,8 @@ export function CodeWorkspace({ starterCode }: { starterCode: string }) {
   }));
   const content = buffers[language.id] ?? language.starterCode;
   useEffect(() => {
-    codeRef.current = { language: language.label, content };
-  }, [codeRef, language.label, content]);
+    codeRef.current = { language: language.label, filename: `Solution.${language.extension}`, code: content };
+  }, [codeRef, language.label, language.extension, content]);
 
   return (
     <section aria-label="Coding workspace" className="flex h-full min-h-0 flex-col">

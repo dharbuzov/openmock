@@ -14,8 +14,8 @@ export function FinishInterviewButton() {
   const router = useRouter();
   const openSettings = useOpenSettings();
   const code = useInterviewCode();
-  const { interview, setInterview } = useInterviewSession();
-  const { problem, messages } = interview;
+  const { interview, setInterview, problem, definition } = useInterviewSession();
+  const { messages } = interview;
   const { captureCurrentArchitecture } = useInterviewDiagram();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -25,7 +25,7 @@ export function FinishInterviewButton() {
 
   async function finish() {
     if (controller.current) return;
-    if (!messages.some((message) => message.role === "user")) {
+    if (!messages.some((message) => message.role === "candidate")) {
       setError("Send at least one answer before finishing.");
       return;
     }
@@ -42,10 +42,16 @@ export function FinishInterviewButton() {
     setError("");
     try {
       const { finishInterview } = await import("@/lib/interview/engine");
-      const workspaceSnapshot = problem.type === "system-design"
-        ? { kind: "system-design" as const, architectureDiagram: captureCurrentArchitecture() }
-        : { kind: "dsa" as const, code: code.current ? { ...code.current } : undefined };
-      const finished = await finishInterview(settings, interview, workspaceSnapshot, request.signal);
+      const workspaceSnapshot = definition.workspace === "diagram"
+        ? { type: "diagram" as const, diagram: captureCurrentArchitecture() }
+        : definition.workspace === "code"
+          ? { type: "code" as const, ...(code.current ?? { language: "text", filename: "solution.txt", code: "" }) }
+          : definition.workspace === "project"
+            ? { type: "project" as const, files: [] }
+            : { type: "none" as const };
+      const finished = await finishInterview(settings, interview, problem, definition, workspaceSnapshot, request.signal);
+      const { saveEvaluation } = await import("@/lib/interview/evaluation-storage");
+      saveEvaluation(finished.evaluation);
       setInterview(finished.interview);
       router.push(`/results/${finished.interview.id}`);
     } catch {

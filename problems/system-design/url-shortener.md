@@ -1,12 +1,15 @@
 ---
 id: url-shortener
 title: Design a URL Shortener
-type: system-design
-level: senior
+interview: system-design
+complexity: low
 tags:
   - distributed-systems
   - scalability
   - caching
+interviewerContext: |
+  Keep the exercise focused on the redirect path, identifier generation,
+  persistence, caching, and failure behavior.
 ---
 
 # Design a URL Shortener
