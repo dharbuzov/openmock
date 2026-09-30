@@ -3,13 +3,22 @@ id: url-shortener
 title: Design a URL Shortener
 interview: system-design
 complexity: low
-tags:
+categories:
   - distributed-systems
-  - scalability
+  - backend
+topics:
   - caching
-interviewerContext: |
-  Keep the exercise focused on the redirect path, identifier generation,
-  persistence, caching, and failure behavior.
+  - data-modeling
+  - scalability
+  - availability
+companies:
+  - id: google
+    relation: relevant
+  - id: meta
+    relation: similar
+tags:
+  - architecture
+  - read-heavy
 ---
 
 # Design a URL Shortener
@@ -55,3 +64,13 @@ Be prepared to discuss:
 - Availability
 - Failure scenarios
 - Trade-offs
+
+# Interviewer Context
+
+If the candidate asks for scale, use approximately:
+
+- 100 million new URLs per month
+- A 100:1 read/write ratio
+- Globally distributed users
+
+Useful follow-up areas include short-code generation, storage, caching, hot URLs, availability, expiration, consistency, and abuse. Do not volunteer every constraint immediately.

@@ -21,10 +21,17 @@ test("company metadata preserves relation and optional provenance", () => {
 });
 
 test("interviewer context remains metadata and never becomes candidate content", () => {
-  const problem = parseProblemDocument(`---\nid: queue\ntitle: Queue\ninterview: system-design\ncomplexity: low\ninterviewerContext: Ask about backpressure.\n---\n# Candidate prompt\n\nDesign a queue.`);
+  const problem = parseProblemDocument(`---\nid: queue\ntitle: Queue\ninterview: system-design\ncomplexity: low\n---\n# Candidate prompt\n\nDesign a queue.\n\n# Interviewer Context\n\nAsk about backpressure.`);
   assert.equal(problem.interviewerContext, "Ask about backpressure.");
   assert.equal(problem.content, "# Candidate prompt\n\nDesign a queue.");
   assert.ok(!problem.content.includes("backpressure"));
+});
+
+test("problem works without Interviewer Context and preserves its explicit interview reference", () => {
+  const problem = parseProblemDocument(`---\nid: collaboration\ntitle: Collaboration\ninterview: behavioral\ncomplexity: medium\n---\nTell me about collaboration.`);
+  assert.equal(problem.interview, "behavioral");
+  assert.equal(problem.content, "Tell me about collaboration.");
+  assert.equal(problem.interviewerContext, undefined);
 });
 
 test("legacy type and level frontmatter remains readable", () => {

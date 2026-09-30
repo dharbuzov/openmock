@@ -8,7 +8,7 @@ export default async function InterviewPage({ params }: PageProps<"/interview/[i
   const { id } = await params;
   const problem = await getProblem(id);
   if (!problem) notFound();
-  const definition = requireInterviewDefinition(problem.interview);
+  const definition = await requireInterviewDefinition(problem.interview);
   return <InterviewRoom
     interview={startInterview(problem, { definition, targetLevel: "senior", mode: "practice" })}
     problem={problem}

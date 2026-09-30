@@ -1,6 +1,12 @@
 ---
 id: two-sum
 complexity: low
+categories:
+- algorithms
+topics:
+- arrays
+- hash-maps
+companies: []
 tags:
 - array
 - hash-map

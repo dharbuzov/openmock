@@ -28,6 +28,10 @@ and `tags` are optional and default to empty arrays. Invalid content reports
 its file path. Legacy `type`/`level` frontmatter remains readable during migration.
 The Markdown files are the only problem catalog; no TypeScript registration is needed.
 
-DSA problems also require `language: java` and a `starterCode: |` YAML block
-containing the Java starter source. The coding workspace displays that source
-in `Solution.java` for Java 21. Code execution is not implemented.
+Problems used with a `code` workspace may optionally provide `language` and a
+`starterCode: |` YAML block. The current coding workspace uses that source as
+its initial buffer. Code execution is not implemented.
+
+Add a `# Interviewer Context` heading after the candidate-facing Markdown when
+the interviewer needs hidden constraints or follow-up guidance. That section is
+passed to the AI interviewer and is never rendered in the candidate problem panel.

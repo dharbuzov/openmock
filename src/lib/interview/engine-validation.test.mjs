@@ -1,12 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "../../../tests/register-typescript.mjs";
+import { loadDefinition } from "../../../tests/content-fixtures.mjs";
 
-const { requireInterviewDefinition } = load("../src/lib/interview/definitions.ts");
 const { applyInterviewTurn, buildInterviewContext, emptyWorkspaceSnapshot, startInterview } = load("../src/lib/interview/engine.ts");
 
 const problem = { id: "url-shortener", title: "URL Shortener", interview: "system-design", complexity: "low", categories: [], topics: [], companies: [], tags: [], content: "Design a shortener." };
-const definition = requireInterviewDefinition("system-design");
+const definition = loadDefinition("system-design");
 const start = () => startInterview(problem, { definition, targetLevel: "senior", mode: "practice" });
 
 test("workspace snapshots form a capability union and reject mismatches", () => {

@@ -3,6 +3,12 @@ id: lru-cache
 title: LRU Cache
 interview: dsa
 complexity: medium
+categories:
+  - algorithms
+topics:
+  - hash-maps
+  - linked-lists
+companies: []
 language: java
 starterCode: |
   class LRUCache {

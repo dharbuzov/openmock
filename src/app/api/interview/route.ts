@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   const problem = await getProblem(input.problemId);
   if (!problem) return Response.json({ error: "Problem not found." }, { status: 404 });
   return Response.json(startInterview(problem, {
-    definition: requireInterviewDefinition(problem.interview),
+    definition: await requireInterviewDefinition(problem.interview),
     targetLevel: (input.targetLevel as InterviewLevelId | undefined) ?? "senior",
     mode: (input.mode as InterviewMode | undefined) ?? "practice",
   }), { status: 201 });

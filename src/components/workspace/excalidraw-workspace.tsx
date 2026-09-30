@@ -25,7 +25,7 @@ export function ExcalidrawWorkspace() {
   }, [registerSceneReader]);
 
   return (
-    <section aria-label="Excalidraw workspace" className="system-design-canvas h-full min-h-0 w-full">
+    <section aria-label="Excalidraw workspace" className="excalidraw-canvas h-full min-h-0 w-full">
       <Excalidraw
         excalidrawAPI={(api) => { editor.current = api; }}
         theme={resolvedTheme === "dark" ? "dark" : "light"}

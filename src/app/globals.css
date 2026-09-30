@@ -135,8 +135,8 @@ body:has([data-interview-room]) > header {
 }
 
 /* Keep Excalidraw's native controls; theme them through its CSS variables. */
-.system-design-canvas .excalidraw,
-.system-design-canvas .excalidraw.theme--dark {
+.excalidraw-canvas .excalidraw,
+.excalidraw-canvas .excalidraw.theme--dark {
   --ui-font: var(--font-geist-sans), sans-serif;
   --color-primary: var(--primary);
   --color-primary-darker: var(--foreground);

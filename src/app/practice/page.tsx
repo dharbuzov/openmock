@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { getProblems } from "@/lib/problems/loader";
+import { getInterviewDefinitions } from "@/lib/interview/definitions";
 
 export default async function PracticePage() {
-  const problems = await getProblems();
+  const [problems, definitions] = await Promise.all([getProblems(), getInterviewDefinitions()]);
+  const definitionNames = new Map(definitions.map(({ id, name }) => [id, name]));
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-12">
       <div className="flex flex-col gap-2">
@@ -15,7 +17,7 @@ export default async function PracticePage() {
           <li key={problem.id} className="flex flex-wrap items-center justify-between gap-4 py-5">
             <div className="flex flex-col gap-2">
               <h2 className="text-sm font-medium">{problem.title}</h2>
-              <p className="font-mono text-xs text-muted-foreground">{problem.interview} / {problem.complexity}</p>
+              <p className="font-mono text-xs text-muted-foreground">{definitionNames.get(problem.interview) ?? problem.interview} / {problem.complexity}</p>
               <p className="text-xs text-muted-foreground">{problem.tags.join(" · ")}</p>
             </div>
             <Link href={`/interview/${problem.id}`} aria-label={`Start ${problem.title}`} className={buttonVariants({ variant: "outline", size: "sm" })}>Start interview</Link>

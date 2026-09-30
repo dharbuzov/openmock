@@ -1,6 +1,5 @@
 import type { Problem } from "../problems/types";
 import type { AISettings } from "../settings/types";
-import { requireInterviewDefinition } from "./definitions";
 import type { Interview, InterviewContext, InterviewDefinition, InterviewLevelId, InterviewMode, InterviewResult, InterviewTurn, WorkspaceSnapshot, WorkspaceType } from "./types";
 
 const newId = () => crypto.randomUUID();
@@ -28,9 +27,9 @@ export function emptyWorkspaceSnapshot(type: WorkspaceType): WorkspaceSnapshot {
 }
 
 export function startInterview(problem: Problem, options: {
-  definition?: InterviewDefinition; targetLevel: InterviewLevelId; mode: InterviewMode;
+  definition: InterviewDefinition; targetLevel: InterviewLevelId; mode: InterviewMode;
 }): Interview {
-  const definition = options.definition ?? requireInterviewDefinition(problem.interview);
+  const { definition } = options;
   if (problem.interview !== definition.id) throw new Error("The problem does not match the interview definition.");
   const { targetLevel, mode } = options;
   const firstStage = definition.stages[0]?.id;

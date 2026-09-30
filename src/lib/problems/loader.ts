@@ -1,9 +1,18 @@
-import "server-only";
-
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { parseProblemDocument } from "./schema";
 import type { Problem } from "./types";
+import { getInterviewDefinitions } from "../interview/definitions";
+import type { InterviewDefinition } from "../interview/types";
+
+export function validateProblemDefinitions(problems: Problem[], definitions: InterviewDefinition[]): void {
+  const definitionIds = new Set(definitions.map(({ id }) => id));
+  for (const problem of problems) {
+    if (!definitionIds.has(problem.interview)) {
+      throw new Error(`Problem ${problem.id} references unknown interview definition: ${problem.interview}`);
+    }
+  }
+}
 
 async function discoverFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -33,6 +42,7 @@ export async function getProblems(): Promise<Problem[]> {
     if (ids.has(problem.id)) throw new Error(`Duplicate problem id: ${problem.id}`);
     ids.add(problem.id);
   }
+  validateProblemDefinitions(problems, await getInterviewDefinitions());
   return problems.sort((a, b) => a.title.localeCompare(b.title));
 }
 

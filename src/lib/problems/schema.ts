@@ -53,9 +53,6 @@ export function parseProblemMetadata(value: unknown): ProblemMetadata {
   if (!parsed.success) {
     throw new Error(parsed.error.issues.map((issue) => `${issue.path.join(".") || "frontmatter"} ${issue.message}`).join("; "));
   }
-  if (parsed.data.interview === "dsa" && (!parsed.data.language || !parsed.data.starterCode)) {
-    throw new Error("DSA problems require a language and non-empty starterCode.");
-  }
   return parsed.data;
 }
 
@@ -64,7 +61,17 @@ export function parseProblemDocument(source: string): Problem {
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/.exec(normalized);
   if (!match) throw new Error("Missing YAML frontmatter.");
   const metadata = parseProblemMetadata(load(match[1], { schema: JSON_SCHEMA }));
-  const content = match[2].trim();
+  const body = match[2].trim();
+  const contextHeading = /^# Interviewer Context\s*$/m.exec(body);
+  const content = (contextHeading ? body.slice(0, contextHeading.index) : body).trim();
   if (!content) throw new Error("Problem body must not be empty.");
-  return { ...metadata, content };
+  const sectionContext = contextHeading
+    ? body.slice(contextHeading.index + contextHeading[0].length).trim()
+    : undefined;
+  const { interviewerContext: frontmatterContext, ...publicMetadata } = metadata;
+  return {
+    ...publicMetadata,
+    content,
+    ...(sectionContext || frontmatterContext ? { interviewerContext: sectionContext || frontmatterContext } : {}),
+  };
 }

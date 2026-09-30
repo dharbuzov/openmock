@@ -78,6 +78,7 @@ export async function evaluateInterviewWithModel(model: LanguageModel, context: 
         recommendations: context.definition.evaluation.recommendations,
         messages: context.interview.messages,
         observations: context.interview.observations,
+        completedStages: context.interview.stage.completed,
         currentWorkspace: context.workspace,
       })}`,
       output: Output.object({ schema: evaluatorOutputSchema, name: "interview_result", description: "Holistic, evidence-based interview feedback." }),

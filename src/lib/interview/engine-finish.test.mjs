@@ -1,13 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "../../../tests/register-typescript.mjs";
+import { loadDefinition } from "../../../tests/content-fixtures.mjs";
 
 const evaluation = load("../src/lib/ai/evaluation.ts");
-const { requireInterviewDefinition } = load("../src/lib/interview/definitions.ts");
 const { finishInterview, startInterview } = load("../src/lib/interview/engine.ts");
 
 const problem = { id: "two-sum", title: "Two Sum", interview: "dsa", complexity: "low", categories: [], topics: [], companies: [], tags: [], content: "Find indices.", language: "java", starterCode: "class Solution {}" };
-const definition = requireInterviewDefinition("dsa");
+const definition = loadDefinition("dsa");
 
 test("finishInterview returns evaluation without persisting it", async () => {
   const interview = startInterview(problem, { definition, targetLevel: "senior", mode: "practice" });
