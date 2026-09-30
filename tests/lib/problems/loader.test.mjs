@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { load } from "../../../tests/register-typescript.mjs";
+import { load } from "../../register-typescript.mjs";
 
 const { getProblems, validateProblemDefinitions } = load("../src/lib/problems/loader.ts");
 const { getInterviewDefinitions } = load("../src/lib/interview/definitions.ts");

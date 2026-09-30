@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { MockLanguageModelV3 } from "ai/test";
 import { load } from "./register-typescript.mjs";
 import { loadDefinition } from "./content-fixtures.mjs";
@@ -18,6 +19,13 @@ const problem = {
   content: "Return matching indices.", interviewerContext: "Probe duplicate values.", language: "java", starterCode: "class Solution {}",
 };
 const definition = loadDefinition("dsa");
+const originalFetch = globalThis.fetch;
+globalThis.fetch = async (url) => {
+  const match = /^\/api\/prompts\/(interviewer|evaluator)$/.exec(String(url));
+  if (!match) return originalFetch(url);
+  return new Response(readFileSync(new URL(`../prompts/${match[1]}.md`, import.meta.url), "utf8"));
+};
+test.after(() => { globalThis.fetch = originalFetch; });
 
 test("provider returns the shared structured InterviewTurn model", async () => {
   const interview = acceptCandidateMessage(startInterview(problem, { definition, targetLevel: "senior", mode: "practice" }), "I will use a hash map.");

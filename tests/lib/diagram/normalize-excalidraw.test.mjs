@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { load } from "../../../tests/register-typescript.mjs";
+import { load } from "../../register-typescript.mjs";
 
 const { normalizeExcalidrawScene } = load("../src/lib/diagram/normalize-excalidraw.ts");
 const element = (id, type, extra = {}) => ({ id, type, isDeleted: false, boundElements: null, ...extra });

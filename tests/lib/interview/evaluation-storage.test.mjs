@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { load, storage } from "../../../tests/register-typescript.mjs";
+import { load, storage } from "../../register-typescript.mjs";
 
 const { parseEvaluation, readEvaluationValue, saveEvaluation } = load("../src/lib/interview/evaluation-storage.ts");
 

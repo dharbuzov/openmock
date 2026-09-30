@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { load } from "../../../tests/register-typescript.mjs";
-import { loadDefinition } from "../../../tests/content-fixtures.mjs";
+import { load } from "../../register-typescript.mjs";
+import { loadDefinition } from "../../content-fixtures.mjs";
 
 const evaluation = load("../src/lib/ai/evaluation.ts");
 const { finishInterview, startInterview } = load("../src/lib/interview/engine.ts");

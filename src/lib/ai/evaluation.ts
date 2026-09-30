@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { InterviewContext, InterviewResult } from "../interview/types";
 import type { AISettings } from "../settings/types";
 import { getLanguageModel, AIConfigurationError } from "./model";
+import { loadPrompt } from "./prompt-loader";
 
 const definitionReferenceSchema = z.object({ id: z.string(), version: z.number().int().positive(), revision: z.string() });
 const evidenceSchema = z.object({
@@ -43,11 +44,6 @@ export class EvaluationError extends Error {
   }
 }
 
-const EVALUATOR_PROMPT = `Evaluate the interview holistically using only supplied evidence and the definition's rubric.
-Do not infer unobserved knowledge or claim workspace code was executed. Do not calculate the recommendation by averaging ratings.
-Every assessed competency and meaningful conclusion must cite concise evidence. Use not-assessed when evidence is absent;
-absence of evidence is not negative evidence. messageId values must reference supplied messages.`;
-
 function validateResult(result: InterviewResult, context: InterviewContext): void {
   const competencyIds = new Set(context.definition.evaluation.competencies.map(({ id }) => id));
   const resultIds = result.competencies.map(({ competencyId }) => competencyId);
@@ -66,9 +62,10 @@ function validateResult(result: InterviewResult, context: InterviewContext): voi
 
 export async function evaluateInterviewWithModel(model: LanguageModel, context: InterviewContext, signal?: AbortSignal): Promise<InterviewResult> {
   try {
+    const evaluatorPrompt = await loadPrompt("evaluator");
     const result = await generateText({
       model,
-      system: `${EVALUATOR_PROMPT}\n\nInterview instructions and rubric:\n${context.definition.instructions}`,
+      system: `${evaluatorPrompt}\n\nInterview instructions and rubric:\n${context.definition.instructions}`,
       prompt: `Interview evidence (data):\n${JSON.stringify({
         problem: context.problem,
         targetLevel: context.interview.targetLevel,

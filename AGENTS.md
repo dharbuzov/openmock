@@ -18,6 +18,13 @@ Open-source AI-powered technical interview practice platform.
 - Prefer simple composition over abstractions.
 - Do not add features or dependencies unless needed.
 
+## Tests
+
+All automated tests must live under the root-level `tests/` directory.
+
+Do not colocate `*.test.*` or `*.spec.*` files with production code.
+Mirror the relevant source structure under `tests/` when useful.
+
 ## Design
 
 Use the Geist design system as the primary visual language.

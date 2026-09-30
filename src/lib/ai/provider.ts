@@ -34,7 +34,7 @@ export async function generateInterviewResponseWithModel(model: LanguageModel, c
     ];
     const result = await generateText({
       model,
-      system: interviewerSystemPrompt(context),
+      system: await interviewerSystemPrompt(context),
       messages,
       output: Output.object({
         schema: interviewTurnSchema,
