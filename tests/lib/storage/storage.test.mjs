@@ -7,6 +7,9 @@ const { SettingsStorage, readSettings } = load(
   "../src/lib/settings/storage.ts",
 );
 const { defaultSettings } = load("../src/lib/settings/types.ts");
+const { openAIModels, anthropicModels, defaultSettingsByProvider } = load(
+  "../src/lib/settings/types.ts",
+);
 const { InterviewLayoutStorage, defaultLayout } = load(
   "../src/lib/interview/layout-storage.ts",
 );
@@ -24,6 +27,32 @@ function memory() {
     setText: (key, value) => entries.set(key, value),
   };
 }
+
+test("cloud provider settings retain supported models and fall back for missing or invalid models", () => {
+  const preferences = memory();
+  const domain = new SettingsStorage(preferences, memory(), memory());
+  for (const [provider, models] of [
+    ["openai", openAIModels],
+    ["anthropic", anthropicModels],
+  ]) {
+    for (const model of [
+      ...models.map(({ value }) => value),
+      undefined,
+      "unsupported",
+    ]) {
+      preferences.set("openmock:ai-preferences:v2", {
+        provider,
+        [provider]: { model },
+      });
+      assert.equal(
+        domain.readSettings().model,
+        models.some(({ value }) => value === model)
+          ? model
+          : defaultSettingsByProvider[provider].model,
+      );
+    }
+  }
+});
 
 test("browser adapter preserves JSON, text, scopes, missing values and removal", () => {
   globalThis.window = { localStorage: storage(), sessionStorage: storage() };

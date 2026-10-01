@@ -38,6 +38,10 @@ test("definition parsing accepts the domain vocabulary and rejects unsupported v
       parsed.levels.map(({ id }) => id),
       interviewLevelIds,
     );
+    assert.deepEqual(
+      parsed.levels.map(({ name }) => name),
+      ["Junior", "Middle", "Senior", "Staff", "Principal"],
+    );
     assert.deepEqual(parsed.modes, interviewModes);
     assert.deepEqual(parsed.evaluation.recommendations, hiringRecommendations);
   }

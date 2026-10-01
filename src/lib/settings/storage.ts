@@ -88,9 +88,9 @@ export class SettingsStorage {
       const saved = preferences[provider];
       const models = provider === "openai" ? openAIModels : anthropicModels;
       const fallback = defaultSettingsByProvider[provider];
-      const model = models.some(({ value }) => value === saved?.model)
-        ? (saved?.model ?? fallback.model)
-        : fallback.model;
+      const model =
+        models.find(({ value }) => value === saved?.model)?.value ??
+        fallback.model;
       const rememberApiKey = saved?.rememberApiKey === true;
       return {
         provider,

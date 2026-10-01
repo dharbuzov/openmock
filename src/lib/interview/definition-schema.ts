@@ -7,8 +7,6 @@ import {
   hiringRecommendations,
   workspaceTypes,
   type InterviewDefinition,
-  type InterviewLevelId,
-  type InterviewMode,
 } from "./types";
 
 const slugSchema = z
@@ -19,9 +17,6 @@ const slugSchema = z
     "must be a lowercase, hyphen-separated slug",
   );
 const nonEmptyString = z.string().trim().min(1);
-const levelSchema = z.enum(interviewLevelIds);
-const modeSchema = z.enum(interviewModes);
-const recommendationSchema = z.enum(hiringRecommendations);
 
 const metadataSchema = z
   .object({
@@ -31,10 +26,10 @@ const metadataSchema = z
     workspace: z.enum(workspaceTypes),
     duration: z.object({ defaultMinutes: z.number().int().positive() }),
     stages: z.array(slugSchema).min(1),
-    levels: z.array(levelSchema).min(1),
-    modes: z.array(modeSchema).min(1),
+    levels: z.array(z.enum(interviewLevelIds)).min(1),
+    modes: z.array(z.enum(interviewModes)).min(1),
     evaluation: z.object({
-      recommendations: z.array(recommendationSchema).min(1),
+      recommendations: z.array(z.enum(hiringRecommendations)).min(1),
       competencies: z
         .array(z.object({ id: slugSchema, name: nonEmptyString }))
         .min(1),
@@ -68,10 +63,6 @@ const metadataSchema = z
     );
   });
 
-function displayName(id: InterviewLevelId): string {
-  return id === "middle" ? "Middle" : `${id[0].toUpperCase()}${id.slice(1)}`;
-}
-
 export function parseInterviewDefinitionDocument(
   source: string,
 ): InterviewDefinition {
@@ -101,8 +92,10 @@ export function parseInterviewDefinitionDocument(
     ...metadata,
     revision: createHash("sha256").update(normalized).digest("hex"),
     stages: metadata.stages.map((id) => ({ id })),
-    levels: metadata.levels.map((id) => ({ id, name: displayName(id) })),
-    modes: metadata.modes as InterviewMode[],
+    levels: metadata.levels.map((id) => ({
+      id,
+      name: `${id[0].toUpperCase()}${id.slice(1)}`,
+    })),
     instructions,
   };
 }
