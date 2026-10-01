@@ -1,5 +1,39 @@
 import type { Problem } from "@/lib/problems/types";
 import type { ReactNode } from "react";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "cn";
+
+// Only the explicitly authored candidate section is displayed. Fenced code
+// can contain heading-like lines without ending the section.
+export function problemDescription(content: string): string {
+  const lines = content.replace(/\r\n/g, "\n").split("\n");
+  const description: string[] = [];
+  let collecting = false;
+  let fence: string | undefined;
+  for (const line of lines) {
+    const marker = /^\s{0,3}(`{3,}|~{3,})/.exec(line)?.[1];
+    if (marker) {
+      if (!fence) fence = marker;
+      else if (marker[0] === fence[0] && marker.length >= fence.length)
+        fence = undefined;
+    } else if (!fence) {
+      if (/^## Description\s*$/i.test(line)) {
+        collecting = true;
+        continue;
+      }
+      if (collecting && /^#{1,2}\s/.test(line)) break;
+    }
+    if (collecting) description.push(line);
+  }
+  return description.join("\n").trim();
+}
+
+function metadataLabel(value: string): string {
+  if (["dsa", "sql"].includes(value)) return value.toUpperCase();
+  return value
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 function inlineMarkdown(text: string): ReactNode[] {
   return text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g).map((part, index) => {
@@ -7,7 +41,7 @@ function inlineMarkdown(text: string): ReactNode[] {
       return (
         <code
           key={index}
-          className="rounded-sm bg-muted px-1 font-mono text-xs"
+          className="rounded-sm bg-muted px-1 font-mono text-xs [overflow-wrap:anywhere]"
         >
           {part.slice(1, -1)}
         </code>
@@ -19,7 +53,17 @@ function inlineMarkdown(text: string): ReactNode[] {
         </strong>
       );
     if (part.startsWith("*")) return <em key={index}>{part.slice(1, -1)}</em>;
-    return part;
+    if (!part.includes("→")) return part;
+    return part.split("→").map((text, arrowIndex) => (
+      <span key={`${index}-${arrowIndex}`}>
+        {arrowIndex > 0 && (
+          <span data-flow-arrow aria-label="to" className="block text-center">
+            ↓
+          </span>
+        )}
+        {text}
+      </span>
+    ));
   });
 }
 
@@ -55,7 +99,7 @@ function MarkdownContent({ content }: { content: string }) {
       blocks.push(
         <Heading
           key={key}
-          className="mt-3 font-medium text-foreground first:mt-0"
+          className="mt-4 text-sm font-medium text-foreground first:mt-0"
         >
           {inlineMarkdown(text)}
         </Heading>,
@@ -92,7 +136,14 @@ function MarkdownContent({ content }: { content: string }) {
         !/^(#{1,6} |```|\s*[-*+] |\s*\d+\. )/.test(lines[index])
       )
         paragraph.push(lines[index++]);
-      blocks.push(<p key={key}>{inlineMarkdown(paragraph.join(" "))}</p>);
+      blocks.push(
+        <p
+          key={key}
+          className="has-[[data-flow-arrow]]:text-xs has-[[data-flow-arrow]]:[&_code]:block has-[[data-flow-arrow]]:[&_code]:bg-transparent has-[[data-flow-arrow]]:[&_code]:px-0"
+        >
+          {inlineMarkdown(paragraph.join(" "))}
+        </p>,
+      );
     }
   }
   return (
@@ -103,6 +154,13 @@ function MarkdownContent({ content }: { content: string }) {
 }
 
 export function ProblemPanel({ problem }: { problem: Problem }) {
+  const topics = [...new Set([...problem.tags, ...problem.topics])];
+  const difficultyClass = {
+    easy: "border-green-200/70 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300",
+    medium:
+      "border-amber-200/70 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
+    hard: "border-red-200/70 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300",
+  };
   return (
     <section
       aria-labelledby="problem-heading"
@@ -112,12 +170,76 @@ export function ProblemPanel({ problem }: { problem: Problem }) {
         <h2 id="problem-heading" className="text-xs font-medium">
           Problem
         </h2>
-        <span className="font-mono text-xs text-muted-foreground">
-          {problem.complexity}
-        </span>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-        <MarkdownContent content={problem.content} />
+      <div
+        className="problem-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-4"
+        tabIndex={0}
+        role="region"
+        aria-label="Problem description"
+      >
+        <div className="mb-6 flex flex-col gap-2">
+          <h3 className="text-base font-medium tracking-tight">
+            {problem.title}
+          </h3>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
+              <Badge
+                variant="outline"
+                className="max-w-full border-blue-200/70 bg-blue-50 text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300"
+              >
+                <span className="truncate">
+                  {metadataLabel(problem.type ?? problem.interview)}
+                </span>
+              </Badge>
+              {problem.difficulty && (
+                <Badge
+                  variant="outline"
+                  className={cn(difficultyClass[problem.difficulty])}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="size-1 rounded-full bg-current"
+                  />
+                  {metadataLabel(problem.difficulty)}
+                </Badge>
+              )}
+              {problem.level && (
+                <Badge
+                  variant="outline"
+                  className="border-violet-200/70 bg-violet-50 text-violet-800 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300"
+                >
+                  {metadataLabel(problem.level)}
+                </Badge>
+              )}
+            </div>
+            {topics.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {topics.slice(0, 2).map((value) => (
+                  <Badge
+                    key={value}
+                    variant="outline"
+                    className="max-w-full text-muted-foreground"
+                  >
+                    <span className="truncate">{metadataLabel(value)}</span>
+                  </Badge>
+                ))}
+                {topics.length > 2 && (
+                  <Badge
+                    variant="outline"
+                    className="text-muted-foreground"
+                    title={topics.slice(2).map(metadataLabel).join(", ")}
+                  >
+                    +{topics.length - 2}
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        <h3 className="mb-2 text-sm font-medium text-foreground">
+          Description
+        </h3>
+        <MarkdownContent content={problemDescription(problem.content)} />
       </div>
     </section>
   );

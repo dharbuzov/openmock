@@ -2,7 +2,10 @@
 id: url-shortener
 title: Design a URL Shortener
 interview: system-design
-complexity: low
+complexity: medium
+type: system-design
+difficulty: medium
+level: senior
 categories:
   - distributed-systems
   - backend
@@ -12,20 +15,22 @@ topics:
   - scalability
   - availability
 companies:
-  - id: google
-    relation: relevant
-  - id: meta
-    relation: similar
+  - Bitly
 tags:
-  - architecture
-  - read-heavy
+  - high-scale
+  - caching
+  - databases
 ---
 
-# Design a URL Shortener
+## Description
 
 Design a URL shortening service similar to Bitly or TinyURL.
 
 Users should be able to create a short URL for a long URL and use the short URL to redirect to the original destination.
+
+### Example
+
+Long URL: `https://example.com/articles/designing-distributed-systems` → Short URL: `https://short.ly/abc123`
 
 ## Functional Requirements
 
@@ -53,7 +58,7 @@ Assume:
 
 ## Discussion
 
-Be prepared to discuss:
+Interviewer guidance: let the candidate discover requirements and scale through clarifying questions. Explore:
 
 - API design
 - Short code generation

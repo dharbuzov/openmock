@@ -22,9 +22,22 @@ const normalizedMetadataSchema = z.object({
   title: nonEmptyString,
   interview: slugSchema,
   complexity: z.enum(["low", "medium", "high"]),
+  type: slugSchema.optional(),
+  difficulty: z.enum(["easy", "medium", "hard"]).optional(),
+  level: z.enum(["junior", "mid", "senior", "staff", "principal"]).optional(),
   categories: stringList,
   topics: stringList,
-  companies: z.array(companySchema).default([]),
+  companies: z
+    .array(
+      z.union([
+        companySchema,
+        nonEmptyString.transform((id) => ({
+          id,
+          relation: "relevant" as const,
+        })),
+      ]),
+    )
+    .default([]),
   tags: stringList,
   interviewerContext: nonEmptyString.optional(),
   language: nonEmptyString.optional(),
@@ -52,7 +65,7 @@ export function parseProblemMetadata(value: unknown): ProblemMetadata {
   const parsed = normalizedMetadataSchema.safeParse({
     ...input,
     interview: input.interview ?? input.type,
-    complexity: input.complexity ?? legacyComplexity(input.level),
+    complexity: input.complexity ?? legacyComplexity(input.difficulty),
     categories: input.categories ?? [],
     topics: input.topics ?? [],
     companies: input.companies ?? [],

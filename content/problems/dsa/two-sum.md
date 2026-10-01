@@ -22,7 +22,7 @@ starterCode: |
   }
 ---
 
-# Two Sum
+## Description
 
 Given an array of integers `nums` and an integer `target`, return the
 indices of the two numbers such that they add up to `target`.
@@ -32,7 +32,7 @@ use the same element twice.
 
 You can return the answer in any order.
 
-## Example
+### Example
 
 ``` text
 Input:
@@ -49,7 +49,7 @@ Because:
 nums[0] + nums[1] = 2 + 7 = 9
 ```
 
-## Constraints
+### Constraints
 
 -   `2 <= nums.length <= 10^4`
 -   `-10^9 <= nums[i] <= 10^9`

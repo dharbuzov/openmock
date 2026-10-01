@@ -14,7 +14,7 @@ tags:
   - reflection
 ---
 
-# Conflict with a Teammate
+## Description
 
 Tell me about a time you had a significant disagreement with a teammate or stakeholder.
 

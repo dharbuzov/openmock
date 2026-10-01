@@ -11,6 +11,9 @@ export interface ProblemMetadata {
   title: string;
   interview: string;
   complexity: ProblemComplexity;
+  type?: string;
+  difficulty?: "easy" | "medium" | "hard";
+  level?: "junior" | "mid" | "senior" | "staff" | "principal";
   categories: string[];
   topics: string[];
   companies: ProblemCompany[];
@@ -23,6 +26,6 @@ export interface ProblemMetadata {
 }
 
 export interface Problem extends ProblemMetadata {
-  /** Candidate-facing Markdown only. */
+  /** Full problem Markdown; the candidate panel selects its Description section. */
   content: string;
 }

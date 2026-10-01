@@ -18,3 +18,5 @@ import "./lib/interview/vocabulary.test.mjs";
 import "./lib/ai/prompt-loader.test.mjs";
 import "./lib/config/config.test.mjs";
 import "./components/interview-controls.test.mjs";
+import "./components/interview-panes.test.mjs";
+import "./components/problem-panel.test.mjs";

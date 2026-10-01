@@ -94,7 +94,7 @@ export function InterviewPanes({
       >
         {panels.map(({ value, label, content }, index) => (
           <Fragment key={value}>
-            {index > 0 && (
+            {desktop && index > 0 && (
               <ResizableHandle
                 aria-label={`Resize ${panels[index - 1].label} and ${label}`}
                 title="Drag to resize. Double-click to reset layout."
