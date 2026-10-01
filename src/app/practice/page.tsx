@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { buttonVariants } from "@/components/ui/button";
+import { PracticeProblems } from "@/components/practice-problems";
 import { getProblems } from "@/lib/problems/loader";
 import { getInterviewDefinitions } from "@/lib/interview/definitions";
 
@@ -8,9 +7,9 @@ export default async function PracticePage() {
     getProblems(),
     getInterviewDefinitions(),
   ]);
-  const definitionNames = new Map(
-    definitions.map(({ id, name }) => [id, name]),
-  );
+  const categories = definitions
+    .filter(({ id }) => problems.some((problem) => problem.interview === id))
+    .map(({ id, name }) => ({ id, name }));
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-12">
       <div className="flex flex-col gap-2">
@@ -19,37 +18,7 @@ export default async function PracticePage() {
           Choose a problem to practice.
         </p>
       </div>
-      <ul className="divide-y border-y">
-        {problems.map((problem) => (
-          <li
-            key={problem.id}
-            className="flex flex-wrap items-center justify-between gap-4 py-5"
-          >
-            <div className="flex flex-col gap-2">
-              <h2 className="text-sm font-medium">{problem.title}</h2>
-              <p className="font-mono text-xs text-muted-foreground">
-                {definitionNames.get(problem.interview) ?? problem.interview} /{" "}
-                {problem.complexity}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {problem.tags.join(" · ")}
-              </p>
-            </div>
-            <Link
-              href={`/practice/${problem.id}/setup`}
-              aria-label={`Choose ${problem.title}`}
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              Choose
-            </Link>
-          </li>
-        ))}
-      </ul>
-      {problems.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No practice problems are available yet.
-        </p>
-      ) : null}
+      <PracticeProblems problems={problems} categories={categories} />
     </main>
   );
 }
