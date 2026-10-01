@@ -244,7 +244,7 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
     "@/lib/settings/storage": {
       readSettings: () => ({ provider: "ollama", model: "local" }),
     },
-    "@/lib/settings/types": { isCloudSettings: () => false },
+    "@/lib/settings/types": { aiSettingsIssue: () => "" },
     "@/components/interview-session-context": {
       useInterviewSession: () => ({
         ...state,
@@ -358,19 +358,24 @@ test("page and API start restricted definitions; unsupported explicit API option
     "@/lib/interview/definitions": {
       requireInterviewDefinition: async () => restricted,
     },
-    "@/components/interview-room": { InterviewRoom: () => null },
+    "@/components/interview-setup": { InterviewSetup: () => null },
     "next/navigation": {
       notFound: () => {
         throw Error("not found");
       },
     },
   };
-  const page = entryPoint("src/app/interview/[id]/page.tsx", overrides);
+  const page = entryPoint("src/app/practice/[id]/setup/page.tsx", overrides);
   const rendered = await page.default({
     params: Promise.resolve({ id: problem.id }),
   });
-  assert.equal(rendered.props.interview.targetLevel, "junior");
-  assert.equal(rendered.props.interview.mode, "mock");
+  assert.equal(rendered.props.definition, restricted);
+  assert.equal(rendered.props.interview, undefined);
+  const restrictedInterview = startInterview(problem, {
+    definition: restricted,
+  });
+  assert.equal(restrictedInterview.targetLevel, "junior");
+  assert.equal(restrictedInterview.mode, "mock");
   const { POST } = entryPoint("src/app/api/interview/route.ts", overrides);
   const post = (options) =>
     POST(

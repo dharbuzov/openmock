@@ -22,3 +22,4 @@ import "./components/interview-panes.test.mjs";
 import "./components/problem-panel.test.mjs";
 import "./lib/interview/timer.test.mjs";
 import "./components/current-stage-badge.test.mjs";
+import "./components/interview-setup.test.mjs";

@@ -10,7 +10,7 @@ import {
 } from "@/components/interview-session-context";
 import { useOpenSettings } from "@/components/settings-provider";
 import { readSettings } from "@/lib/settings/storage";
-import { isCloudSettings } from "@/lib/settings/types";
+import { aiSettingsIssue } from "@/lib/settings/types";
 
 export function FinishInterviewButton() {
   const router = useRouter();
@@ -37,7 +37,7 @@ export function FinishInterviewButton() {
     }
 
     const settings = readSettings();
-    if ((isCloudSettings(settings) && !settings.apiKey) || !settings.model) {
+    if (aiSettingsIssue(settings)) {
       openSettings();
       return;
     }

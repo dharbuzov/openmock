@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import ts from "typescript";
+import { loadComponent } from "../helpers/components.mjs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { load } from "../register-typescript.mjs";
@@ -10,29 +10,15 @@ const { parseProblemDocument, parseProblemMetadata } = load(
   "../src/lib/problems/schema.ts",
 );
 const { interviewContext } = load("../src/lib/ai/prompts.ts");
-const { outputText } = ts.transpileModule(
-  readFileSync("src/components/problem-panel.tsx", "utf8"),
+const { ProblemPanel, problemDescription } = loadComponent(
+  "src/components/problem-panel.tsx",
   {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      jsx: ts.JsxEmit.ReactJSX,
+    "@/components/ui/badge": {
+      Badge: ({ variant, ...props }) =>
+        React.createElement("span", { ...props, "data-variant": variant }),
     },
   },
 );
-const compiled = { exports: {} };
-new Function("require", "module", "exports", outputText)(
-  (name) => {
-    if (name === "@/components/ui/badge")
-      return {
-        Badge: ({ variant, ...props }) =>
-          React.createElement("span", { ...props, "data-variant": variant }),
-      };
-    return load(name);
-  },
-  compiled,
-  compiled.exports,
-);
-const { ProblemPanel, problemDescription } = compiled.exports;
 
 test("candidate panel renders title, badges, description and example without hidden sections", () => {
   const problem = parseProblemDocument(

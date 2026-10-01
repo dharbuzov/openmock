@@ -1,3 +1,4 @@
+import type { InteractionMode } from "./interaction-mode-control";
 import Link from "next/link";
 import { ProblemPanel } from "@/components/problem-panel";
 import { Workspace } from "@/components/workspace/workspace";
@@ -17,10 +18,12 @@ export function InterviewRoom({
   interview,
   problem,
   definition,
+  initialMode = "chat",
 }: {
   interview: Interview;
   problem: Problem;
   definition: InterviewDefinition;
+  initialMode?: InteractionMode;
 }) {
   return (
     <InterviewCodeProvider key={interview.id}>
@@ -29,7 +32,7 @@ export function InterviewRoom({
         problem={problem}
         definition={definition}
       >
-        <InterviewControlsProvider>
+        <InterviewControlsProvider initialMode={initialMode}>
           <InterviewDiagramProvider>
             <main
               data-interview-room

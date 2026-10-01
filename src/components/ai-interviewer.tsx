@@ -12,7 +12,7 @@ import {
   useCaptureWorkspace,
 } from "@/components/interview-session-context";
 import { readSettings } from "@/lib/settings/storage";
-import { isCloudSettings } from "@/lib/settings/types";
+import { aiSettingsIssue } from "@/lib/settings/types";
 import type { WorkspaceSnapshot } from "@/lib/interview/types";
 import {
   Tooltip,
@@ -73,7 +73,7 @@ export function AIInterviewer() {
     )
       return;
     const settings = readSettings();
-    if ((isCloudSettings(settings) && !settings.apiKey) || !settings.model) {
+    if (aiSettingsIssue(settings)) {
       if (mode === "live") setMode("chat");
       openSettings();
       return;

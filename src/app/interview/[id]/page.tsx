@@ -1,23 +1,25 @@
-import { notFound } from "next/navigation";
-import { InterviewRoom } from "@/components/interview-room";
-import { startInterview } from "@/lib/interview/engine";
+import { notFound, redirect } from "next/navigation";
+import { ConfiguredInterviewRoom } from "@/components/configured-interview-room";
 import { getProblem } from "@/lib/problems/loader";
 import { requireInterviewDefinition } from "@/lib/interview/definitions";
 
 export default async function InterviewPage({
   params,
+  searchParams,
 }: PageProps<"/interview/[id]">) {
   const { id } = await params;
   const problem = await getProblem(id);
   if (!problem) notFound();
+  const { session } = await searchParams;
+  if (typeof session !== "string" || !session)
+    redirect(`/practice/${id}/setup`);
   const definition = await requireInterviewDefinition(problem.interview);
   return (
-    <InterviewRoom
-      interview={startInterview(problem, {
-        definition,
-      })}
+    <ConfiguredInterviewRoom
+      key={session}
       problem={problem}
       definition={definition}
+      sessionId={session}
     />
   );
 }

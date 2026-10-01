@@ -89,3 +89,14 @@ export function isCloudSettings(
 ): settings is OpenAISettings | AnthropicSettings {
   return settings.provider === "openai" || settings.provider === "anthropic";
 }
+
+export function aiSettingsIssue(settings: AISettings): string {
+  if (!settings.model.trim()) return "Choose an AI model.";
+  if (isCloudSettings(settings))
+    return settings.apiKey.trim() ? "" : "API key required.";
+  try {
+    const url = new URL(settings.baseUrl);
+    if (url.protocol === "http:" || url.protocol === "https:") return "";
+  } catch {}
+  return "Enter a valid Ollama server URL.";
+}

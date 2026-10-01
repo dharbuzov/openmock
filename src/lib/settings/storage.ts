@@ -131,5 +131,18 @@ const settingsStorage = new SettingsStorage(
 export const readSettings = () => settingsStorage.readSettings();
 export const readProviderSettings = (provider: AIProviderId) =>
   settingsStorage.readProviderSettings(provider);
-export const saveSettings = (settings: AISettings) =>
+const settingsListeners = new Set<() => void>();
+
+export function subscribeSettings(listener: () => void): () => void {
+  settingsListeners.add(listener);
+  window.addEventListener("storage", listener);
+  return () => {
+    settingsListeners.delete(listener);
+    window.removeEventListener("storage", listener);
+  };
+}
+
+export function saveSettings(settings: AISettings): void {
   settingsStorage.saveSettings(settings);
+  settingsListeners.forEach((listener) => listener());
+}

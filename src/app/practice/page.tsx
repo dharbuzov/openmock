@@ -16,7 +16,7 @@ export default async function PracticePage() {
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold tracking-tight">Practice</h1>
         <p className="text-sm text-muted-foreground">
-          Choose a problem to start an interview.
+          Choose a problem to practice.
         </p>
       </div>
       <ul className="divide-y border-y">
@@ -36,11 +36,11 @@ export default async function PracticePage() {
               </p>
             </div>
             <Link
-              href={`/interview/${problem.id}`}
-              aria-label={`Start ${problem.title}`}
+              href={`/practice/${problem.id}/setup`}
+              aria-label={`Choose ${problem.title}`}
               className={buttonVariants({ variant: "outline", size: "sm" })}
             >
-              Start interview
+              Choose
             </Link>
           </li>
         ))}
