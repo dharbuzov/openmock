@@ -170,6 +170,33 @@ function element(tree, predicate) {
 }
 
 test("actual Send/Finish handlers exclude concurrent work and Retry reuses the captured workspace", async () => {
+  const { normalizeExcalidrawScene } = load(
+    "../src/lib/diagram/normalize-excalidraw.ts",
+  );
+  const workspace = captureWorkspaceSnapshot("diagram", {
+    code: () => undefined,
+    diagram: () =>
+      normalizeExcalidrawScene([
+        {
+          id: "service",
+          type: "rectangle",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 80,
+        },
+        {
+          id: "note",
+          type: "text",
+          text: "Retry with backoff",
+          x: 0,
+          y: 100,
+          width: 150,
+          height: 20,
+        },
+      ]),
+  });
+  let finishSnapshot;
   let state = { interview: initial(), operation: null };
   const operations = new SessionOperations(state.interview, (next) => {
     state = next;
@@ -201,7 +228,7 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
       }),
       useCaptureWorkspace: () => () => {
         captures++;
-        return { type: "none", capture: captures };
+        return workspace;
       },
     },
     "@/lib/interview/engine": {
@@ -220,7 +247,14 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
           });
         return interview;
       },
-      finishInterview: async (_settings, interview) => {
+      finishInterview: async (
+        _settings,
+        interview,
+        _problem,
+        _definition,
+        snapshot,
+      ) => {
+        finishSnapshot = snapshot;
         evaluations++;
         return {
           interview: { ...interview, status: "completed" },
@@ -277,6 +311,8 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
   await element(finish(), (node) => node.type === "button").props.onClick();
   assert.equal(evaluations, 1);
   assert.equal(captures, 2);
+  assert.deepEqual(snapshots[0], workspace);
+  assert.deepEqual(finishSnapshot, workspace);
   assert.equal(saved.interviewId, state.interview.id);
   assert.equal(state.interview.status, "completed");
   assert.equal(navigated, `/results/${state.interview.id}`);

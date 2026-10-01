@@ -1,5 +1,10 @@
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import type { ArchitectureDiagram, DiagramEdge, DiagramNode } from "./types";
+import type {
+  ArchitectureDiagram,
+  DiagramEdge,
+  DiagramNode,
+  DiagramPlacement,
+} from "./types";
 
 const nodeTypes = new Set<DiagramNode["type"]>([
   "rectangle",
@@ -15,6 +20,17 @@ function compactLabel(value: string | null | undefined): string | undefined {
   return compact ? compact.slice(0, 160) : undefined;
 }
 
+function placement(element: ExcalidrawElement): DiagramPlacement {
+  const { x, y, width, height, frameId, groupIds } = element;
+  return {
+    ...([x, y, width, height].every(Number.isFinite)
+      ? { bounds: { x, y, width, height } }
+      : {}),
+    ...(frameId ? { frameId } : {}),
+    ...(groupIds?.length ? { groupIds } : {}),
+  };
+}
+
 export function normalizeExcalidrawScene(
   elements: readonly ExcalidrawElement[],
 ): ArchitectureDiagram {
@@ -25,6 +41,12 @@ export function normalizeExcalidrawScene(
       .map((element) => [element.id, element]),
   );
   const labelsByContainer = new Map<string, string[]>();
+  const containersByText = new Map<string, string>();
+  for (const element of visible) {
+    for (const binding of element.boundElements ?? []) {
+      if (binding.type === "text") containersByText.set(binding.id, element.id);
+    }
+  }
 
   for (const element of visible) {
     if (element.type !== "text" || !element.containerId) continue;
@@ -59,6 +81,7 @@ export function normalizeExcalidrawScene(
       return {
         id: element.id,
         type: element.type,
+        ...placement(element),
         ...(label ? { label } : {}),
       };
     });
@@ -76,6 +99,7 @@ export function normalizeExcalidrawScene(
     edges.push({
       id: element.id,
       type: element.type,
+      ...placement(element),
       ...(resolvedFrom ? { from: resolvedFrom } : {}),
       ...(resolvedTo ? { to: resolvedTo } : {}),
       ...(label ? { label } : {}),
@@ -83,7 +107,23 @@ export function normalizeExcalidrawScene(
     if (edges.length === maxEdges) break;
   }
 
-  return { nodes, edges };
+  const texts = visible.flatMap((element) => {
+    if (element.type !== "text") return [];
+    // originalText preserves authored line breaks rather than renderer wrapping.
+    const text = element.originalText ?? element.text;
+    if (!text.trim()) return [];
+    const containerId = element.containerId ?? containersByText.get(element.id);
+    return [
+      {
+        id: element.id,
+        text,
+        ...placement(element),
+        ...(containerId ? { containerId } : {}),
+      },
+    ];
+  });
+
+  return { nodes, edges, texts };
 }
 
 export function captureArchitectureDiagram(

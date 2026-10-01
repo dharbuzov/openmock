@@ -12,6 +12,10 @@ const { generateInterviewResponseWithModel, AIProviderError } = load(
   "../src/lib/ai/provider.ts",
 );
 const { evaluateInterviewWithModel } = load("../src/lib/ai/evaluation.ts");
+const { normalizeExcalidrawScene } = load(
+  "../src/lib/diagram/normalize-excalidraw.ts",
+);
+const { captureWorkspaceSnapshot } = load("../src/lib/interview/workspace.ts");
 
 const mockResult = (text) => ({
   content: [{ type: "text", text }],
@@ -128,22 +132,81 @@ test("system design context includes the normalized diagram through the generic 
   const model = new MockLanguageModelV3({
     doGenerate: mockResult(JSON.stringify(output)),
   });
-  await generateInterviewResponseWithModel(model, {
+  const workspace = captureWorkspaceSnapshot("diagram", {
+    code: () => undefined,
+    diagram: () =>
+      normalizeExcalidrawScene([
+        { id: "cache", type: "rectangle", x: 0, y: 0, width: 100, height: 80 },
+        {
+          id: "cache-label",
+          type: "text",
+          text: "Redis",
+          containerId: "cache",
+        },
+        { id: "db", type: "ellipse", x: 200, y: 0, width: 100, height: 80 },
+        {
+          id: "arrow",
+          type: "arrow",
+          startBinding: { elementId: "cache" },
+          endBinding: { elementId: "db" },
+        },
+        {
+          id: "note",
+          type: "text",
+          text: "TTL: 30s\nInvalidate on writes",
+          x: 0,
+          y: 150,
+          width: 200,
+          height: 40,
+        },
+      ]),
+  });
+  const context = {
     interview,
     problem: systemProblem,
     definition: systemDefinition,
-    workspace: {
-      type: "diagram",
-      diagram: {
-        nodes: [{ id: "cache", type: "rectangle", label: "Redis" }],
-        edges: [],
-      },
-    },
-  });
+    workspace,
+  };
+  await generateInterviewResponseWithModel(model, context);
   const prompt = JSON.stringify(model.doGenerateCalls[0].prompt);
   assert.match(prompt, /System Design Interview/);
   assert.match(prompt, /Redis/);
   assert.match(prompt, /cache before the database/);
+  const evaluator = new MockLanguageModelV3({
+    doGenerate: mockResult(
+      JSON.stringify({
+        recommendation: "hire",
+        competencies: systemDefinition.evaluation.competencies.map(
+          ({ id }) => ({
+            competencyId: id,
+            rating: "not-assessed",
+            summary: "No evidence.",
+            evidence: [],
+          }),
+        ),
+        strengths: [],
+        concerns: [],
+        keyMoments: [],
+        summary: "Limited evidence.",
+        finalAssessment: "Further discussion needed.",
+      }),
+    ),
+  });
+  await evaluateInterviewWithModel(evaluator, context);
+  for (const [calls, prefix] of [
+    [model.doGenerateCalls, "Interview context (data):\n"],
+    [evaluator.doGenerateCalls, "Interview evidence (data):\n"],
+  ]) {
+    const data = calls[0].prompt
+      .flatMap((message) =>
+        Array.isArray(message.content) ? message.content : [],
+      )
+      .find((part) => part.type === "text" && part.text.startsWith(prefix));
+    assert.deepEqual(
+      JSON.parse(data.text.slice(prefix.length)).currentWorkspace,
+      workspace,
+    );
+  }
 });
 
 test("provider failures remain safe", async () => {

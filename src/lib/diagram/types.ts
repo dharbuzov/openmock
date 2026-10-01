@@ -1,10 +1,16 @@
-export type DiagramNode = {
+export type DiagramPlacement = {
+  bounds?: { x: number; y: number; width: number; height: number };
+  frameId?: string;
+  groupIds?: readonly string[];
+};
+
+export type DiagramNode = DiagramPlacement & {
   id: string;
   type: string;
   label?: string;
 };
 
-export type DiagramEdge = {
+export type DiagramEdge = DiagramPlacement & {
   id: string;
   type: string;
   from?: string;
@@ -15,4 +21,9 @@ export type DiagramEdge = {
 export type ArchitectureDiagram = {
   nodes: DiagramNode[];
   edges: DiagramEdge[];
+  texts?: (DiagramPlacement & {
+    id: string;
+    text: string;
+    containerId?: string;
+  })[];
 };
