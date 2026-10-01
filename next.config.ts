@@ -2,7 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
-    "/*": ["./problems/**/*.md", "./prompts/*.md"],
+    "/*": [
+      "./content/interviews/*.md",
+      "./content/problems/**/*.md",
+      "./content/prompts/*.md",
+    ],
   },
 };
 

@@ -7,6 +7,9 @@ const { parseInterviewDefinitionDocument } = load(
 
 export function loadDefinition(id) {
   return parseInterviewDefinitionDocument(
-    readFileSync(new URL(`../interviews/${id}.md`, import.meta.url), "utf8"),
+    readFileSync(
+      new URL(`../content/interviews/${id}.md`, import.meta.url),
+      "utf8",
+    ),
   );
 }

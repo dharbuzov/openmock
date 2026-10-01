@@ -47,7 +47,9 @@ async function loadProblem(filename: string): Promise<Problem> {
 }
 
 export async function getProblems(): Promise<Problem[]> {
-  const files = await discoverFiles(path.join(process.cwd(), "problems"));
+  const files = await discoverFiles(
+    path.join(process.cwd(), "content", "problems"),
+  );
   const problems = await Promise.all(files.map(loadProblem));
   const ids = new Set<string>();
   for (const problem of problems) {

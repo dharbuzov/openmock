@@ -13,6 +13,6 @@ skills-lock.json
 .codex/
 
 # Runtime content: preserve interview definitions, problems, and prompts verbatim.
-/interviews/
-/problems/
-/prompts/
+/content/interviews/
+/content/problems/
+/content/prompts/

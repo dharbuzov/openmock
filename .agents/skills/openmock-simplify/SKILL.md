@@ -156,7 +156,7 @@ Simplification must preserve these project rules:
 - UI does not own domain logic
 - domain modules own domain persistence
 - shared storage owns persistence mechanics only
-- global prompts remain under `/prompts`
+- global prompts remain under `/content/prompts`
 - tests remain under root `/tests`
 
 Do not move files or redesign module boundaries as part of simplification.

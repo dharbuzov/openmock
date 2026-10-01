@@ -41,7 +41,10 @@ globalThis.fetch = async (url) => {
   const match = /^\/api\/prompts\/(interviewer|evaluator)$/.exec(String(url));
   if (!match) return originalFetch(url);
   return new Response(
-    readFileSync(new URL(`../prompts/${match[1]}.md`, import.meta.url), "utf8"),
+    readFileSync(
+      new URL(`../content/prompts/${match[1]}.md`, import.meta.url),
+      "utf8",
+    ),
   );
 };
 test.after(() => {

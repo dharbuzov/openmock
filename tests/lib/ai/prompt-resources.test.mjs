@@ -9,7 +9,7 @@ import { loadDefinition } from "../../content-fixtures.mjs";
 const { readPromptResource } = load("../src/lib/ai/prompt-resources.ts");
 const { interviewerSystemPrompt } = load("../src/lib/ai/prompts.ts");
 
-test("loads required global prompts from root prompt resources", async () => {
+test("loads required global prompts from content/prompts resources", async () => {
   assert.match(
     await readPromptResource("interviewer"),
     /OpenMock's interviewer/,
@@ -20,8 +20,12 @@ test("loads required global prompts from root prompt resources", async () => {
 test("missing and empty required prompts fail clearly", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "openmock-prompts-"));
   try {
-    await mkdir(path.join(root, "prompts"));
-    await writeFile(path.join(root, "prompts", "evaluator.md"), "   ", "utf8");
+    await mkdir(path.join(root, "content", "prompts"), { recursive: true });
+    await writeFile(
+      path.join(root, "content", "prompts", "evaluator.md"),
+      "   ",
+      "utf8",
+    );
     await assert.rejects(
       readPromptResource("interviewer", root),
       /Required prompt could not be loaded/,

@@ -101,7 +101,7 @@ Do not move runtime state or application logic into prompts.
 
 Global OpenMock system prompts live under:
 
-`/prompts`
+`/content/prompts`
 
 Prompt text should not be duplicated across TypeScript files.
 

@@ -7,7 +7,7 @@ const { getInterviewDefinitions, requireInterviewDefinition } = load(
 );
 const { startInterview } = load("../src/lib/interview/engine.ts");
 
-test("discovers every interviews/*.md file without a registry", async () => {
+test("discovers every content/interviews/*.md file without a registry", async () => {
   const definitions = await getInterviewDefinitions();
   assert.deepEqual(definitions.map(({ id }) => id).sort(), [
     "behavioral",

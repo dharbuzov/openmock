@@ -78,7 +78,9 @@ interactive DSA and System Design workspaces, adaptive interview turns, and
 structured evidence-based evaluation. Voice, authentication, databases, and
 code execution are intentionally out of scope.
 
-- `problems/`: community-owned Markdown content with validated YAML frontmatter.
+- `content/interviews/`: interview definitions and instructions.
+- `content/problems/`: community-owned Markdown content with validated YAML frontmatter.
+- `content/prompts/`: global AI interviewer and evaluator prompts.
 - `src/app/`: server-rendered pages and the thin interview API route.
 - `src/components/`: interview panels, shared header, and shadcn UI primitives.
 - `src/lib/interview/engine.ts`: application-level interview lifecycle orchestration.

@@ -17,7 +17,7 @@ async function loadDefinition(filename: string): Promise<InterviewDefinition> {
 export async function getInterviewDefinitions(): Promise<
   InterviewDefinition[]
 > {
-  const directory = path.join(process.cwd(), "interviews");
+  const directory = path.join(process.cwd(), "content", "interviews");
   const entries = await readdir(directory, { withFileTypes: true });
   const files = entries
     .filter(
