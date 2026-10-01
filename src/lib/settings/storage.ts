@@ -1,3 +1,5 @@
+import { localStorage, localTextStorage, sessionTextStorage } from "../storage/local-storage";
+import type { Storage } from "../storage/storage";
 import {
   aiProviders,
   anthropicModels,
@@ -30,98 +32,110 @@ function apiKeyStorageKey(provider: CloudProviderId): string {
   return `openmock:api-key:v2:${provider}`;
 }
 
-function readPreferences(): StoredPreferences {
-  const stored = window.localStorage.getItem(preferencesKey);
-  if (stored) return JSON.parse(stored) as StoredPreferences;
+export class SettingsStorage {
+  constructor(
+    private readonly preferencesStorage: Storage,
+    private readonly persistentKeys: Storage,
+    private readonly temporaryKeys: Storage,
+  ) {}
 
-  const legacy = JSON.parse(window.localStorage.getItem(legacyPreferencesKey) ?? "{}") as {
-    model?: string;
-    rememberApiKey?: boolean;
-  };
-  return {
-    provider: "openai",
-    openai: {
-      model: legacy.model,
-      rememberApiKey: legacy.rememberApiKey,
-    },
-  };
-}
+  private readPreferences(): StoredPreferences {
+    const stored = this.preferencesStorage.get<StoredPreferences>(preferencesKey);
+    if (stored) return stored;
 
-function readApiKey(provider: CloudProviderId, rememberApiKey: boolean): string {
-  const storage = rememberApiKey ? window.localStorage : window.sessionStorage;
-  return storage.getItem(apiKeyStorageKey(provider))
-    ?? (provider === "openai" ? storage.getItem(legacyApiKeyStorageKey) : null)
-    ?? "";
-}
+    const legacy = (this.preferencesStorage.get<{
+      model?: string;
+      rememberApiKey?: boolean;
+    }>(legacyPreferencesKey) ?? {});
+    return {
+      provider: "openai",
+      openai: {
+        model: legacy.model,
+        rememberApiKey: legacy.rememberApiKey,
+      },
+    };
+  }
 
-export function readProviderSettings(provider: AIProviderId): AISettings {
-  if (typeof window === "undefined") return { ...defaultSettingsByProvider[provider] };
-  try {
-    const preferences = readPreferences();
-    if (provider === "ollama") {
+  private readApiKey(provider: CloudProviderId, rememberApiKey: boolean): string {
+    const storage = rememberApiKey ? this.persistentKeys : this.temporaryKeys;
+    return storage.get<string>(apiKeyStorageKey(provider))
+      ?? (provider === "openai" ? storage.get<string>(legacyApiKeyStorageKey) : null)
+      ?? "";
+  }
+
+  readProviderSettings(provider: AIProviderId): AISettings {
+    try {
+      const preferences = this.readPreferences();
+      if (provider === "ollama") {
+        return {
+          provider,
+          baseUrl: preferences.ollama?.baseUrl?.trim() || defaultOllamaSettings.baseUrl,
+          model: preferences.ollama?.model?.trim() ?? "",
+        };
+      }
+
+      const saved = preferences[provider];
+      const models = provider === "openai" ? openAIModels : anthropicModels;
+      const fallback = defaultSettingsByProvider[provider];
+      const model = models.some(({ value }) => value === saved?.model)
+        ? saved?.model ?? fallback.model
+        : fallback.model;
+      const rememberApiKey = saved?.rememberApiKey === true;
       return {
         provider,
-        baseUrl: preferences.ollama?.baseUrl?.trim() || defaultOllamaSettings.baseUrl,
-        model: preferences.ollama?.model?.trim() ?? "",
+        model,
+        rememberApiKey,
+        apiKey: this.readApiKey(provider, rememberApiKey),
+      };
+    } catch {
+      return { ...defaultSettingsByProvider[provider] };
+    }
+  }
+
+  readSettings(): AISettings {
+    try {
+      const provider = this.readPreferences().provider;
+      return this.readProviderSettings(isProvider(provider) ? provider : "openai");
+    } catch {
+      return { ...defaultSettings };
+    }
+  }
+
+  saveSettings(settings: AISettings): void {
+    const preferences = this.readPreferences();
+    preferences.provider = settings.provider;
+
+    if (settings.provider !== "openai") {
+      const rememberOpenAIKey = preferences.openai?.rememberApiKey === true;
+      const legacyStorage = rememberOpenAIKey ? this.persistentKeys : this.temporaryKeys;
+      const legacyKey = legacyStorage.get<string>(legacyApiKeyStorageKey);
+      const migratedKey = apiKeyStorageKey("openai");
+      if (legacyKey && !legacyStorage.get<string>(migratedKey)) legacyStorage.set(migratedKey, legacyKey);
+    }
+
+    if (settings.provider === "ollama") {
+      preferences.ollama = { baseUrl: settings.baseUrl.trim(), model: settings.model };
+    } else {
+      const key = apiKeyStorageKey(settings.provider);
+      this.persistentKeys.remove(key);
+      this.temporaryKeys.remove(key);
+      if (settings.apiKey) {
+        (settings.rememberApiKey ? this.persistentKeys : this.temporaryKeys).set(key, settings.apiKey);
+      }
+      preferences[settings.provider] = {
+        model: settings.model,
+        rememberApiKey: settings.rememberApiKey,
       };
     }
 
-    const saved = preferences[provider];
-    const models = provider === "openai" ? openAIModels : anthropicModels;
-    const fallback = defaultSettingsByProvider[provider];
-    const model = models.some(({ value }) => value === saved?.model)
-      ? saved?.model ?? fallback.model
-      : fallback.model;
-    const rememberApiKey = saved?.rememberApiKey === true;
-    return {
-      provider,
-      model,
-      rememberApiKey,
-      apiKey: readApiKey(provider, rememberApiKey),
-    };
-  } catch {
-    return { ...defaultSettingsByProvider[provider] };
+    this.preferencesStorage.set(preferencesKey, preferences);
+    this.persistentKeys.remove(legacyApiKeyStorageKey);
+    this.temporaryKeys.remove(legacyApiKeyStorageKey);
   }
+
 }
 
-export function readSettings(): AISettings {
-  if (typeof window === "undefined") return { ...defaultSettings };
-  try {
-    const provider = readPreferences().provider;
-    return readProviderSettings(isProvider(provider) ? provider : "openai");
-  } catch {
-    return { ...defaultSettings };
-  }
-}
-
-export function saveSettings(settings: AISettings): void {
-  const preferences = readPreferences();
-  preferences.provider = settings.provider;
-
-  if (settings.provider !== "openai") {
-    const rememberOpenAIKey = preferences.openai?.rememberApiKey === true;
-    const legacyStorage = rememberOpenAIKey ? window.localStorage : window.sessionStorage;
-    const legacyKey = legacyStorage.getItem(legacyApiKeyStorageKey);
-    const migratedKey = apiKeyStorageKey("openai");
-    if (legacyKey && !legacyStorage.getItem(migratedKey)) legacyStorage.setItem(migratedKey, legacyKey);
-  }
-
-  if (settings.provider === "ollama") {
-    preferences.ollama = { baseUrl: settings.baseUrl.trim(), model: settings.model };
-  } else {
-    const key = apiKeyStorageKey(settings.provider);
-    window.localStorage.removeItem(key);
-    window.sessionStorage.removeItem(key);
-    if (settings.apiKey) {
-      (settings.rememberApiKey ? window.localStorage : window.sessionStorage).setItem(key, settings.apiKey);
-    }
-    preferences[settings.provider] = {
-      model: settings.model,
-      rememberApiKey: settings.rememberApiKey,
-    };
-  }
-
-  window.localStorage.setItem(preferencesKey, JSON.stringify(preferences));
-  window.localStorage.removeItem(legacyApiKeyStorageKey);
-  window.sessionStorage.removeItem(legacyApiKeyStorageKey);
-}
+const settingsStorage = new SettingsStorage(localStorage, localTextStorage, sessionTextStorage);
+export const readSettings = () => settingsStorage.readSettings();
+export const readProviderSettings = (provider: AIProviderId) => settingsStorage.readProviderSettings(provider);
+export const saveSettings = (settings: AISettings) => settingsStorage.saveSettings(settings);

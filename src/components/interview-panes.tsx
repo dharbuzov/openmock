@@ -1,9 +1,11 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import type { GroupImperativeHandle, Layout } from "react-resizable-panels";
+import type { GroupImperativeHandle } from "react-resizable-panels";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+import { defaultLayout, readLayout, saveLayout } from "@/lib/interview/layout-storage";
 
 const desktopQuery = "(min-width: 1280px)";
 function subscribe(onChange: () => void) {
@@ -13,22 +15,6 @@ function subscribe(onChange: () => void) {
 }
 const getSnapshot = () => window.matchMedia(desktopQuery).matches;
 const getServerSnapshot = () => false;
-
-const layoutKey = "openmock:interview-layout";
-const defaultLayout = { problem: 22, workspace: 56, interviewer: 22 };
-function readLayout(): Layout {
-  try {
-    const layout = JSON.parse(localStorage.getItem(layoutKey) ?? "null");
-    const sizes = Object.keys(defaultLayout).map((key) => layout?.[key]);
-    if (sizes.every((size) => typeof size === "number" && Number.isFinite(size) && size > 0)
-      && Math.abs(sizes.reduce((sum, size) => sum + size, 0) - 100) < 0.1) return layout;
-  } catch { /* Storage may be unavailable or contain an outdated preference. */ }
-  return defaultLayout;
-}
-function saveLayout(layout: Layout) {
-  try { localStorage.setItem(layoutKey, JSON.stringify(layout)); }
-  catch { /* Resizing still works when storage is unavailable. */ }
-}
 
 // Server-rendered panels are passed as slots; only pane selection is client-side.
 export function InterviewPanes({ problem, workspace, interviewer }: {
