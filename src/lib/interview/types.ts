@@ -1,14 +1,37 @@
 import type { ArchitectureDiagram } from "../diagram/types";
 import type { Problem } from "../problems/types";
 
-export type WorkspaceType = "diagram" | "code" | "project" | "none";
+export const workspaceTypes = ["diagram", "code", "project", "none"] as const;
+export const interviewLevelIds = [
+  "junior",
+  "middle",
+  "senior",
+  "staff",
+  "principal",
+] as const;
+export const interviewModes = ["practice", "mock"] as const;
+export const hiringRecommendations = [
+  "strong-hire",
+  "hire",
+  "mixed",
+  "no-hire",
+  "strong-no-hire",
+] as const;
+export const competencyRatings = [
+  "strong-positive",
+  "positive",
+  "mixed",
+  "negative",
+  "strong-negative",
+  "not-assessed",
+] as const;
+
+export type WorkspaceType = (typeof workspaceTypes)[number];
 export type InterviewStage = { id: string; name?: string };
-export type InterviewLevelId =
-  "junior" | "middle" | "senior" | "staff" | "principal";
+export type InterviewLevelId = (typeof interviewLevelIds)[number];
 export type InterviewLevel = { id: InterviewLevelId; name: string };
-export type InterviewMode = "practice" | "mock";
-export type HiringRecommendation =
-  "strong-hire" | "hire" | "mixed" | "no-hire" | "strong-no-hire";
+export type InterviewMode = (typeof interviewModes)[number];
+export type HiringRecommendation = (typeof hiringRecommendations)[number];
 export type CompetencyDefinition = { id: string; name: string };
 export type EvaluationDefinition = {
   competencies: CompetencyDefinition[];
@@ -106,13 +129,7 @@ export type InterviewTurn = {
   stageComplete: boolean;
   observations: InterviewTurnObservation[];
 };
-export type CompetencyRating =
-  | "strong-positive"
-  | "positive"
-  | "mixed"
-  | "negative"
-  | "strong-negative"
-  | "not-assessed";
+export type CompetencyRating = (typeof competencyRatings)[number];
 export type EvaluationEvidence = {
   observation: string;
   messageId?: string;

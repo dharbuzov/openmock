@@ -20,6 +20,8 @@ function memory() {
     get: (key) => entries.get(key) ?? null,
     set: (key, value) => entries.set(key, value),
     remove: (key) => entries.delete(key),
+    getText: (key) => entries.get(key) ?? null,
+    setText: (key, value) => entries.set(key, value),
   };
 }
 
@@ -28,7 +30,7 @@ test("browser adapter preserves JSON, text, scopes, missing values and removal",
   try {
     const local = new LocalStorage();
     const session = new LocalStorage("sessionStorage");
-    const text = new LocalStorage("localStorage", "text");
+    const text = new LocalStorage("localStorage");
     assert.equal(local.get("missing"), null);
     local.set("value", { nested: [1, true] });
     assert.equal(window.localStorage.getItem("value"), '{"nested":[1,true]}');
@@ -36,8 +38,8 @@ test("browser adapter preserves JSON, text, scopes, missing values and removal",
     assert.equal(session.get("value"), null);
     session.set("session", "value");
     assert.equal(window.sessionStorage.getItem("session"), '"value"');
-    text.set("key", 'secret"value');
-    assert.equal(text.get("key"), 'secret"value');
+    text.setText("key", 'secret"value');
+    assert.equal(text.getText("key"), 'secret"value');
     assert.equal(window.localStorage.getItem("key"), 'secret"value');
     local.remove("value");
     assert.equal(local.get("value"), null);
@@ -123,8 +125,8 @@ test("existing settings JSON and raw keys remain readable and writable", () => {
     window.localStorage.setItem("openmock:api-key:v2:openai", "raw-secret");
     const domain = new SettingsStorage(
       new LocalStorage(),
-      new LocalStorage("localStorage", "text"),
-      new LocalStorage("sessionStorage", "text"),
+      new LocalStorage("localStorage"),
+      new LocalStorage("sessionStorage"),
     );
     assert.equal(domain.readSettings().apiKey, "raw-secret");
     domain.saveSettings(domain.readSettings());
@@ -186,7 +188,7 @@ test("evaluation persistence preserves its key and handles invalid snapshots", (
     assert.equal(parseEvaluation(invalid), null);
   assert.equal(
     readEvaluationValue("existing", {
-      get() {
+      getText() {
         throw Error();
       },
     }),

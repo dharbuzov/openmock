@@ -5,94 +5,79 @@ import { Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useOpenSettings } from "@/components/settings-provider";
-import { useInterviewCode } from "@/components/interview-code-context";
-import { useInterviewSession } from "@/components/interview-session-context";
-import { useInterviewDiagram } from "@/components/interview-diagram-context";
+import {
+  useInterviewSession,
+  useCaptureWorkspace,
+} from "@/components/interview-session-context";
 import { readSettings } from "@/lib/settings/storage";
 import { isCloudSettings } from "@/lib/settings/types";
 import type { WorkspaceSnapshot } from "@/lib/interview/types";
 
 export function AIInterviewer() {
-  const { interview, setInterview, problem, definition } =
-    useInterviewSession();
+  const {
+    interview,
+    problem,
+    definition,
+    operation,
+    beginOperation,
+    commitOperation,
+    endOperation,
+    isCurrentOperation,
+  } = useInterviewSession();
   const { messages } = interview;
-  const { captureCurrentArchitecture } = useInterviewDiagram();
+  const captureWorkspace = useCaptureWorkspace();
   const [answer, setAnswer] = useState("");
-  const [pending, setPending] = useState(false);
+  const pending = operation === "send";
   const [error, setError] = useState("");
-  const controller = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
-  const code = useInterviewCode();
   const lastWorkspaceSnapshot = useRef<WorkspaceSnapshot | null>(null);
   const openSettings = useOpenSettings();
-  useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => {
     end.current?.scrollIntoView({ block: "nearest" });
   }, [messages, pending, error]);
 
   async function send(retry = false) {
-    if (controller.current || (!retry && !answer.trim())) return;
+    if (
+      operation ||
+      interview.status !== "in-progress" ||
+      (!retry && !answer.trim())
+    )
+      return;
     const settings = readSettings();
     if ((isCloudSettings(settings) && !settings.apiKey) || !settings.model) {
       openSettings();
       return;
     }
-    const request = new AbortController();
-    controller.current = request;
-    const { acceptCandidateMessage, processCandidateMessage } =
-      await import("@/lib/interview/engine");
-    const next = retry ? interview : acceptCandidateMessage(interview, answer);
-    if (!retry) {
-      switch (definition.workspace) {
-        case "diagram":
-          lastWorkspaceSnapshot.current = {
-            type: "diagram",
-            diagram: captureCurrentArchitecture(),
-          };
-          break;
-        case "code":
-          lastWorkspaceSnapshot.current = {
-            type: "code",
-            ...(code.current ?? {
-              language: "text",
-              filename: "solution.txt",
-              code: "",
-            }),
-          };
-          break;
-        case "project":
-          lastWorkspaceSnapshot.current = { type: "project", files: [] };
-          break;
-        case "none":
-          lastWorkspaceSnapshot.current = { type: "none" };
-          break;
-      }
-    }
-    const workspaceSnapshot = lastWorkspaceSnapshot.current ?? undefined;
-    setInterview(next);
-    if (!retry) setAnswer("");
+    const request = beginOperation("send");
+    if (!request) return;
     setError("");
-    setPending(true);
     try {
+      const { acceptCandidateMessage, processCandidateMessage } =
+        await import("@/lib/interview/engine");
+      if (!isCurrentOperation(request)) return;
+      const next = retry
+        ? request.interview
+        : acceptCandidateMessage(request.interview, answer);
+      if (!retry) lastWorkspaceSnapshot.current = captureWorkspace();
+      const workspaceSnapshot = lastWorkspaceSnapshot.current ?? undefined;
+      commitOperation(request, next);
+      if (!retry) setAnswer("");
       const result = await processCandidateMessage(
         settings,
         next,
         problem,
         definition,
         workspaceSnapshot,
-        request.signal,
+        request.controller.signal,
       );
-      if (!request.signal.aborted) {
-        setInterview(result);
-      }
+      commitOperation(request, result);
     } catch {
-      if (!request.signal.aborted)
+      if (isCurrentOperation(request))
         setError(
           "Could not reach the interviewer. Check your AI settings and try again.",
         );
     } finally {
-      controller.current = null;
-      if (!request.signal.aborted) setPending(false);
+      endOperation(request);
     }
   }
 
@@ -150,7 +135,14 @@ export function AIInterviewer() {
               {error}
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={() => send(true)}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={
+                  operation !== null || interview.status !== "in-progress"
+                }
+                onClick={() => send(true)}
+              >
                 Retry
               </Button>
               <Button size="sm" variant="ghost" onClick={openSettings}>
@@ -211,7 +203,11 @@ export function AIInterviewer() {
             <Button
               type="submit"
               size="sm"
-              disabled={pending || !answer.trim()}
+              disabled={
+                operation !== null ||
+                interview.status !== "in-progress" ||
+                !answer.trim()
+              }
             >
               Send
             </Button>

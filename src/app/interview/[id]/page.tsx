@@ -15,8 +15,6 @@ export default async function InterviewPage({
     <InterviewRoom
       interview={startInterview(problem, {
         definition,
-        targetLevel: "senior",
-        mode: "practice",
       })}
       problem={problem}
       definition={definition}

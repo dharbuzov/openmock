@@ -1,10 +1,6 @@
-import {
-  deserialize,
-  sessionStorage,
-  sessionTextStorage,
-} from "../storage/local-storage";
+import { deserialize, sessionStorage } from "../storage/local-storage";
 import type { Storage } from "../storage/storage";
-import { interviewResultSchema } from "../ai/evaluation";
+import { interviewResultSchema } from "./result-schema";
 import type { InterviewResult } from "./types";
 
 function storageKey(interviewId: string): string {
@@ -20,10 +16,10 @@ export function saveEvaluation(
 
 export function readEvaluationValue(
   interviewId: string,
-  storage: Storage = sessionTextStorage,
+  storage: Storage = sessionStorage,
 ): string | null {
   try {
-    return storage.get<string>(storageKey(interviewId));
+    return storage.getText(storageKey(interviewId));
   } catch {
     return null;
   }

@@ -1,16 +1,15 @@
-import { startInterview } from "@/lib/interview/engine";
+import { startInterview, InterviewOptionsError } from "@/lib/interview/engine";
 import { getProblem } from "@/lib/problems/loader";
 import { requireInterviewDefinition } from "@/lib/interview/definitions";
-import type { InterviewLevelId, InterviewMode } from "@/lib/interview/types";
+import {
+  interviewLevelIds,
+  interviewModes,
+  type InterviewLevelId,
+  type InterviewMode,
+} from "@/lib/interview/types";
 
-const levels = new Set<InterviewLevelId>([
-  "junior",
-  "middle",
-  "senior",
-  "staff",
-  "principal",
-]);
-const modes = new Set<InterviewMode>(["practice", "mock"]);
+const levels = new Set<InterviewLevelId>(interviewLevelIds);
+const modes = new Set<InterviewMode>(interviewModes);
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -55,13 +54,19 @@ export async function POST(request: Request) {
   const problem = await getProblem(input.problemId);
   if (!problem)
     return Response.json({ error: "Problem not found." }, { status: 404 });
-  return Response.json(
-    startInterview(problem, {
-      definition: await requireInterviewDefinition(problem.interview),
-      targetLevel:
-        (input.targetLevel as InterviewLevelId | undefined) ?? "senior",
-      mode: (input.mode as InterviewMode | undefined) ?? "practice",
-    }),
-    { status: 201 },
-  );
+  const definition = await requireInterviewDefinition(problem.interview);
+  try {
+    return Response.json(
+      startInterview(problem, {
+        definition,
+        targetLevel: input.targetLevel as InterviewLevelId | undefined,
+        mode: input.mode as InterviewMode | undefined,
+      }),
+      { status: 201 },
+    );
+  } catch (error) {
+    if (error instanceof InterviewOptionsError)
+      return Response.json({ error: error.message }, { status: 400 });
+    throw error;
+  }
 }

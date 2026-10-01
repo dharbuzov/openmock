@@ -1,10 +1,14 @@
 import { createHash } from "node:crypto";
 import { load, JSON_SCHEMA } from "js-yaml";
 import { z } from "zod";
-import type {
-  InterviewDefinition,
-  InterviewLevelId,
-  InterviewMode,
+import {
+  interviewLevelIds,
+  interviewModes,
+  hiringRecommendations,
+  workspaceTypes,
+  type InterviewDefinition,
+  type InterviewLevelId,
+  type InterviewMode,
 } from "./types";
 
 const slugSchema = z
@@ -15,28 +19,16 @@ const slugSchema = z
     "must be a lowercase, hyphen-separated slug",
   );
 const nonEmptyString = z.string().trim().min(1);
-const levelSchema = z.enum([
-  "junior",
-  "middle",
-  "senior",
-  "staff",
-  "principal",
-]);
-const modeSchema = z.enum(["practice", "mock"]);
-const recommendationSchema = z.enum([
-  "strong-hire",
-  "hire",
-  "mixed",
-  "no-hire",
-  "strong-no-hire",
-]);
+const levelSchema = z.enum(interviewLevelIds);
+const modeSchema = z.enum(interviewModes);
+const recommendationSchema = z.enum(hiringRecommendations);
 
 const metadataSchema = z
   .object({
     id: slugSchema,
     name: nonEmptyString,
     version: z.number().int().positive(),
-    workspace: z.enum(["diagram", "code", "project", "none"]),
+    workspace: z.enum(workspaceTypes),
     duration: z.object({ defaultMinutes: z.number().int().positive() }),
     stages: z.array(slugSchema).min(1),
     levels: z.array(levelSchema).min(1),

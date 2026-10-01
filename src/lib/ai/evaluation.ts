@@ -1,54 +1,10 @@
 import { generateText, Output, type LanguageModel } from "ai";
-import { z } from "zod";
 import type { InterviewContext, InterviewResult } from "../interview/types";
 import type { AISettings } from "../settings/types";
 import { getLanguageModel, AIConfigurationError } from "./model";
 import { loadPrompt } from "./prompt-loader";
 
-const definitionReferenceSchema = z.object({
-  id: z.string(),
-  version: z.number().int().positive(),
-  revision: z.string(),
-});
-const evidenceSchema = z.object({
-  observation: z.string().trim().min(1).max(400),
-  messageId: z.string().trim().min(1).optional(),
-  stage: z.string().trim().min(1).optional(),
-});
-const competencySchema = z.object({
-  competencyId: z.string().trim().min(1),
-  rating: z.enum([
-    "strong-positive",
-    "positive",
-    "mixed",
-    "negative",
-    "strong-negative",
-    "not-assessed",
-  ]),
-  summary: z.string().trim().min(1).max(600),
-  evidence: z.array(evidenceSchema).max(8),
-});
-
-export const interviewResultSchema = z.object({
-  interviewId: z.string().trim().min(1),
-  problemId: z.string().trim().min(1),
-  definition: definitionReferenceSchema,
-  targetLevel: z.enum(["junior", "middle", "senior", "staff", "principal"]),
-  recommendation: z.enum([
-    "strong-hire",
-    "hire",
-    "mixed",
-    "no-hire",
-    "strong-no-hire",
-  ]),
-  competencies: z.array(competencySchema),
-  strengths: z.array(evidenceSchema).max(8),
-  concerns: z.array(evidenceSchema).max(8),
-  keyMoments: z.array(evidenceSchema).max(10),
-  summary: z.string().trim().min(1).max(1_000),
-  finalAssessment: z.string().trim().min(1).max(1_500),
-  createdAt: z.string().datetime(),
-});
+import { interviewResultSchema } from "../interview/result-schema";
 
 const evaluatorOutputSchema = interviewResultSchema.omit({
   interviewId: true,

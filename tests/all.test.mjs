@@ -12,3 +12,7 @@ import "./ai-sdk.test.mjs";
 import "./components/finish-interview-button.test.mjs";
 
 import "./lib/storage/storage.test.mjs";
+
+import "./lib/interview/architecture-fixes.test.mjs";
+import "./lib/interview/vocabulary.test.mjs";
+import "./lib/ai/prompt-loader.test.mjs";

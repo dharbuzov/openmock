@@ -1,8 +1,4 @@
-import {
-  localStorage,
-  localTextStorage,
-  sessionTextStorage,
-} from "../storage/local-storage";
+import { localStorage, sessionStorage } from "../storage/local-storage";
 import type { Storage } from "../storage/storage";
 import {
   aiProviders,
@@ -68,9 +64,9 @@ export class SettingsStorage {
   ): string {
     const storage = rememberApiKey ? this.persistentKeys : this.temporaryKeys;
     return (
-      storage.get<string>(apiKeyStorageKey(provider)) ??
+      storage.getText(apiKeyStorageKey(provider)) ??
       (provider === "openai"
-        ? storage.get<string>(legacyApiKeyStorageKey)
+        ? storage.getText(legacyApiKeyStorageKey)
         : null) ??
       ""
     );
@@ -127,10 +123,10 @@ export class SettingsStorage {
       const legacyStorage = rememberOpenAIKey
         ? this.persistentKeys
         : this.temporaryKeys;
-      const legacyKey = legacyStorage.get<string>(legacyApiKeyStorageKey);
+      const legacyKey = legacyStorage.getText(legacyApiKeyStorageKey);
       const migratedKey = apiKeyStorageKey("openai");
-      if (legacyKey && !legacyStorage.get<string>(migratedKey))
-        legacyStorage.set(migratedKey, legacyKey);
+      if (legacyKey && !legacyStorage.getText(migratedKey))
+        legacyStorage.setText(migratedKey, legacyKey);
     }
 
     if (settings.provider === "ollama") {
@@ -146,7 +142,7 @@ export class SettingsStorage {
         (settings.rememberApiKey
           ? this.persistentKeys
           : this.temporaryKeys
-        ).set(key, settings.apiKey);
+        ).setText(key, settings.apiKey);
       }
       preferences[settings.provider] = {
         model: settings.model,
@@ -162,8 +158,8 @@ export class SettingsStorage {
 
 const settingsStorage = new SettingsStorage(
   localStorage,
-  localTextStorage,
-  sessionTextStorage,
+  localStorage,
+  sessionStorage,
 );
 export const readSettings = () => settingsStorage.readSettings();
 export const readProviderSettings = (provider: AIProviderId) =>

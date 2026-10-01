@@ -8,7 +8,9 @@ import {
   type RefObject,
 } from "react";
 
-type CodeSnapshot = { language: string; filename: string; code: string };
+import type { CodeWorkspaceSnapshot } from "@/lib/interview/types";
+
+type CodeSnapshot = Omit<CodeWorkspaceSnapshot, "type">;
 const CodeContext = createContext<RefObject<CodeSnapshot | undefined> | null>(
   null,
 );

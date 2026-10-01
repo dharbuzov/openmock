@@ -55,25 +55,34 @@ export function emptyWorkspaceSnapshot(type: WorkspaceType): WorkspaceSnapshot {
   }
 }
 
+export class InterviewOptionsError extends Error {}
+
 export function startInterview(
   problem: Problem,
   options: {
     definition: InterviewDefinition;
-    targetLevel: InterviewLevelId;
-    mode: InterviewMode;
+    targetLevel?: InterviewLevelId;
+    mode?: InterviewMode;
   },
 ): Interview {
   const { definition } = options;
   if (problem.interview !== definition.id)
     throw new Error("The problem does not match the interview definition.");
-  const { targetLevel, mode } = options;
+  const targetLevel =
+    options.targetLevel ??
+    (definition.levels.some(({ id }) => id === "senior")
+      ? "senior"
+      : definition.levels[0]?.id);
+  const mode =
+    options.mode ??
+    (definition.modes.includes("practice") ? "practice" : definition.modes[0]);
   const firstStage = definition.stages[0]?.id;
   if (!firstStage)
     throw new Error("Interview definitions require at least one stage.");
-  if (!definition.levels.some(({ id }) => id === targetLevel))
-    throw new Error("Unsupported target level.");
-  if (!definition.modes.includes(mode))
-    throw new Error("Unsupported interview mode.");
+  if (!targetLevel || !definition.levels.some(({ id }) => id === targetLevel))
+    throw new InterviewOptionsError("Unsupported target level.");
+  if (!mode || !definition.modes.includes(mode))
+    throw new InterviewOptionsError("Unsupported interview mode.");
   const startedAt = now();
   return {
     id: newId(),
