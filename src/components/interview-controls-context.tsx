@@ -3,7 +3,6 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useMemo,
   useState,
   useSyncExternalStore,
@@ -12,7 +11,6 @@ import {
 import { InterviewTimer } from "@/lib/interview/timer";
 import { recognitionConstructor } from "@/lib/voice/browser";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useInterviewSession } from "./interview-session-context";
 
 type InteractionMode = "chat" | "live";
 type Controls = {
@@ -34,9 +32,9 @@ export function InterviewControlsProvider({
 }: {
   children: ReactNode;
 }) {
-  const { interview } = useInterviewSession();
-  const [timer] = useState(() => new InterviewTimer(interview.startedAt));
-  const [paused, setPaused] = useState(false);
+  // @ts-ignore
+  const [timer] = useState(() => new InterviewTimer());
+  const [paused, setPaused] = useState(true);
   const [mode, setMode] = useState<InteractionMode>("chat");
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const speechAvailable = useSyncExternalStore(
@@ -49,11 +47,6 @@ export function InterviewControlsProvider({
     () => "speechSynthesis" in window,
     noCapability,
   );
-  useEffect(() => {
-    if (interview.status === "completed") {
-      timer.pause();
-    }
-  }, [interview.status, timer]);
   const value = useMemo(
     () => ({
       mode,
@@ -62,24 +55,15 @@ export function InterviewControlsProvider({
       setVoiceEnabled,
       speechAvailable,
       playbackAvailable,
-      paused: paused || interview.status === "completed",
+      paused,
       elapsed: timer.elapsed,
       toggleTimer: () => {
-        if (interview.status !== "in-progress") return;
         if (paused) timer.resume();
         else timer.pause();
         setPaused(!paused);
       },
     }),
-    [
-      mode,
-      voiceEnabled,
-      speechAvailable,
-      playbackAvailable,
-      paused,
-      timer,
-      interview.status,
-    ],
+    [mode, voiceEnabled, speechAvailable, playbackAvailable, paused, timer],
   );
   return (
     <TooltipProvider>

@@ -18,7 +18,7 @@ import { useInterviewSession } from "./interview-session-context";
 export function InterviewControls() {
   const { mode, setMode, speechAvailable, paused, toggleTimer, elapsed } =
     useInterviewControls();
-  const { interview, definition } = useInterviewSession();
+  const { definition } = useInterviewSession();
   const duration = definition.duration.defaultMinutes * 60_000;
   const [remaining, setRemaining] = useState(duration);
   const time = formatRemaining(remaining);
@@ -91,7 +91,11 @@ export function InterviewControls() {
                 variant="ghost"
                 size="icon-sm"
                 aria-label={timerLabel}
-                disabled={interview.status !== "in-progress"}
+                className={cn(
+                  paused
+                    ? "text-green-700 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
+                    : "text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300",
+                )}
                 onClick={toggleTimer}
               />
             }

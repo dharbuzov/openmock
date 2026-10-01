@@ -3,7 +3,7 @@ import type { WorkspaceType } from "@/lib/interview/types";
 import { ExcalidrawWorkspace } from "./excalidraw-workspace";
 import { CodeWorkspace } from "./code-workspace";
 
-export function Workspace({
+function WorkspaceContent({
   problem,
   type,
 }: {
@@ -28,6 +28,24 @@ export function Workspace({
       className="h-full p-4 text-sm text-muted-foreground"
     >
       This interview uses conversation only.
+    </section>
+  );
+}
+
+export function Workspace(props: { problem: Problem; type: WorkspaceType }) {
+  return (
+    <section
+      aria-labelledby="workspace-heading"
+      className="flex h-full min-h-0 flex-col"
+    >
+      <div className="flex h-11 shrink-0 items-center justify-between gap-3 border-b px-4">
+        <h2 id="workspace-heading" className="shrink-0 text-xs font-medium">
+          Workspace
+        </h2>
+      </div>
+      <div className="min-h-0 flex-1">
+        <WorkspaceContent {...props} />
+      </div>
     </section>
   );
 }

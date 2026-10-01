@@ -11,11 +11,9 @@ import {
 import { useOpenSettings } from "@/components/settings-provider";
 import { readSettings } from "@/lib/settings/storage";
 import { isCloudSettings } from "@/lib/settings/types";
-import { useInterviewControls } from "./interview-controls-context";
 
 export function FinishInterviewButton() {
   const router = useRouter();
-  const { elapsed } = useInterviewControls();
   const openSettings = useOpenSettings();
   const {
     interview,
@@ -53,7 +51,7 @@ export function FinishInterviewButton() {
       const workspaceSnapshot = captureWorkspace();
       const finished = await finishInterview(
         settings,
-        { ...request.interview, elapsedMs: elapsed() },
+        request.interview,
         problem,
         definition,
         workspaceSnapshot,

@@ -1,5 +1,7 @@
 "use client";
 
+import { CurrentStageBadge } from "./current-stage-badge";
+
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -46,7 +48,6 @@ export function AIInterviewer() {
     setVoiceEnabled,
     speechAvailable,
     playbackAvailable,
-    elapsed,
   } = useInterviewControls();
   const voice = useInterviewVoice({
     messages,
@@ -84,10 +85,9 @@ export function AIInterviewer() {
       const { acceptCandidateMessage, processCandidateMessage } =
         await import("@/lib/interview/engine");
       if (!isCurrentOperation(request)) return;
-      const nextInterview = retry
+      const next = retry
         ? request.interview
         : acceptCandidateMessage(request.interview, candidateAnswer);
-      const next = { ...nextInterview, elapsedMs: elapsed() };
       if (!retry) lastWorkspaceSnapshot.current = captureWorkspace();
       const workspaceSnapshot = lastWorkspaceSnapshot.current ?? undefined;
       commitOperation(request, next);
@@ -116,41 +116,44 @@ export function AIInterviewer() {
       aria-labelledby="interviewer-heading"
       className="flex h-full min-h-0 flex-col"
     >
-      <div className="flex h-11 shrink-0 items-center justify-between border-b px-4">
-        <h2 id="interviewer-heading" className="text-xs font-medium">
+      <div className="flex h-11 shrink-0 items-center justify-between gap-3 border-b px-4">
+        <h2 id="interviewer-heading" className="shrink-0 text-xs font-medium">
           AI Interviewer
         </h2>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={
-                  voiceEnabled
-                    ? "Disable interviewer voice"
-                    : "Enable interviewer voice"
-                }
-                aria-pressed={voiceEnabled}
-                disabled={!playbackAvailable}
-                onClick={() => setVoiceEnabled(!voiceEnabled)}
-              />
-            }
-          >
-            {voiceEnabled ? (
-              <Volume2 aria-hidden="true" />
-            ) : (
-              <VolumeX aria-hidden="true" />
-            )}
-          </TooltipTrigger>
-          <TooltipContent>
-            {playbackAvailable
-              ? voiceEnabled
-                ? "Disable interviewer voice"
-                : "Enable interviewer voice"
-              : "Voice playback is unavailable in this browser"}
-          </TooltipContent>
-        </Tooltip>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <CurrentStageBadge numbered />
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={
+                    voiceEnabled
+                      ? "Disable interviewer voice"
+                      : "Enable interviewer voice"
+                  }
+                  aria-pressed={voiceEnabled}
+                  disabled={!playbackAvailable}
+                  onClick={() => setVoiceEnabled(!voiceEnabled)}
+                />
+              }
+            >
+              {voiceEnabled ? (
+                <Volume2 aria-hidden="true" />
+              ) : (
+                <VolumeX aria-hidden="true" />
+              )}
+            </TooltipTrigger>
+            <TooltipContent>
+              {playbackAvailable
+                ? voiceEnabled
+                  ? "Disable interviewer voice"
+                  : "Enable interviewer voice"
+                : "Voice playback is unavailable in this browser"}
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
         {messages.length === 0 && (

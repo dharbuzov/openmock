@@ -1,14 +1,7 @@
 export class InterviewTimer {
-  private accumulated: number;
-  private runningSince: number | null;
-  constructor(
-    startedAt: string,
-    private readonly now = Date.now,
-  ) {
-    const current = now();
-    this.accumulated = Math.max(0, current - Date.parse(startedAt));
-    this.runningSince = current;
-  }
+  private accumulated = 0;
+  private runningSince: number | null = null;
+  constructor(private readonly now = Date.now) {}
   elapsed = (): number =>
     this.accumulated +
     (this.runningSince === null

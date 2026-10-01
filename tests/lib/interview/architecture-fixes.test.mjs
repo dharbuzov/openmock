@@ -215,6 +215,7 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
       VolumeX: "volume-off",
       Check: "check",
     },
+    "./current-stage-badge": { CurrentStageBadge: "stage-badge" },
     "./interview-controls-context": {
       useInterviewControls: () => ({
         mode: "chat",

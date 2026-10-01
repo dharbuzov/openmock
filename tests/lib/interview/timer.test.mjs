@@ -8,7 +8,8 @@ const duration = 45 * 60_000;
 
 function clock() {
   let now = 0;
-  const timer = new InterviewTimer(new Date(now).toISOString(), () => now);
+  const timer = new InterviewTimer(() => now);
+  timer.resume();
   return {
     timer,
     advance: (ms) => {
@@ -62,4 +63,15 @@ test("timestamps catch up after delayed rendering without accumulating tick drif
   c.advance(duration);
   assert.equal(c.remaining(), -123_456);
   assert.equal(c.display(), "+02:03");
+});
+
+test("candidate timer starts paused and ignores time before explicit Play", () => {
+  let now = 900_000;
+  const timer = new InterviewTimer(() => now);
+  now += 600_000;
+  assert.equal(timer.elapsed(), 0);
+  assert.equal(formatRemaining(duration - timer.elapsed()), "45:00");
+  timer.resume();
+  now += 1000;
+  assert.equal(formatRemaining(duration - timer.elapsed()), "44:59");
 });

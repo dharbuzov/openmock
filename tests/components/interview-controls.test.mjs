@@ -10,7 +10,8 @@ const { interviewContext } = load("../src/lib/ai/prompts.ts");
 
 test("timer runs, freezes through repeated pauses, and resumes without resetting", () => {
   let now = 0;
-  const timer = new InterviewTimer(new Date(0).toISOString(), () => now);
+  const timer = new InterviewTimer(() => now);
+  timer.resume();
   now = 1471000;
   assert.equal(formatElapsed(timer.elapsed()), "24:31");
   timer.pause();
