@@ -122,19 +122,19 @@ test("settings use injected storage and preserve migration, keys and key lifetim
       ollama: { baseUrl: "http://localhost:11434", model: "local" },
     });
     domain.saveSettings({
-      ...defaultSettings,
+      ...defaultSettingsByProvider.openai,
       apiKey: "new-secret",
       rememberApiKey,
     });
     assert.equal(keys.get("openmock:api-key:v2:openai"), "new-secret");
     domain.saveSettings({
-      ...defaultSettings,
+      ...defaultSettingsByProvider.openai,
       apiKey: "temporary",
       rememberApiKey: false,
     });
     assert.equal(persistent.get("openmock:api-key:v2:openai"), null);
     assert.equal(temporary.get("openmock:api-key:v2:openai"), "temporary");
-    domain.saveSettings({ ...defaultSettings, apiKey: "" });
+    domain.saveSettings({ ...defaultSettingsByProvider.openai, apiKey: "" });
     assert.equal(temporary.get("openmock:api-key:v2:openai"), null);
     preferences.set("openmock:ai-preferences:v2", {
       provider: "unknown",

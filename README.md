@@ -92,6 +92,9 @@ instructions for adding definitions and problems.
 
 ### Module boundaries
 
+Environment variables are read only by the configuration layer.
+Application modules consume typed configuration instead of process.env.
+
 - Keep the engine independent of concrete interview types.
 - Prefer definitions and composition over type-specific branching.
 - Keep model selection independent of concrete interview definitions.
@@ -113,11 +116,31 @@ the current implementation.
 git clone https://github.com/dharbuzov/openmock.git
 cd openmock
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
 Open [localhost:3000](http://localhost:3000), configure your provider in Settings,
 and visit `/practice` to choose a problem.
+
+### Configuration
+
+Deployment defaults are validated in `src/lib/config/`. Set these variables in
+`.env.local` or your deployment environment:
+
+| Variable                       | Default    | Purpose                                               |
+| ------------------------------ | ---------- | ----------------------------------------------------- |
+| `OPENMOCK_AI_PROVIDER`         | `ollama`   | Default provider: `ollama`, `openai`, or `anthropic`. |
+| `OPENMOCK_AI_MODEL`            | `qwen3:8b` | Non-empty model ID for the default provider.          |
+| `OPENMOCK_DISABLED_INTERVIEWS` | Empty      | Comma-separated interview definition IDs to disable.  |
+
+Settings can override AI defaults. Disabled interviews and their problems are
+excluded from discovery and cannot be enabled through Settings. Whitespace and
+empty entries in the disabled list are ignored. Unknown, well-formed IDs are
+allowed so configuration stays independent of the content catalog.
+
+AI defaults are public and included in the browser bundle at build time; rebuild
+when changing them. Choose a model appropriate for the configured provider.
 
 ### Checks
 

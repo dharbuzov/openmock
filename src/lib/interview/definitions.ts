@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { parseInterviewDefinitionDocument } from "./definition-schema";
 import type { InterviewDefinition } from "./types";
+import { config } from "../config/config";
 
 async function loadDefinition(filename: string): Promise<InterviewDefinition> {
   try {
@@ -14,9 +15,9 @@ async function loadDefinition(filename: string): Promise<InterviewDefinition> {
   }
 }
 
-export async function getInterviewDefinitions(): Promise<
-  InterviewDefinition[]
-> {
+export async function getInterviewDefinitions({
+  includeDisabled = false,
+} = {}): Promise<InterviewDefinition[]> {
   const directory = path.join(process.cwd(), "content", "interviews");
   const entries = await readdir(directory, { withFileTypes: true });
   const files = entries
@@ -35,7 +36,12 @@ export async function getInterviewDefinitions(): Promise<
       throw new Error(`Duplicate interview definition id: ${definition.id}`);
     ids.add(definition.id);
   }
-  return definitions.sort((a, b) => a.name.localeCompare(b.name));
+  return definitions
+    .filter(
+      (definition) =>
+        includeDisabled || !config.interviews.disabled.includes(definition.id),
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function getInterviewDefinition(

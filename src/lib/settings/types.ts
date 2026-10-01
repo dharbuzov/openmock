@@ -1,3 +1,5 @@
+import { config } from "../config/config";
+
 export const aiProviders = [
   { value: "openai", label: "OpenAI" },
   { value: "anthropic", label: "Anthropic" },
@@ -6,17 +8,27 @@ export const aiProviders = [
 
 export type AIProviderId = (typeof aiProviders)[number]["value"];
 
-export const openAIModels = [
+function withConfiguredModel(
+  provider: AIProviderId,
+  models: { value: string; label: string }[],
+) {
+  return config.ai.provider === provider &&
+    !models.some(({ value }) => value === config.ai.model)
+    ? [...models, { value: config.ai.model, label: config.ai.model }]
+    : models;
+}
+
+export const openAIModels = withConfiguredModel("openai", [
   { value: "gpt-4.1-mini", label: "GPT-4.1 mini" },
   { value: "gpt-4.1", label: "GPT-4.1" },
-] as const;
+]);
 
 // Keep provider model IDs centralized because provider catalogs change over time.
-export const anthropicModels = [
+export const anthropicModels = withConfiguredModel("anthropic", [
   { value: "claude-sonnet-5", label: "Claude Sonnet 5" },
   { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
   { value: "claude-opus-5", label: "Claude Opus 5" },
-] as const;
+]);
 
 interface CloudAISettings {
   model: string;
@@ -45,19 +57,23 @@ export type CloudProviderId =
 export const defaultOllamaSettings: OllamaSettings = {
   provider: "ollama",
   baseUrl: "http://localhost:11434",
-  model: "",
+  model: config.ai.provider === "ollama" ? config.ai.model : "",
 };
 
 export const defaultSettingsByProvider: Record<AIProviderId, AISettings> = {
   openai: {
     provider: "openai",
-    model: openAIModels[0].value,
+    model:
+      config.ai.provider === "openai" ? config.ai.model : openAIModels[0].value,
     apiKey: "",
     rememberApiKey: false,
   },
   anthropic: {
     provider: "anthropic",
-    model: anthropicModels[0].value,
+    model:
+      config.ai.provider === "anthropic"
+        ? config.ai.model
+        : anthropicModels[0].value,
     apiKey: "",
     rememberApiKey: false,
   },
@@ -65,7 +81,7 @@ export const defaultSettingsByProvider: Record<AIProviderId, AISettings> = {
 };
 
 export const defaultSettings: AISettings = {
-  ...defaultSettingsByProvider.openai,
+  ...defaultSettingsByProvider[config.ai.provider],
 };
 
 export function isCloudSettings(

@@ -57,8 +57,14 @@ export async function getProblems(): Promise<Problem[]> {
       throw new Error(`Duplicate problem id: ${problem.id}`);
     ids.add(problem.id);
   }
-  validateProblemDefinitions(problems, await getInterviewDefinitions());
-  return problems.sort((a, b) => a.title.localeCompare(b.title));
+  const definitions = await getInterviewDefinitions({ includeDisabled: true });
+  validateProblemDefinitions(problems, definitions);
+  const available = new Set(
+    (await getInterviewDefinitions()).map(({ id }) => id),
+  );
+  return problems
+    .filter((problem) => available.has(problem.interview))
+    .sort((a, b) => a.title.localeCompare(b.title));
 }
 
 export async function getProblem(id: string): Promise<Problem | undefined> {

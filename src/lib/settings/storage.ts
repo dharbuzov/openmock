@@ -44,11 +44,11 @@ export class SettingsStorage {
       this.preferencesStorage.get<StoredPreferences>(preferencesKey);
     if (stored) return stored;
 
-    const legacy =
-      this.preferencesStorage.get<{
-        model?: string;
-        rememberApiKey?: boolean;
-      }>(legacyPreferencesKey) ?? {};
+    const legacy = this.preferencesStorage.get<{
+      model?: string;
+      rememberApiKey?: boolean;
+    }>(legacyPreferencesKey);
+    if (!legacy) return {};
     return {
       provider: "openai",
       openai: {
@@ -81,7 +81,8 @@ export class SettingsStorage {
           baseUrl:
             preferences.ollama?.baseUrl?.trim() ||
             defaultOllamaSettings.baseUrl,
-          model: preferences.ollama?.model?.trim() ?? "",
+          model:
+            preferences.ollama?.model?.trim() ?? defaultOllamaSettings.model,
         };
       }
 
@@ -89,7 +90,9 @@ export class SettingsStorage {
       const models = provider === "openai" ? openAIModels : anthropicModels;
       const fallback = defaultSettingsByProvider[provider];
       const model =
-        models.find(({ value }) => value === saved?.model)?.value ??
+        (saved?.model === fallback.model
+          ? saved.model
+          : models.find(({ value }) => value === saved?.model)?.value) ??
         fallback.model;
       const rememberApiKey = saved?.rememberApiKey === true;
       return {
@@ -107,7 +110,7 @@ export class SettingsStorage {
     try {
       const provider = this.readPreferences().provider;
       return this.readProviderSettings(
-        isProvider(provider) ? provider : "openai",
+        isProvider(provider) ? provider : defaultSettings.provider,
       );
     } catch {
       return { ...defaultSettings };

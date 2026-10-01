@@ -16,3 +16,4 @@ import "./lib/storage/storage.test.mjs";
 import "./lib/interview/architecture-fixes.test.mjs";
 import "./lib/interview/vocabulary.test.mjs";
 import "./lib/ai/prompt-loader.test.mjs";
+import "./lib/config/config.test.mjs";
