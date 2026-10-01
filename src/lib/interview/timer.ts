@@ -29,3 +29,7 @@ export function formatElapsed(milliseconds: number): string {
     .toString()
     .padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
 }
+
+export function formatRemaining(milliseconds: number): string {
+  return `${milliseconds < 0 ? "+" : ""}${formatElapsed(Math.abs(milliseconds))}`;
+}

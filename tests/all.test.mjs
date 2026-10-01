@@ -20,3 +20,4 @@ import "./lib/config/config.test.mjs";
 import "./components/interview-controls.test.mjs";
 import "./components/interview-panes.test.mjs";
 import "./components/problem-panel.test.mjs";
+import "./lib/interview/timer.test.mjs";
