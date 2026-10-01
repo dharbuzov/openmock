@@ -95,3 +95,15 @@ an initialized interview with status 201. Invalid JSON or missing/invalid
 `problemId` returns 400; unknown problems return 404.
 
 Run checks with `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`.
+
+`npm run check` runs lint, typecheck, tests, and dependency-cruiser boundary
+validation. Run `npm run check:boundaries` separately to inspect dependency
+violations, cycles, and unresolved imports. TypeScript aliases come from
+`tsconfig.json`; type-only dependencies are included.
+
+`npm run check:size` uses [scc](https://github.com/boyter/scc#install), which must
+be installed on your PATH, to report production source code, comments, blanks,
+and per-file sizes sorted by code lines. It excludes tests, generated files,
+dependencies, and build output. Files over 300 or 500 code lines are inspection
+signals, never quality gates. Semantic architecture decisions remain the
+responsibility of the `openmock-architecture` skill.

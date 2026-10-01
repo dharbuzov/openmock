@@ -11,7 +11,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "test": "node tests/all.test.mjs"
+    "test": "node tests/all.test.mjs",
+    "check:boundaries": "depcruise --config .dependency-cruiser.cjs src",
+    "check:size": "scc src --by-file --sort code --no-cocomo --no-complexity --no-gen --exclude-dir node_modules,.next,out,build,dist,coverage,tests --exclude-file next-env.d.ts --exclude-ext ico,svg --not-match \"\\.(test|spec)\\.|\\.d\\.[cm]?ts$\"",
+    "check": "npm run lint && npm run typecheck && npm test && npm run check:boundaries"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.125",
@@ -40,6 +43,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dependency-cruiser": "^17.4.3",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "eslint-config-prettier": "^10.1.8",
