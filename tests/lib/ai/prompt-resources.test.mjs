@@ -10,7 +10,10 @@ const { readPromptResource } = load("../src/lib/ai/prompt-resources.ts");
 const { interviewerSystemPrompt } = load("../src/lib/ai/prompts.ts");
 
 test("loads required global prompts from root prompt resources", async () => {
-  assert.match(await readPromptResource("interviewer"), /OpenMock's interviewer/);
+  assert.match(
+    await readPromptResource("interviewer"),
+    /OpenMock's interviewer/,
+  );
   assert.match(await readPromptResource("evaluator"), /supplied evidence/);
 });
 
@@ -19,8 +22,14 @@ test("missing and empty required prompts fail clearly", async () => {
   try {
     await mkdir(path.join(root, "prompts"));
     await writeFile(path.join(root, "prompts", "evaluator.md"), "   ", "utf8");
-    await assert.rejects(readPromptResource("interviewer", root), /Required prompt could not be loaded/);
-    await assert.rejects(readPromptResource("evaluator", root), /Required prompt is empty/);
+    await assert.rejects(
+      readPromptResource("interviewer", root),
+      /Required prompt could not be loaded/,
+    );
+    await assert.rejects(
+      readPromptResource("evaluator", root),
+      /Required prompt is empty/,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }

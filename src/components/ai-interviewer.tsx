@@ -13,7 +13,8 @@ import { isCloudSettings } from "@/lib/settings/types";
 import type { WorkspaceSnapshot } from "@/lib/interview/types";
 
 export function AIInterviewer() {
-  const { interview, setInterview, problem, definition } = useInterviewSession();
+  const { interview, setInterview, problem, definition } =
+    useInterviewSession();
   const { messages } = interview;
   const { captureCurrentArchitecture } = useInterviewDiagram();
   const [answer, setAnswer] = useState("");
@@ -25,22 +26,46 @@ export function AIInterviewer() {
   const lastWorkspaceSnapshot = useRef<WorkspaceSnapshot | null>(null);
   const openSettings = useOpenSettings();
   useEffect(() => () => controller.current?.abort(), []);
-  useEffect(() => { end.current?.scrollIntoView({ block: "nearest" }); }, [messages, pending, error]);
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "nearest" });
+  }, [messages, pending, error]);
 
   async function send(retry = false) {
     if (controller.current || (!retry && !answer.trim())) return;
     const settings = readSettings();
-    if ((isCloudSettings(settings) && !settings.apiKey) || !settings.model) { openSettings(); return; }
+    if ((isCloudSettings(settings) && !settings.apiKey) || !settings.model) {
+      openSettings();
+      return;
+    }
     const request = new AbortController();
     controller.current = request;
-    const { acceptCandidateMessage, processCandidateMessage } = await import("@/lib/interview/engine");
+    const { acceptCandidateMessage, processCandidateMessage } =
+      await import("@/lib/interview/engine");
     const next = retry ? interview : acceptCandidateMessage(interview, answer);
     if (!retry) {
       switch (definition.workspace) {
-        case "diagram": lastWorkspaceSnapshot.current = { type: "diagram", diagram: captureCurrentArchitecture() }; break;
-        case "code": lastWorkspaceSnapshot.current = { type: "code", ...(code.current ?? { language: "text", filename: "solution.txt", code: "" }) }; break;
-        case "project": lastWorkspaceSnapshot.current = { type: "project", files: [] }; break;
-        case "none": lastWorkspaceSnapshot.current = { type: "none" }; break;
+        case "diagram":
+          lastWorkspaceSnapshot.current = {
+            type: "diagram",
+            diagram: captureCurrentArchitecture(),
+          };
+          break;
+        case "code":
+          lastWorkspaceSnapshot.current = {
+            type: "code",
+            ...(code.current ?? {
+              language: "text",
+              filename: "solution.txt",
+              code: "",
+            }),
+          };
+          break;
+        case "project":
+          lastWorkspaceSnapshot.current = { type: "project", files: [] };
+          break;
+        case "none":
+          lastWorkspaceSnapshot.current = { type: "none" };
+          break;
       }
     }
     const workspaceSnapshot = lastWorkspaceSnapshot.current ?? undefined;
@@ -49,12 +74,22 @@ export function AIInterviewer() {
     setError("");
     setPending(true);
     try {
-      const result = await processCandidateMessage(settings, next, problem, definition, workspaceSnapshot, request.signal);
+      const result = await processCandidateMessage(
+        settings,
+        next,
+        problem,
+        definition,
+        workspaceSnapshot,
+        request.signal,
+      );
       if (!request.signal.aborted) {
         setInterview(result);
       }
     } catch {
-      if (!request.signal.aborted) setError("Could not reach the interviewer. Check your AI settings and try again.");
+      if (!request.signal.aborted)
+        setError(
+          "Could not reach the interviewer. Check your AI settings and try again.",
+        );
     } finally {
       controller.current = null;
       if (!request.signal.aborted) setPending(false);
@@ -62,47 +97,124 @@ export function AIInterviewer() {
   }
 
   return (
-    <section aria-labelledby="interviewer-heading" className="flex h-full min-h-0 flex-col">
+    <section
+      aria-labelledby="interviewer-heading"
+      className="flex h-full min-h-0 flex-col"
+    >
       <div className="flex h-11 shrink-0 items-center justify-between border-b px-4">
-        <h2 id="interviewer-heading" className="text-xs font-medium">AI Interviewer</h2>
+        <h2 id="interviewer-heading" className="text-xs font-medium">
+          AI Interviewer
+        </h2>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-        {messages.length === 0 && <div className="flex flex-col gap-3">
-          <p className="text-sm leading-6 text-muted-foreground">Begin by walking me through your initial approach, or introduce yourself.</p>
-          <Button variant="outline" size="sm" onClick={openSettings}>Configure AI provider</Button>
-        </div>}
-        <ol aria-label="Interview conversation" aria-live="polite" className="flex flex-col gap-7">
+        {messages.length === 0 && (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm leading-6 text-muted-foreground">
+              Begin by walking me through your initial approach, or introduce
+              yourself.
+            </p>
+            <Button variant="outline" size="sm" onClick={openSettings}>
+              Configure AI provider
+            </Button>
+          </div>
+        )}
+        <ol
+          aria-label="Interview conversation"
+          aria-live="polite"
+          className="flex flex-col gap-7"
+        >
           {messages.map((message) => (
-            <li key={message.id} className={message.role === "candidate" ? "border-l-2 pl-3" : undefined}>
-              <p className="mb-2 text-xs font-medium">{message.role === "candidate" ? "You" : "AI Interviewer"}</p>
-              <p className="whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{message.content}</p>
+            <li
+              key={message.id}
+              className={
+                message.role === "candidate" ? "border-l-2 pl-3" : undefined
+              }
+            >
+              <p className="mb-2 text-xs font-medium">
+                {message.role === "candidate" ? "You" : "AI Interviewer"}
+              </p>
+              <p className="whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">
+                {message.content}
+              </p>
             </li>
           ))}
         </ol>
-        {pending && <p role="status" className="mt-4 text-xs text-muted-foreground">Interviewer is thinking…</p>}
-        {error && <div className="mt-4 flex flex-col gap-3">
-          <p role="alert" className="text-xs leading-5 text-muted-foreground">{error}</p>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => send(true)}>Retry</Button>
-            <Button size="sm" variant="ghost" onClick={openSettings}>AI settings</Button>
+        {pending && (
+          <p role="status" className="mt-4 text-xs text-muted-foreground">
+            Interviewer is thinking…
+          </p>
+        )}
+        {error && (
+          <div className="mt-4 flex flex-col gap-3">
+            <p role="alert" className="text-xs leading-5 text-muted-foreground">
+              {error}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => send(true)}>
+                Retry
+              </Button>
+              <Button size="sm" variant="ghost" onClick={openSettings}>
+                AI settings
+              </Button>
+            </div>
           </div>
-        </div>}
+        )}
         <div ref={end} />
       </div>
-      <form onSubmit={(event) => { event.preventDefault(); void send(); }} className="flex shrink-0 flex-col gap-3 border-t p-4">
-        <label htmlFor="interview-answer" className="sr-only">Your answer</label>
-        <Textarea id="interview-answer" name="answer" placeholder="Type your answer…" value={answer}
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void send();
+        }}
+        className="flex shrink-0 flex-col gap-3 border-t p-4"
+      >
+        <label htmlFor="interview-answer" className="sr-only">
+          Your answer
+        </label>
+        <Textarea
+          id="interview-answer"
+          name="answer"
+          placeholder="Type your answer…"
+          value={answer}
           onChange={(event) => setAnswer(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault(); void send();
+            if (
+              event.key === "Enter" &&
+              !event.shiftKey &&
+              !event.nativeEvent.isComposing
+            ) {
+              event.preventDefault();
+              void send();
             }
-          }} aria-describedby="answer-note" className="max-h-36 min-h-24 resize-none" />
+          }}
+          aria-describedby="answer-note"
+          className="max-h-36 min-h-24 resize-none"
+        />
         <div className="flex items-center justify-between gap-2">
-          <p id="answer-note" className="text-xs leading-5 text-muted-foreground">Shift+Enter for a new line</p>
+          <p
+            id="answer-note"
+            className="text-xs leading-5 text-muted-foreground"
+          >
+            Shift+Enter for a new line
+          </p>
           <div className="flex items-center gap-1">
-            <Button type="button" variant="ghost" size="icon-sm" disabled aria-label="Microphone unavailable" title="Voice input is not available"><Mic aria-hidden="true" /></Button>
-            <Button type="submit" size="sm" disabled={pending || !answer.trim()}>Send</Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              disabled
+              aria-label="Microphone unavailable"
+              title="Voice input is not available"
+            >
+              <Mic aria-hidden="true" />
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={pending || !answer.trim()}
+            >
+              Send
+            </Button>
           </div>
         </div>
       </form>

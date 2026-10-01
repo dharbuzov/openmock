@@ -1,13 +1,21 @@
 import type { InterviewContext } from "../interview/types";
 import { loadPrompt } from "./prompt-loader";
 
-export async function interviewerSystemPrompt(context: InterviewContext): Promise<string> {
+export async function interviewerSystemPrompt(
+  context: InterviewContext,
+): Promise<string> {
   return `${await loadPrompt("interviewer")}\n\n${context.definition.instructions}`;
 }
 
 export function interviewContext(context: InterviewContext): string {
-  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - Date.parse(context.interview.startedAt)) / 60_000));
-  const remainingMinutes = Math.max(0, context.definition.duration.defaultMinutes - elapsedMinutes);
+  const elapsedMinutes = Math.max(
+    0,
+    Math.floor((Date.now() - Date.parse(context.interview.startedAt)) / 60_000),
+  );
+  const remainingMinutes = Math.max(
+    0,
+    context.definition.duration.defaultMinutes - elapsedMinutes,
+  );
   return JSON.stringify({
     interviewDefinition: {
       id: context.definition.id,

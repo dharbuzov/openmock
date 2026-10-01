@@ -16,7 +16,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "OpenMock",
-  description: "Free, open-source technical interview practice for software engineers.",
+  description:
+    "Free, open-source technical interview practice for software engineers.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -26,7 +27,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col"><AppProviders><Header />{children}</AppProviders></body>
+      <body className="min-h-full flex flex-col">
+        <AppProviders>
+          <Header />
+          {children}
+        </AppProviders>
+      </body>
     </html>
   );
 }

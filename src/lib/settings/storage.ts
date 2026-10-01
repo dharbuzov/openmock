@@ -1,4 +1,8 @@
-import { localStorage, localTextStorage, sessionTextStorage } from "../storage/local-storage";
+import {
+  localStorage,
+  localTextStorage,
+  sessionTextStorage,
+} from "../storage/local-storage";
 import type { Storage } from "../storage/storage";
 import {
   aiProviders,
@@ -40,13 +44,15 @@ export class SettingsStorage {
   ) {}
 
   private readPreferences(): StoredPreferences {
-    const stored = this.preferencesStorage.get<StoredPreferences>(preferencesKey);
+    const stored =
+      this.preferencesStorage.get<StoredPreferences>(preferencesKey);
     if (stored) return stored;
 
-    const legacy = (this.preferencesStorage.get<{
-      model?: string;
-      rememberApiKey?: boolean;
-    }>(legacyPreferencesKey) ?? {});
+    const legacy =
+      this.preferencesStorage.get<{
+        model?: string;
+        rememberApiKey?: boolean;
+      }>(legacyPreferencesKey) ?? {};
     return {
       provider: "openai",
       openai: {
@@ -56,11 +62,18 @@ export class SettingsStorage {
     };
   }
 
-  private readApiKey(provider: CloudProviderId, rememberApiKey: boolean): string {
+  private readApiKey(
+    provider: CloudProviderId,
+    rememberApiKey: boolean,
+  ): string {
     const storage = rememberApiKey ? this.persistentKeys : this.temporaryKeys;
-    return storage.get<string>(apiKeyStorageKey(provider))
-      ?? (provider === "openai" ? storage.get<string>(legacyApiKeyStorageKey) : null)
-      ?? "";
+    return (
+      storage.get<string>(apiKeyStorageKey(provider)) ??
+      (provider === "openai"
+        ? storage.get<string>(legacyApiKeyStorageKey)
+        : null) ??
+      ""
+    );
   }
 
   readProviderSettings(provider: AIProviderId): AISettings {
@@ -69,7 +82,9 @@ export class SettingsStorage {
       if (provider === "ollama") {
         return {
           provider,
-          baseUrl: preferences.ollama?.baseUrl?.trim() || defaultOllamaSettings.baseUrl,
+          baseUrl:
+            preferences.ollama?.baseUrl?.trim() ||
+            defaultOllamaSettings.baseUrl,
           model: preferences.ollama?.model?.trim() ?? "",
         };
       }
@@ -78,7 +93,7 @@ export class SettingsStorage {
       const models = provider === "openai" ? openAIModels : anthropicModels;
       const fallback = defaultSettingsByProvider[provider];
       const model = models.some(({ value }) => value === saved?.model)
-        ? saved?.model ?? fallback.model
+        ? (saved?.model ?? fallback.model)
         : fallback.model;
       const rememberApiKey = saved?.rememberApiKey === true;
       return {
@@ -95,7 +110,9 @@ export class SettingsStorage {
   readSettings(): AISettings {
     try {
       const provider = this.readPreferences().provider;
-      return this.readProviderSettings(isProvider(provider) ? provider : "openai");
+      return this.readProviderSettings(
+        isProvider(provider) ? provider : "openai",
+      );
     } catch {
       return { ...defaultSettings };
     }
@@ -107,20 +124,29 @@ export class SettingsStorage {
 
     if (settings.provider !== "openai") {
       const rememberOpenAIKey = preferences.openai?.rememberApiKey === true;
-      const legacyStorage = rememberOpenAIKey ? this.persistentKeys : this.temporaryKeys;
+      const legacyStorage = rememberOpenAIKey
+        ? this.persistentKeys
+        : this.temporaryKeys;
       const legacyKey = legacyStorage.get<string>(legacyApiKeyStorageKey);
       const migratedKey = apiKeyStorageKey("openai");
-      if (legacyKey && !legacyStorage.get<string>(migratedKey)) legacyStorage.set(migratedKey, legacyKey);
+      if (legacyKey && !legacyStorage.get<string>(migratedKey))
+        legacyStorage.set(migratedKey, legacyKey);
     }
 
     if (settings.provider === "ollama") {
-      preferences.ollama = { baseUrl: settings.baseUrl.trim(), model: settings.model };
+      preferences.ollama = {
+        baseUrl: settings.baseUrl.trim(),
+        model: settings.model,
+      };
     } else {
       const key = apiKeyStorageKey(settings.provider);
       this.persistentKeys.remove(key);
       this.temporaryKeys.remove(key);
       if (settings.apiKey) {
-        (settings.rememberApiKey ? this.persistentKeys : this.temporaryKeys).set(key, settings.apiKey);
+        (settings.rememberApiKey
+          ? this.persistentKeys
+          : this.temporaryKeys
+        ).set(key, settings.apiKey);
       }
       preferences[settings.provider] = {
         model: settings.model,
@@ -132,10 +158,15 @@ export class SettingsStorage {
     this.persistentKeys.remove(legacyApiKeyStorageKey);
     this.temporaryKeys.remove(legacyApiKeyStorageKey);
   }
-
 }
 
-const settingsStorage = new SettingsStorage(localStorage, localTextStorage, sessionTextStorage);
+const settingsStorage = new SettingsStorage(
+  localStorage,
+  localTextStorage,
+  sessionTextStorage,
+);
 export const readSettings = () => settingsStorage.readSettings();
-export const readProviderSettings = (provider: AIProviderId) => settingsStorage.readProviderSettings(provider);
-export const saveSettings = (settings: AISettings) => settingsStorage.saveSettings(settings);
+export const readProviderSettings = (provider: AIProviderId) =>
+  settingsStorage.readProviderSettings(provider);
+export const saveSettings = (settings: AISettings) =>
+  settingsStorage.saveSettings(settings);

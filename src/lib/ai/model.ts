@@ -1,7 +1,11 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOllama } from "ollama-ai-provider-v2";
-import { defaultSettingsMiddleware, wrapLanguageModel, type LanguageModel } from "ai";
+import {
+  defaultSettingsMiddleware,
+  wrapLanguageModel,
+  type LanguageModel,
+} from "ai";
 import type { AISettings } from "../settings/types";
 import { normalizeOllamaBaseUrl } from "./ollama";
 
@@ -13,11 +17,15 @@ export class AIConfigurationError extends Error {
 }
 
 export function getLanguageModel(settings: AISettings): LanguageModel {
-  if (!settings.model.trim()) throw new AIConfigurationError("Select an AI model before continuing.");
+  if (!settings.model.trim())
+    throw new AIConfigurationError("Select an AI model before continuing.");
 
   switch (settings.provider) {
     case "openai": {
-      if (!settings.apiKey.trim()) throw new AIConfigurationError("Enter an OpenAI API key before continuing.");
+      if (!settings.apiKey.trim())
+        throw new AIConfigurationError(
+          "Enter an OpenAI API key before continuing.",
+        );
       return wrapLanguageModel({
         model: createOpenAI({ apiKey: settings.apiKey.trim() })(settings.model),
         middleware: defaultSettingsMiddleware({
@@ -26,7 +34,10 @@ export function getLanguageModel(settings: AISettings): LanguageModel {
       });
     }
     case "anthropic": {
-      if (!settings.apiKey.trim()) throw new AIConfigurationError("Enter an Anthropic API key before continuing.");
+      if (!settings.apiKey.trim())
+        throw new AIConfigurationError(
+          "Enter an Anthropic API key before continuing.",
+        );
       return createAnthropic({
         apiKey: settings.apiKey.trim(),
         headers: { "anthropic-dangerous-direct-browser-access": "true" },

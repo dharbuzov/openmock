@@ -39,7 +39,8 @@ export interface OllamaSettings {
 }
 
 export type AISettings = OpenAISettings | AnthropicSettings | OllamaSettings;
-export type CloudProviderId = OpenAISettings["provider"] | AnthropicSettings["provider"];
+export type CloudProviderId =
+  OpenAISettings["provider"] | AnthropicSettings["provider"];
 
 export const defaultOllamaSettings: OllamaSettings = {
   provider: "ollama",
@@ -63,8 +64,12 @@ export const defaultSettingsByProvider: Record<AIProviderId, AISettings> = {
   ollama: defaultOllamaSettings,
 };
 
-export const defaultSettings: AISettings = { ...defaultSettingsByProvider.openai };
+export const defaultSettings: AISettings = {
+  ...defaultSettingsByProvider.openai,
+};
 
-export function isCloudSettings(settings: AISettings): settings is OpenAISettings | AnthropicSettings {
+export function isCloudSettings(
+  settings: AISettings,
+): settings is OpenAISettings | AnthropicSettings {
   return settings.provider === "openai" || settings.provider === "anthropic";
 }

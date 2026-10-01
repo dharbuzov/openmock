@@ -5,7 +5,11 @@ import ts from "typescript";
 export const load = createRequire(import.meta.url);
 load.extensions[".ts"] = (module, filename) => {
   const { outputText } = ts.transpileModule(readFileSync(filename, "utf8"), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+      esModuleInterop: true,
+    },
   });
   module._compile(outputText, filename);
 };

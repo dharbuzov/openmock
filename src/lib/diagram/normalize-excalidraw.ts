@@ -1,7 +1,12 @@
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { ArchitectureDiagram, DiagramEdge, DiagramNode } from "./types";
 
-const nodeTypes = new Set<DiagramNode["type"]>(["rectangle", "ellipse", "diamond", "frame"]);
+const nodeTypes = new Set<DiagramNode["type"]>([
+  "rectangle",
+  "ellipse",
+  "diamond",
+  "frame",
+]);
 const maxNodes = 80;
 const maxEdges = 120;
 
@@ -10,11 +15,15 @@ function compactLabel(value: string | null | undefined): string | undefined {
   return compact ? compact.slice(0, 160) : undefined;
 }
 
-export function normalizeExcalidrawScene(elements: readonly ExcalidrawElement[]): ArchitectureDiagram {
+export function normalizeExcalidrawScene(
+  elements: readonly ExcalidrawElement[],
+): ArchitectureDiagram {
   const visible = elements.filter((element) => !element.isDeleted);
-  const textById = new Map(visible
-    .filter((element) => element.type === "text")
-    .map((element) => [element.id, element]));
+  const textById = new Map(
+    visible
+      .filter((element) => element.type === "text")
+      .map((element) => [element.id, element]),
+  );
   const labelsByContainer = new Map<string, string[]>();
 
   for (const element of visible) {
@@ -31,7 +40,8 @@ export function normalizeExcalidrawScene(elements: readonly ExcalidrawElement[])
     for (const binding of element.boundElements ?? []) {
       if (binding.type !== "text") continue;
       const boundText = textById.get(binding.id);
-      const label = boundText?.type === "text" ? compactLabel(boundText.text) : undefined;
+      const label =
+        boundText?.type === "text" ? compactLabel(boundText.text) : undefined;
       if (label && !labels.includes(label)) labels.push(label);
     }
     if (labels.length > 0) return compactLabel(labels.join(" "));
@@ -39,9 +49,10 @@ export function normalizeExcalidrawScene(elements: readonly ExcalidrawElement[])
   }
 
   const nodes: DiagramNode[] = visible
-    .filter((element): element is ExcalidrawElement & { type: DiagramNode["type"] } => (
-      nodeTypes.has(element.type as DiagramNode["type"])
-    ))
+    .filter(
+      (element): element is ExcalidrawElement & { type: DiagramNode["type"] } =>
+        nodeTypes.has(element.type as DiagramNode["type"]),
+    )
     .slice(0, maxNodes)
     .map((element) => {
       const label = labelFor(element);

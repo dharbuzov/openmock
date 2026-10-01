@@ -20,11 +20,14 @@ export class LocalStorage implements Storage {
   get<T>(key: string): T | null {
     const value = this.browserStorage?.getItem(key);
     if (value == null) return null;
-    return this.format === "text" ? value as T : deserialize<T>(value);
+    return this.format === "text" ? (value as T) : deserialize<T>(value);
   }
 
   set<T>(key: string, value: T): void {
-    this.browserStorage?.setItem(key, this.format === "text" ? String(value) : JSON.stringify(value));
+    this.browserStorage?.setItem(
+      key,
+      this.format === "text" ? String(value) : JSON.stringify(value),
+    );
   }
 
   remove(key: string): void {

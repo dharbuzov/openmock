@@ -13,18 +13,29 @@ export class InterviewLayoutStorage {
       const layout = this.storage.get<Layout>(layoutKey);
       if (!layout) return defaultLayout;
       const sizes = Object.keys(defaultLayout).map((key) => layout?.[key]);
-      if (sizes.every((size) => typeof size === "number" && Number.isFinite(size) && size > 0)
-        && Math.abs(sizes.reduce((sum, size) => sum + size, 0) - 100) < 0.1) return layout;
-    } catch { /* Storage may be unavailable or contain an outdated preference. */ }
+      if (
+        sizes.every(
+          (size) =>
+            typeof size === "number" && Number.isFinite(size) && size > 0,
+        ) &&
+        Math.abs(sizes.reduce((sum, size) => sum + size, 0) - 100) < 0.1
+      )
+        return layout;
+    } catch {
+      /* Storage may be unavailable or contain an outdated preference. */
+    }
     return defaultLayout;
   }
   saveLayout(layout: Layout) {
-    try { this.storage.set(layoutKey, layout); }
-    catch { /* Resizing still works when storage is unavailable. */ }
+    try {
+      this.storage.set(layoutKey, layout);
+    } catch {
+      /* Resizing still works when storage is unavailable. */
+    }
   }
-
 }
 
 const interviewLayoutStorage = new InterviewLayoutStorage(localStorage);
 export const readLayout = () => interviewLayoutStorage.readLayout();
-export const saveLayout = (layout: Layout) => interviewLayoutStorage.saveLayout(layout);
+export const saveLayout = (layout: Layout) =>
+  interviewLayoutStorage.saveLayout(layout);

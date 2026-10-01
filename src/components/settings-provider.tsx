@@ -13,10 +13,21 @@ const SettingsContext = createContext<(() => void) | null>(null);
 export function AppProviders({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<AISettings | null>(null);
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey={themeStorageKey} disableTransitionOnChange>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      storageKey={themeStorageKey}
+      disableTransitionOnChange
+    >
       <SettingsContext value={() => setDraft(readSettings())}>
         {children}
-        {draft && <SettingsDialog initialSettings={draft} onClose={() => setDraft(null)} />}
+        {draft && (
+          <SettingsDialog
+            initialSettings={draft}
+            onClose={() => setDraft(null)}
+          />
+        )}
       </SettingsContext>
     </ThemeProvider>
   );
@@ -30,5 +41,15 @@ export function useOpenSettings() {
 
 export function SettingsButton() {
   const open = useOpenSettings();
-  return <Button variant="ghost" size="icon-sm" aria-label="Settings" title="Settings" onClick={open}><Settings aria-hidden="true" /></Button>;
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Settings"
+      title="Settings"
+      onClick={open}
+    >
+      <Settings aria-hidden="true" />
+    </Button>
+  );
 }

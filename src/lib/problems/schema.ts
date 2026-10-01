@@ -2,7 +2,12 @@ import { z } from "zod";
 import { load, JSON_SCHEMA } from "js-yaml";
 import type { Problem, ProblemComplexity, ProblemMetadata } from "./types";
 
-const slugSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must be a lowercase, hyphen-separated slug");
+const slugSchema = z
+  .string()
+  .regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    "must be a lowercase, hyphen-separated slug",
+  );
 const nonEmptyString = z.string().trim().min(1);
 const stringList = z.array(nonEmptyString).default([]);
 
@@ -29,10 +34,13 @@ const normalizedMetadataSchema = z.object({
 function legacyComplexity(level: unknown): ProblemComplexity {
   if (typeof level !== "string") return "low";
   switch (level.trim().toLowerCase()) {
-    case "medium": return "medium";
+    case "medium":
+      return "medium";
     case "hard":
-    case "high": return "high";
-    default: return "low";
+    case "high":
+      return "high";
+    default:
+      return "low";
   }
 }
 
@@ -51,27 +59,43 @@ export function parseProblemMetadata(value: unknown): ProblemMetadata {
     tags: input.tags ?? [],
   });
   if (!parsed.success) {
-    throw new Error(parsed.error.issues.map((issue) => `${issue.path.join(".") || "frontmatter"} ${issue.message}`).join("; "));
+    throw new Error(
+      parsed.error.issues
+        .map(
+          (issue) =>
+            `${issue.path.join(".") || "frontmatter"} ${issue.message}`,
+        )
+        .join("; "),
+    );
   }
   return parsed.data;
 }
 
 export function parseProblemDocument(source: string): Problem {
   const normalized = source.replace(/^\uFEFF/, "");
-  const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/.exec(normalized);
+  const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/.exec(
+    normalized,
+  );
   if (!match) throw new Error("Missing YAML frontmatter.");
-  const metadata = parseProblemMetadata(load(match[1], { schema: JSON_SCHEMA }));
+  const metadata = parseProblemMetadata(
+    load(match[1], { schema: JSON_SCHEMA }),
+  );
   const body = match[2].trim();
   const contextHeading = /^# Interviewer Context\s*$/m.exec(body);
-  const content = (contextHeading ? body.slice(0, contextHeading.index) : body).trim();
+  const content = (
+    contextHeading ? body.slice(0, contextHeading.index) : body
+  ).trim();
   if (!content) throw new Error("Problem body must not be empty.");
   const sectionContext = contextHeading
     ? body.slice(contextHeading.index + contextHeading[0].length).trim()
     : undefined;
-  const { interviewerContext: frontmatterContext, ...publicMetadata } = metadata;
+  const { interviewerContext: frontmatterContext, ...publicMetadata } =
+    metadata;
   return {
     ...publicMetadata,
     content,
-    ...(sectionContext || frontmatterContext ? { interviewerContext: sectionContext || frontmatterContext } : {}),
+    ...(sectionContext || frontmatterContext
+      ? { interviewerContext: sectionContext || frontmatterContext }
+      : {}),
   };
 }

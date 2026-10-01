@@ -11,7 +11,11 @@ const Excalidraw = dynamic(
   () => import("@excalidraw/excalidraw").then((module) => module.Excalidraw),
   {
     ssr: false,
-    loading: () => <p role="status" className="p-6 text-sm text-muted-foreground">Loading workspace…</p>,
+    loading: () => (
+      <p role="status" className="p-6 text-sm text-muted-foreground">
+        Loading workspace…
+      </p>
+    ),
   },
 );
 
@@ -25,9 +29,14 @@ export function ExcalidrawWorkspace() {
   }, [registerSceneReader]);
 
   return (
-    <section aria-label="Excalidraw workspace" className="excalidraw-canvas h-full min-h-0 w-full">
+    <section
+      aria-label="Excalidraw workspace"
+      className="excalidraw-canvas h-full min-h-0 w-full"
+    >
       <Excalidraw
-        excalidrawAPI={(api) => { editor.current = api; }}
+        excalidrawAPI={(api) => {
+          editor.current = api;
+        }}
         theme={resolvedTheme === "dark" ? "dark" : "light"}
         autoFocus={false}
         handleKeyboardGlobally={false}

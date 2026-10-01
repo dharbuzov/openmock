@@ -1,9 +1,17 @@
 "use client";
 
-import { createContext, useContext, useRef, type ReactNode, type RefObject } from "react";
+import {
+  createContext,
+  useContext,
+  useRef,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
 type CodeSnapshot = { language: string; filename: string; code: string };
-const CodeContext = createContext<RefObject<CodeSnapshot | undefined> | null>(null);
+const CodeContext = createContext<RefObject<CodeSnapshot | undefined> | null>(
+  null,
+);
 
 export function InterviewCodeProvider({ children }: { children: ReactNode }) {
   const snapshot = useRef<CodeSnapshot | undefined>(undefined);

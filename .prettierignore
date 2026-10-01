@@ -1,0 +1,18 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+package-lock.json
+skills-lock.json
+.agents/
+.codex/
+
+# Runtime content: preserve interview definitions, problems, and prompts verbatim.
+/interviews/
+/problems/
+/prompts/

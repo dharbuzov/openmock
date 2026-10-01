@@ -37,6 +37,7 @@ precise, minimal, compact, and functional.
 Application interfaces should resemble developer tools rather than SaaS dashboards.
 
 Prefer:
+
 - Geist typography
 - monochrome surfaces
 - thin separators
@@ -46,6 +47,7 @@ Prefer:
 - workspace-oriented layouts
 
 Avoid:
+
 - generic SaaS cards
 - gradients
 - glassmorphism
@@ -56,6 +58,7 @@ Avoid:
 - unnecessary animations
 
 For the Interview Room:
+
 - use `Problem | Workspace | AI Interviewer`
 - make the workspace the dominant surface
 - prefer separators over cards
@@ -72,4 +75,3 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
-
