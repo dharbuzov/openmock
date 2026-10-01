@@ -1,111 +1,153 @@
 # OpenMock
 
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-App_Router-black?logo=nextdotjs)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+![Status: Active development](https://img.shields.io/badge/Status-Active_development-orange)
+
 **Free and open-source AI mock interviews for software engineers.**
 
-Practice technical interviews with an AI interviewer that asks questions,
-challenges your decisions, and adapts to your answers.
+Practice with an AI interviewer that asks questions, challenges your decisions,
+and adapts to your answers. Choose a problem, explain your approach, and review
+feedback grounded in your conversation and workspace.
 
-## Why OpenMock?
-
-Interview preparation shouldn't require another subscription.
-
-OpenMock is built to make realistic AI mock interviews freely available
-to engineers, especially when preparing for their next role.
-
-No courses. No endless content library.
-
-Pick an interview and practice.
+OpenMock is under active development. You can run it locally, add interview
+content, and contribute improvements.
 
 ## Interviews
 
-- **System Design** — design systems, explain trade-offs, and handle follow-up questions.
+- **System Design** — design systems, explain trade-offs, and answer follow-up questions.
 - **DSA** — solve coding problems while explaining your reasoning.
-
-More interview types can be added over time.
+- **Behavioral** — discuss your experience, decisions, and collaboration.
 
 ## How it works
 
-1. Choose an interview.
-2. Start the interview room.
-3. Talk through your solution.
-4. Get challenged by the AI interviewer.
-5. Review your performance and feedback.
+1. Configure your AI provider in Settings.
+2. Choose a practice problem and start an interview.
+3. Explain your solution and work in the code or diagram workspace when needed.
+4. Answer follow-up questions from the AI interviewer.
+5. Finish the interview to review evidence-based feedback.
 
-## AI
+## AI providers
 
-OpenMock is designed around **Bring Your Own Key (BYOK)**.
+OpenMock supports **Bring Your Own Key (BYOK)** with OpenAI and Anthropic,
+as well as local models through Ollama. Provider settings are configured in the
+browser. OpenMock does not charge a subscription; cloud providers charge for
+model usage according to their own pricing.
 
-Use your own supported AI provider instead of paying OpenMock for model usage.
+## Tech stack
 
-Local models are also planned.
+Next.js App Router, TypeScript, React, Tailwind CSS, shadcn/ui, and Geist.
+The code workspace uses Monaco, and the diagram workspace uses Excalidraw.
 
-## Open Source
+## Architecture
 
-The interview experience is open source.
+OpenMock is a modular monolith that separates the **interview engine** from
+**interview content**.
 
-You can run OpenMock yourself, modify it, create new interview types,
-and contribute improvements back to the community.
+The engine manages interview state, stage progression, workspace snapshots,
+and evaluation orchestration. It uses interview definitions rather than branching
+on specific interview types such as System Design, DSA, or Behavioral.
+The AI layer builds prompts and generates structured responses; the engine
+validates and applies those responses.
 
-## Tech Stack
+```text
+content/
+├── interviews/    # Interview definitions and instructions
+├── problems/      # Practice problems and interviewer context
+└── prompts/       # Global interviewer and evaluator prompts
 
-- Next.js
-- TypeScript
-- Tailwind CSS
-- shadcn/ui
-- Geist
+src/
+├── app/           # Pages and API routes
+├── components/    # Interview panels, workspaces, and UI primitives
+└── lib/
+    ├── interview/ # Definitions, lifecycle, and domain result validation
+    ├── ai/        # Model selection, prompts, generation, and evaluation
+    ├── problems/  # Problem discovery, loading, and validation
+    ├── diagram/   # Diagram snapshot normalization
+    ├── settings/  # Provider settings and their persistence
+    └── storage/   # Shared browser storage primitives
+```
 
-## Status
+### Definition-driven interviews
 
-🚧 **OpenMock is under active development.**
+Each Markdown interview definition describes:
 
-The project is currently focused on building the first usable version
-of the interview experience.
+- Stages and their order.
+- Interviewer instructions.
+- Supported modes and target levels.
+- Workspace requirements.
+- Evaluation competencies and allowed recommendations.
+
+Adding an interview type that uses an existing workspace capability requires
+content changes without TypeScript registration. A new workspace capability may
+also require application code.
+
+Problems contain YAML metadata, candidate-facing Markdown, and optional hidden
+interviewer context. Each problem references an interview definition through its
+`interview` field. Global prompts define behavior shared across interview types.
+
+See the [content guide](./content/README.md) for directory details and links to
+instructions for adding definitions and problems.
+
+### Module boundaries
+
+- Keep the engine independent of concrete interview types.
+- Prefer definitions and composition over type-specific branching.
+- Keep model selection independent of concrete interview definitions.
+- Keep domain rules in library modules and UI interactions in components.
+- Keep shared storage primitives independent of domain modules and React.
+- Prefer small, explicit abstractions over speculative frameworks.
+
+Provider settings, layout preferences, and evaluation persistence remain owned
+by their respective modules, using shared storage primitives. Completed
+evaluations are retained in browser session storage and contain no provider
+credentials. Interview IDs currently match problem IDs.
+
+Voice, authentication, server-side databases, and code execution are outside
+the current implementation.
 
 ## Development
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/dharbuzov/openmock.git
 cd openmock
-
 npm install
 npm run dev
 ```
 
-## Application architecture
+Open [localhost:3000](http://localhost:3000), configure your provider in Settings,
+and visit `/practice` to choose a problem.
 
-The current implementation supports browser-configured BYOK AI providers,
-interactive DSA and System Design workspaces, adaptive interview turns, and
-structured evidence-based evaluation. Voice, authentication, databases, and
-code execution are intentionally out of scope.
+### Checks
 
-- `content/interviews/`: interview definitions and instructions.
-- `content/problems/`: community-owned Markdown content with validated YAML frontmatter.
-- `content/prompts/`: global AI interviewer and evaluator prompts.
-- `src/app/`: server-rendered pages and the thin interview API route.
-- `src/components/`: interview panels, shared header, and shadcn UI primitives.
-- `src/lib/interview/engine.ts`: application-level interview lifecycle orchestration.
-- `src/lib/ai/`: provider/model resolution, prompts, generation, and structured evaluation.
-- `src/lib/diagram/`: normalized architecture snapshots from the System Design canvas.
+```bash
+npm run check         # ESLint, TypeScript, tests, and dependency boundaries
+npm run format:check  # Check Prettier formatting
+npm run format        # Apply Prettier formatting
+npm run build         # Build the production application
+```
 
-Try `/` → `/practice` → `/interview/two-sum` → `/results/two-sum`.
-Interview IDs currently match problem IDs because persistent multi-session storage
-is not part of this version. Completed evaluations are retained in browser session
-storage and contain no provider credentials. Unknown IDs return 404.
+All automated tests live under the root `tests/` directory.
+
+`npm run check:boundaries` runs dependency-cruiser to check module boundaries,
+dependency cycles, and unresolved imports. It reads TypeScript aliases from
+`tsconfig.json` and includes type-only dependencies. Semantic architecture
+decisions remain part of the `openmock-architecture` skill review.
+
+`npm run check:size` produces an informational source-size report using
+[scc](https://github.com/boyter/scc#install), which must be installed on your PATH.
+It excludes tests, generated files, dependencies, and build output. Files over
+300 or 500 code lines are signals to inspect, never quality gates.
+
+### Interview API
 
 `POST /api/interview` accepts JSON such as `{"problemId":"two-sum"}` and returns
-an initialized interview with status 201. Invalid JSON or missing/invalid
-`problemId` returns 400; unknown problems return 404.
+an initialized interview with status `201`. Invalid JSON or missing/invalid
+`problemId` returns `400`; unknown problems return `404`.
 
-Run checks with `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`.
+## License
 
-`npm run check` runs lint, typecheck, tests, and dependency-cruiser boundary
-validation. Run `npm run check:boundaries` separately to inspect dependency
-violations, cycles, and unresolved imports. TypeScript aliases come from
-`tsconfig.json`; type-only dependencies are included.
+Copyright 2026 OpenMock contributors.
 
-`npm run check:size` uses [scc](https://github.com/boyter/scc#install), which must
-be installed on your PATH, to report production source code, comments, blanks,
-and per-file sizes sorted by code lines. It excludes tests, generated files,
-dependencies, and build output. Files over 300 or 500 code lines are inspection
-signals, never quality gates. Semantic architecture decisions remain the
-responsibility of the `openmock-architecture` skill.
+Licensed under the [Apache License, Version 2.0](./LICENSE).
