@@ -40,7 +40,7 @@ test("cloud provider settings retain supported models and fall back for missing 
       undefined,
       "unsupported",
     ]) {
-      preferences.set("openmock:ai-preferences:v2", {
+      preferences.set("openmock:ai-preferences", {
         provider,
         [provider]: { model },
       });
@@ -94,49 +94,59 @@ test("adapter and settings reads tolerate SSR without browser storage", () => {
   assert.deepEqual(readSettings(), defaultSettings);
 });
 
-test("settings use injected storage and preserve migration, keys and key lifetime", () => {
+test("settings preserve provider preferences, keys and key lifetime", () => {
   for (const rememberApiKey of [true, false]) {
     const preferences = memory(),
       persistent = memory(),
       temporary = memory();
     const domain = new SettingsStorage(preferences, persistent, temporary);
     assert.deepEqual(domain.readSettings(), defaultSettings);
-    preferences.set("openmock:ai-preferences:v1", {
-      model: "gpt-4.1",
-      rememberApiKey,
+    preferences.set("openmock:ai-preferences", {
+      provider: "openai",
+      openai: {
+        model: "gpt-4.1",
+        rememberApiKey,
+      },
     });
     const keys = rememberApiKey ? persistent : temporary;
-    keys.set("openmock:api-key:v1", "legacy-secret");
-    assert.equal(domain.readSettings().apiKey, "legacy-secret");
+    keys.setText("openmock:api-key:openai", "openai-secret");
+    assert.equal(domain.readSettings().apiKey, "openai-secret");
     assert.equal(domain.readSettings().model, "gpt-4.1");
     domain.saveSettings({
       provider: "ollama",
       baseUrl: " http://localhost:11434 ",
       model: "local",
     });
-    assert.equal(keys.get("openmock:api-key:v2:openai"), "legacy-secret");
-    assert.equal(keys.get("openmock:api-key:v1"), null);
-    assert.deepEqual(preferences.get("openmock:ai-preferences:v2"), {
+    assert.equal(keys.get("openmock:api-key:openai"), "openai-secret");
+    assert.deepEqual(preferences.get("openmock:ai-preferences"), {
       provider: "ollama",
       openai: { model: "gpt-4.1", rememberApiKey },
       ollama: { baseUrl: "http://localhost:11434", model: "local" },
     });
     domain.saveSettings({
+      ...defaultSettingsByProvider.anthropic,
+      apiKey: "anthropic-secret",
+      rememberApiKey,
+    });
+    assert.equal(domain.readSettings().apiKey, "anthropic-secret");
+    assert.equal(domain.readProviderSettings("openai").apiKey, "openai-secret");
+    assert.equal(domain.readProviderSettings("ollama").model, "local");
+    domain.saveSettings({
       ...defaultSettingsByProvider.openai,
       apiKey: "new-secret",
       rememberApiKey,
     });
-    assert.equal(keys.get("openmock:api-key:v2:openai"), "new-secret");
+    assert.equal(keys.get("openmock:api-key:openai"), "new-secret");
     domain.saveSettings({
       ...defaultSettingsByProvider.openai,
       apiKey: "temporary",
       rememberApiKey: false,
     });
-    assert.equal(persistent.get("openmock:api-key:v2:openai"), null);
-    assert.equal(temporary.get("openmock:api-key:v2:openai"), "temporary");
+    assert.equal(persistent.get("openmock:api-key:openai"), null);
+    assert.equal(temporary.get("openmock:api-key:openai"), "temporary");
     domain.saveSettings({ ...defaultSettingsByProvider.openai, apiKey: "" });
-    assert.equal(temporary.get("openmock:api-key:v2:openai"), null);
-    preferences.set("openmock:ai-preferences:v2", {
+    assert.equal(temporary.get("openmock:api-key:openai"), null);
+    preferences.set("openmock:ai-preferences", {
       provider: "unknown",
       openai: { model: "unknown" },
     });
@@ -144,14 +154,47 @@ test("settings use injected storage and preserve migration, keys and key lifetim
   }
 });
 
-test("existing settings JSON and raw keys remain readable and writable", () => {
+test("settings reads and saves never access old storage keys", () => {
+  const preferences = memory(),
+    persistent = memory(),
+    temporary = memory();
+  for (const backing of [preferences, persistent, temporary]) {
+    for (const key of [
+      "openmock:ai-preferences:v1",
+      "openmock:ai-preferences:v2",
+      "openmock:api-key:v1",
+      "openmock:api-key:v2:openai",
+      "openmock:api-key:v2:anthropic",
+    ]) {
+      backing.set(key, "old-value");
+    }
+    for (const method of ["get", "getText", "set", "setText", "remove"]) {
+      const operation = backing[method];
+      backing[method] = (key, ...args) => {
+        assert.ok(!/:v[12]/.test(key), `Unexpected old key access: ${key}`);
+        return operation(key, ...args);
+      };
+    }
+  }
+  const domain = new SettingsStorage(preferences, persistent, temporary);
+  assert.deepEqual(domain.readSettings(), defaultSettings);
+  for (const provider of ["openai", "anthropic", "ollama"]) {
+    assert.deepEqual(
+      domain.readProviderSettings(provider),
+      defaultSettingsByProvider[provider],
+    );
+    domain.saveSettings(defaultSettingsByProvider[provider]);
+  }
+});
+
+test("current settings JSON and raw keys remain readable and writable", () => {
   globalThis.window = { localStorage: storage(), sessionStorage: storage() };
   try {
     window.localStorage.setItem(
-      "openmock:ai-preferences:v2",
+      "openmock:ai-preferences",
       '{"provider":"openai","openai":{"model":"gpt-4.1","rememberApiKey":true}}',
     );
-    window.localStorage.setItem("openmock:api-key:v2:openai", "raw-secret");
+    window.localStorage.setItem("openmock:api-key:openai", "raw-secret");
     const domain = new SettingsStorage(
       new LocalStorage(),
       new LocalStorage("localStorage"),
@@ -160,17 +203,17 @@ test("existing settings JSON and raw keys remain readable and writable", () => {
     assert.equal(domain.readSettings().apiKey, "raw-secret");
     domain.saveSettings(domain.readSettings());
     assert.equal(
-      window.localStorage.getItem("openmock:api-key:v2:openai"),
+      window.localStorage.getItem("openmock:api-key:openai"),
       "raw-secret",
     );
     assert.deepEqual(
-      JSON.parse(window.localStorage.getItem("openmock:ai-preferences:v2")),
+      JSON.parse(window.localStorage.getItem("openmock:ai-preferences")),
       {
         provider: "openai",
         openai: { model: "gpt-4.1", rememberApiKey: true },
       },
     );
-    window.localStorage.setItem("openmock:ai-preferences:v2", "{");
+    window.localStorage.setItem("openmock:ai-preferences", "{");
     assert.deepEqual(domain.readSettings(), defaultSettings);
     assert.throws(() => domain.saveSettings(defaultSettings), SyntaxError);
   } finally {

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   useInterviewSession,
@@ -10,9 +11,11 @@ import {
 import { useOpenSettings } from "@/components/settings-provider";
 import { readSettings } from "@/lib/settings/storage";
 import { isCloudSettings } from "@/lib/settings/types";
+import { useInterviewControls } from "./interview-controls-context";
 
 export function FinishInterviewButton() {
   const router = useRouter();
+  const { elapsed } = useInterviewControls();
   const openSettings = useOpenSettings();
   const {
     interview,
@@ -50,7 +53,7 @@ export function FinishInterviewButton() {
       const workspaceSnapshot = captureWorkspace();
       const finished = await finishInterview(
         settings,
-        request.interview,
+        { ...request.interview, elapsedMs: elapsed() },
         problem,
         definition,
         workspaceSnapshot,
@@ -81,13 +84,18 @@ export function FinishInterviewButton() {
         </span>
       ) : null}
       <Button
-        size="sm"
+        size="icon-sm"
+        className="sm:w-auto sm:px-2.5"
+        aria-label={pending ? "Evaluating interview" : "Finish interview"}
         variant="outline"
         disabled={operation !== null || interview.status !== "in-progress"}
         onClick={finish}
         title={error || undefined}
       >
-        {pending ? "Evaluating…" : "Finish"}
+        <Check aria-hidden="true" className="sm:hidden" />
+        <span className="hidden sm:inline">
+          {pending ? "Evaluating…" : "Finish"}
+        </span>
       </Button>
     </div>
   );

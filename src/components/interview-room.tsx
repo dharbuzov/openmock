@@ -10,6 +10,8 @@ import { InterviewCodeProvider } from "@/components/interview-code-context";
 import { InterviewSessionProvider } from "@/components/interview-session-context";
 import { FinishInterviewButton } from "@/components/finish-interview-button";
 import { InterviewDiagramProvider } from "@/components/interview-diagram-context";
+import { InterviewControlsProvider } from "@/components/interview-controls-context";
+import { InterviewControls } from "@/components/interview-controls";
 
 export function InterviewRoom({
   interview,
@@ -27,50 +29,47 @@ export function InterviewRoom({
         problem={problem}
         definition={definition}
       >
-        <InterviewDiagramProvider>
-          <main
-            data-interview-room
-            className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background"
-          >
-            <header className="flex h-[50px] shrink-0 items-center justify-between gap-4 border-b px-4">
-              <div className="flex min-w-0 items-center gap-4">
-                <Link
-                  href="/"
-                  className="shrink-0 text-sm font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-4"
-                >
-                  OpenMock
-                </Link>
-                <h1
-                  className="truncate border-l pl-4 text-sm font-medium"
-                  title={problem.title}
-                >
-                  {problem.title}
-                </h1>
-              </div>
-              <div className="flex shrink-0 items-center gap-4">
-                <SettingsButton />
-                <span
-                  aria-label="Elapsed time: 24 minutes, 31 seconds, sample value"
-                  className="hidden font-mono text-xs tabular-nums sm:inline"
-                >
-                  24:31
-                </span>
-                <FinishInterviewButton />
-              </div>
-            </header>
-            <InterviewPanes
-              problem={<ProblemPanel problem={problem} />}
-              workspace={
-                <Workspace
-                  key={interview.id}
-                  problem={problem}
-                  type={definition.workspace}
-                />
-              }
-              interviewer={<AIInterviewer />}
-            />
-          </main>
-        </InterviewDiagramProvider>
+        <InterviewControlsProvider>
+          <InterviewDiagramProvider>
+            <main
+              data-interview-room
+              className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background"
+            >
+              <header className="grid h-[50px] shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 border-b px-1 sm:gap-3 sm:px-4">
+                <div className="flex min-w-0 items-center gap-4 overflow-hidden">
+                  <Link
+                    href="/"
+                    className="hidden shrink-0 text-sm font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-4 sm:block"
+                  >
+                    OpenMock
+                  </Link>
+                  <h1
+                    className="hidden truncate border-l pl-4 text-sm font-medium lg:block"
+                    title={problem.title}
+                  >
+                    {problem.title}
+                  </h1>
+                </div>
+                <InterviewControls />
+                <div className="flex min-w-0 items-center justify-end gap-1 sm:gap-3">
+                  <SettingsButton />
+                  <FinishInterviewButton />
+                </div>
+              </header>
+              <InterviewPanes
+                problem={<ProblemPanel problem={problem} />}
+                workspace={
+                  <Workspace
+                    key={interview.id}
+                    problem={problem}
+                    type={definition.workspace}
+                  />
+                }
+                interviewer={<AIInterviewer />}
+              />
+            </main>
+          </InterviewDiagramProvider>
+        </InterviewControlsProvider>
       </InterviewSessionProvider>
     </InterviewCodeProvider>
   );

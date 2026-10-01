@@ -91,6 +91,7 @@ export type Interview = {
   observations: InterviewObservation[];
   startedAt: string;
   completedAt?: string;
+  elapsedMs?: number;
   endReason?: InterviewEndReason;
 };
 

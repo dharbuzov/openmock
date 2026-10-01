@@ -13,9 +13,7 @@ import {
 } from "./types";
 
 export const themeStorageKey = "openmock:theme";
-const preferencesKey = "openmock:ai-preferences:v2";
-const legacyPreferencesKey = "openmock:ai-preferences:v1";
-const legacyApiKeyStorageKey = "openmock:api-key:v1";
+const preferencesKey = "openmock:ai-preferences";
 
 type StoredPreferences = {
   provider?: AIProviderId;
@@ -29,7 +27,7 @@ function isProvider(value: unknown): value is AIProviderId {
 }
 
 function apiKeyStorageKey(provider: CloudProviderId): string {
-  return `openmock:api-key:v2:${provider}`;
+  return `openmock:api-key:${provider}`;
 }
 
 export class SettingsStorage {
@@ -40,22 +38,7 @@ export class SettingsStorage {
   ) {}
 
   private readPreferences(): StoredPreferences {
-    const stored =
-      this.preferencesStorage.get<StoredPreferences>(preferencesKey);
-    if (stored) return stored;
-
-    const legacy = this.preferencesStorage.get<{
-      model?: string;
-      rememberApiKey?: boolean;
-    }>(legacyPreferencesKey);
-    if (!legacy) return {};
-    return {
-      provider: "openai",
-      openai: {
-        model: legacy.model,
-        rememberApiKey: legacy.rememberApiKey,
-      },
-    };
+    return this.preferencesStorage.get<StoredPreferences>(preferencesKey) ?? {};
   }
 
   private readApiKey(
@@ -63,13 +46,7 @@ export class SettingsStorage {
     rememberApiKey: boolean,
   ): string {
     const storage = rememberApiKey ? this.persistentKeys : this.temporaryKeys;
-    return (
-      storage.getText(apiKeyStorageKey(provider)) ??
-      (provider === "openai"
-        ? storage.getText(legacyApiKeyStorageKey)
-        : null) ??
-      ""
-    );
+    return storage.getText(apiKeyStorageKey(provider)) ?? "";
   }
 
   readProviderSettings(provider: AIProviderId): AISettings {
@@ -121,17 +98,6 @@ export class SettingsStorage {
     const preferences = this.readPreferences();
     preferences.provider = settings.provider;
 
-    if (settings.provider !== "openai") {
-      const rememberOpenAIKey = preferences.openai?.rememberApiKey === true;
-      const legacyStorage = rememberOpenAIKey
-        ? this.persistentKeys
-        : this.temporaryKeys;
-      const legacyKey = legacyStorage.getText(legacyApiKeyStorageKey);
-      const migratedKey = apiKeyStorageKey("openai");
-      if (legacyKey && !legacyStorage.getText(migratedKey))
-        legacyStorage.setText(migratedKey, legacyKey);
-    }
-
     if (settings.provider === "ollama") {
       preferences.ollama = {
         baseUrl: settings.baseUrl.trim(),
@@ -154,8 +120,6 @@ export class SettingsStorage {
     }
 
     this.preferencesStorage.set(preferencesKey, preferences);
-    this.persistentKeys.remove(legacyApiKeyStorageKey);
-    this.temporaryKeys.remove(legacyApiKeyStorageKey);
   }
 }
 

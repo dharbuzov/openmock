@@ -208,7 +208,35 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
   let saved;
   let navigated;
   const overrides = {
-    "lucide-react": { Mic: "mic" },
+    "lucide-react": {
+      Mic: "mic",
+      MicOff: "mic-off",
+      Volume2: "volume",
+      VolumeX: "volume-off",
+      Check: "check",
+    },
+    "./interview-controls-context": {
+      useInterviewControls: () => ({
+        mode: "chat",
+        voiceEnabled: false,
+        setVoiceEnabled: () => {},
+        speechAvailable: false,
+        playbackAvailable: false,
+        elapsed: () => 60000,
+      }),
+    },
+    "./use-interview-voice": {
+      useInterviewVoice: () => ({
+        listening: false,
+        error: "",
+        toggleMicrophone: () => {},
+      }),
+    },
+    "@/components/ui/tooltip": {
+      Tooltip: "tooltip",
+      TooltipTrigger: "tooltip-trigger",
+      TooltipContent: "tooltip-content",
+    },
     "@/components/ui/button": { Button: "button" },
     "@/components/ui/textarea": { Textarea: "textarea" },
     "@/components/settings-provider": { useOpenSettings: () => () => {} },

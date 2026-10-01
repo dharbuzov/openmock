@@ -99,16 +99,15 @@ test("configured cloud defaults reach Settings and saved preferences override th
     assert.ok(
       anthropicModels.some(({ value }) => value === "deployment-model"),
     );
-    entries.set("openmock:ai-preferences:v2", {
+    entries.set("openmock:ai-preferences", {
       provider: "ollama",
       ollama: { model: "user-model", baseUrl: "http://localhost:11434" },
     });
     assert.equal(settings.readSettings().provider, "ollama");
     assert.equal(settings.readSettings().model, "user-model");
-    entries.set("openmock:ai-preferences:v1", { model: "gpt-4.1" });
-    entries.delete("openmock:ai-preferences:v2");
-    assert.equal(settings.readSettings().provider, "openai");
-    assert.equal(settings.readSettings().model, "gpt-4.1");
+    entries.delete("openmock:ai-preferences");
+    assert.equal(settings.readSettings().provider, "anthropic");
+    assert.equal(settings.readSettings().model, "deployment-model");
   } finally {
     config.ai = original;
     paths.forEach((path, index) => {

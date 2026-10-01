@@ -10,7 +10,10 @@ export async function interviewerSystemPrompt(
 export function interviewContext(context: InterviewContext): string {
   const elapsedMinutes = Math.max(
     0,
-    Math.floor((Date.now() - Date.parse(context.interview.startedAt)) / 60_000),
+    Math.floor(
+      (context.interview.elapsedMs ??
+        Date.now() - Date.parse(context.interview.startedAt)) / 60_000,
+    ),
   );
   const remainingMinutes = Math.max(
     0,

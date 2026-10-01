@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Mic } from "lucide-react";
+import { Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useOpenSettings } from "@/components/settings-provider";
@@ -12,6 +12,13 @@ import {
 import { readSettings } from "@/lib/settings/storage";
 import { isCloudSettings } from "@/lib/settings/types";
 import type { WorkspaceSnapshot } from "@/lib/interview/types";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useInterviewControls } from "./interview-controls-context";
+import { useInterviewVoice } from "./use-interview-voice";
 
 export function AIInterviewer() {
   const {
@@ -32,19 +39,41 @@ export function AIInterviewer() {
   const end = useRef<HTMLDivElement>(null);
   const lastWorkspaceSnapshot = useRef<WorkspaceSnapshot | null>(null);
   const openSettings = useOpenSettings();
+  const {
+    mode,
+    setMode,
+    voiceEnabled,
+    setVoiceEnabled,
+    speechAvailable,
+    playbackAvailable,
+    elapsed,
+  } = useInterviewControls();
+  const voice = useInterviewVoice({
+    messages,
+    busy: operation !== null,
+    active: interview.status === "in-progress" && !error,
+    onDictation: (text) =>
+      setAnswer((previous) =>
+        [previous.trim(), text].filter(Boolean).join(" "),
+      ),
+    onLiveAnswer: (text) => {
+      void send(false, text);
+    },
+  });
   useEffect(() => {
     end.current?.scrollIntoView({ block: "nearest" });
   }, [messages, pending, error]);
 
-  async function send(retry = false) {
+  async function send(retry = false, candidateAnswer = answer) {
     if (
       operation ||
       interview.status !== "in-progress" ||
-      (!retry && !answer.trim())
+      (!retry && !candidateAnswer.trim())
     )
       return;
     const settings = readSettings();
     if ((isCloudSettings(settings) && !settings.apiKey) || !settings.model) {
+      if (mode === "live") setMode("chat");
       openSettings();
       return;
     }
@@ -55,9 +84,10 @@ export function AIInterviewer() {
       const { acceptCandidateMessage, processCandidateMessage } =
         await import("@/lib/interview/engine");
       if (!isCurrentOperation(request)) return;
-      const next = retry
+      const nextInterview = retry
         ? request.interview
-        : acceptCandidateMessage(request.interview, answer);
+        : acceptCandidateMessage(request.interview, candidateAnswer);
+      const next = { ...nextInterview, elapsedMs: elapsed() };
       if (!retry) lastWorkspaceSnapshot.current = captureWorkspace();
       const workspaceSnapshot = lastWorkspaceSnapshot.current ?? undefined;
       commitOperation(request, next);
@@ -90,6 +120,37 @@ export function AIInterviewer() {
         <h2 id="interviewer-heading" className="text-xs font-medium">
           AI Interviewer
         </h2>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={
+                  voiceEnabled
+                    ? "Disable interviewer voice"
+                    : "Enable interviewer voice"
+                }
+                aria-pressed={voiceEnabled}
+                disabled={!playbackAvailable}
+                onClick={() => setVoiceEnabled(!voiceEnabled)}
+              />
+            }
+          >
+            {voiceEnabled ? (
+              <Volume2 aria-hidden="true" />
+            ) : (
+              <VolumeX aria-hidden="true" />
+            )}
+          </TooltipTrigger>
+          <TooltipContent>
+            {playbackAvailable
+              ? voiceEnabled
+                ? "Disable interviewer voice"
+                : "Enable interviewer voice"
+              : "Voice playback is unavailable in this browser"}
+          </TooltipContent>
+        </Tooltip>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
         {messages.length === 0 && (
@@ -151,6 +212,11 @@ export function AIInterviewer() {
             </div>
           </div>
         )}
+        {voice.error && (
+          <p role="alert" className="mt-4 text-xs text-muted-foreground">
+            {voice.error}
+          </p>
+        )}
         <div ref={end} />
       </div>
       <form
@@ -194,11 +260,33 @@ export function AIInterviewer() {
               type="button"
               variant="ghost"
               size="icon-sm"
-              disabled
-              aria-label="Microphone unavailable"
-              title="Voice input is not available"
+              disabled={
+                !speechAvailable ||
+                operation !== null ||
+                interview.status !== "in-progress"
+              }
+              aria-label={
+                mode === "live"
+                  ? "Stop live listening"
+                  : voice.listening
+                    ? "Stop dictation"
+                    : "Dictate answer"
+              }
+              aria-pressed={voice.listening}
+              title={
+                speechAvailable
+                  ? voice.listening
+                    ? "Stop microphone"
+                    : "Dictate answer"
+                  : "Speech recognition is unavailable in this browser"
+              }
+              onClick={voice.toggleMicrophone}
             >
-              <Mic aria-hidden="true" />
+              {voice.listening ? (
+                <MicOff aria-hidden="true" />
+              ) : (
+                <Mic aria-hidden="true" />
+              )}
             </Button>
             <Button
               type="submit"
