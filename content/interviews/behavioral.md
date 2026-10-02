@@ -1,6 +1,9 @@
 ---
 id: behavioral
 name: Behavioral
+description: Discuss experience, collaboration, and impact
+icon: messages-square
+order: 30
 version: 1
 workspace: none
 duration:

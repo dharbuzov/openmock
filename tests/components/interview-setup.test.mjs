@@ -31,13 +31,27 @@ const primitives = {
       React.createElement("span", { ...props, "data-variant": variant }),
   },
   "@/components/ui/field": Object.fromEntries(
-    ["Field", "FieldDescription", "FieldLabel", "FieldSet", "FieldLegend"].map(
-      (name) => [
-        name,
-        ({ children }) => React.createElement("div", null, children),
-      ],
-    ),
+    [
+      "Field",
+      "FieldGroup",
+      "FieldDescription",
+      "FieldLabel",
+      "FieldSet",
+      "FieldLegend",
+    ].map((name) => [
+      name,
+      ({ children }) => React.createElement("div", null, children),
+    ]),
   ),
+  "@/components/ui/tooltip": {
+    TooltipProvider: ({ children }) =>
+      React.createElement("div", null, children),
+    Tooltip: ({ children }) => React.createElement("div", null, children),
+    TooltipTrigger: ({ render, children }) =>
+      React.cloneElement(render, {}, children),
+    TooltipContent: ({ children }) =>
+      React.createElement("div", null, children),
+  },
   "@/components/ui/separator": { Separator: "hr" },
   "@/components/ui/toggle-group": {
     ToggleGroup: "toggle-group",

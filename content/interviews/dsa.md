@@ -1,6 +1,9 @@
 ---
 id: dsa
 name: Data Structures and Algorithms
+description: Solve coding and algorithm problems
+icon: code-xml
+order: 20
 version: 1
 workspace: code
 duration:

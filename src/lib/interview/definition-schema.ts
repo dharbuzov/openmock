@@ -22,6 +22,9 @@ const metadataSchema = z
   .object({
     id: slugSchema,
     name: nonEmptyString,
+    description: nonEmptyString.optional(),
+    icon: nonEmptyString.optional(),
+    order: z.number().int().optional(),
     version: z.number().int().positive(),
     workspace: z.enum(workspaceTypes),
     duration: z.object({ defaultMinutes: z.number().int().positive() }),

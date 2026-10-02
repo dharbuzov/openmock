@@ -7,18 +7,24 @@ export default async function PracticePage() {
     getProblems(),
     getInterviewDefinitions(),
   ]);
-  const categories = definitions
-    .filter(({ id }) => problems.some((problem) => problem.interview === id))
-    .map(({ id, name }) => ({ id, name }));
+  const interviewTypes = definitions.map(
+    ({ id, name, description, icon, order }) => ({
+      id,
+      name,
+      description,
+      icon,
+      order,
+    }),
+  );
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-12">
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-12">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold tracking-tight">Practice</h1>
         <p className="text-sm text-muted-foreground">
           Choose a problem to practice.
         </p>
       </div>
-      <PracticeProblems problems={problems} categories={categories} />
+      <PracticeProblems problems={problems} interviewTypes={interviewTypes} />
     </main>
   );
 }

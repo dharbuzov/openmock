@@ -13,3 +13,19 @@ the revision even when the authored version is unchanged.
 Problems reference a definition explicitly through their `interview` frontmatter
 field. Adding a definition that uses an existing workspace capability requires no
 TypeScript registration.
+
+Practice navigation uses each definition's `name`, optional `description`, Lucide
+`icon` identifier, and integer `order`. Lower orders appear first; definitions
+without an order follow, sorted by name and then ID. For example:
+
+```yaml
+id: sql
+name: SQL
+description: Query and model relational data
+icon: database
+order: 40
+```
+
+Icons resolve through the generic UI Lucide registry. Missing or unknown icons
+use CircleHelp. Every enabled definition appears, including those with zero
+problems. Add problems with `interview: sql` to populate that type's list.

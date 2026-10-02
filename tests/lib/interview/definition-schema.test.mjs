@@ -94,3 +94,33 @@ test("rejects invalid recommendations", () => {
     /evaluation.recommendations/,
   );
 });
+
+test("presentation metadata is optional, preserved, and validated", () => {
+  const legacy = parseInterviewDefinitionDocument(document());
+  assert.equal(legacy.icon, undefined);
+  assert.equal(legacy.order, undefined);
+  assert.equal(legacy.description, undefined);
+  const metadata = {
+    description: "Query relational data",
+    icon: "database",
+    order: 40,
+  };
+  const parsed = parseInterviewDefinitionDocument(document(metadata));
+  for (const [key, value] of Object.entries(metadata))
+    assert.equal(parsed[key], value);
+  // Unknown icon identifiers remain valid content; the UI provides a fallback.
+  assert.equal(
+    parseInterviewDefinitionDocument(document({ icon: "future-icon" })).icon,
+    "future-icon",
+  );
+  for (const invalid of [
+    { order: "40" },
+    { order: 1.5 },
+    { icon: "" },
+    { description: "" },
+  ])
+    assert.throws(
+      () => parseInterviewDefinitionDocument(document(invalid)),
+      /order|icon|description/,
+    );
+});

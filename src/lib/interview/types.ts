@@ -41,6 +41,9 @@ export type EvaluationDefinition = {
 export type InterviewDefinition = {
   id: string;
   name: string;
+  description?: string;
+  icon?: string;
+  order?: number;
   version: number;
   revision: string;
   workspace: WorkspaceType;
@@ -51,6 +54,11 @@ export type InterviewDefinition = {
   evaluation: EvaluationDefinition;
   instructions: string;
 };
+
+export type InterviewTypeSummary = Pick<
+  InterviewDefinition,
+  "id" | "name" | "description" | "icon" | "order"
+>;
 
 export type InterviewStatus = "in-progress" | "completed";
 export type InterviewEndReason =

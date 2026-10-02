@@ -1,11 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useOpenSettings } from "./settings-provider";
@@ -107,16 +112,28 @@ function SetupForm({
     }
   }
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-7 px-6 py-10">
-      <Link
-        href="/practice"
-        className="flex w-fit items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-3.5" />
-        Back to Practice
-      </Link>
+    <main className="mx-auto grid w-full max-w-6xl grid-cols-[2rem_minmax(0,1fr)] gap-x-3 gap-y-7 px-6 py-12">
+      <div className="self-center">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Back to Practice"
+                  onClick={() => router.push("/practice")}
+                />
+              }
+            >
+              <ArrowLeft />
+            </TooltipTrigger>
+            <TooltipContent>Back to Practice</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
       <h1 className="text-3xl font-semibold tracking-tight">Interview Setup</h1>
-      <div className="grid items-start gap-8 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] md:gap-10">
+      <div className="col-span-2 grid min-w-0 items-start gap-8 md:col-span-1 md:col-start-2 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] md:gap-10">
         <section
           aria-label="Problem context"
           className="flex min-w-0 flex-col gap-3"

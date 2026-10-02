@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { Database, Landmark, CircleHelp } from "lucide-react";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -21,8 +23,23 @@ const overrides = {
     ToggleGroup: "toggle-group",
     ToggleGroupItem: "toggle-item",
   },
-  "@/components/ui/field": { Field: "field", FieldLabel: "label" },
-  "@/components/ui/button": { buttonVariants: () => "" },
+  "@/components/ui/field": {
+    Field: "field",
+    FieldGroup: "field-group",
+    FieldLabel: "label",
+  },
+  "@/components/ui/button": { Button: "button", buttonVariants: () => "" },
+  "@/components/ui/separator": { Separator: "separator" },
+  "@/components/ui/select": Object.fromEntries(
+    [
+      "Select",
+      "SelectContent",
+      "SelectGroup",
+      "SelectItem",
+      "SelectTrigger",
+      "SelectValue",
+    ].map((name) => [name, name.toLowerCase()]),
+  ),
   "./problem-metadata-badges": { ProblemMetadataBadges: "metadata" },
   "next/link": { __esModule: true, default: "a" },
 };
@@ -40,7 +57,7 @@ function problem(id, options = {}) {
     tags: ["payments"],
     topics: [],
     companies: [{ id: "Revolut", relation: "relevant" }],
-    categories: [],
+    interviewTypes: [],
     content:
       "## Description\nDesign a payment service.\n\n## Scale\nsecret-capacity",
     ...options,
@@ -121,7 +138,7 @@ test("Practice controls filter rows and metadata stays display-only", () => {
   );
   const props = {
     problems,
-    categories: [
+    interviewTypes: [
       { id: "system-design", name: "System Design" },
       { id: "dsa", name: "DSA" },
     ],
@@ -130,8 +147,8 @@ test("Practice controls filter rows and metadata stays display-only", () => {
   let tree = render();
   findElement(
     tree,
-    (node) => node.props["aria-label"] === "Interview category",
-  ).props.onValueChange(["system-design"]);
+    (node) => node.type === "button" && node.key === "system-design",
+  ).props.onClick();
   findElement(
     tree,
     (node) => node.props["aria-labelledby"] === "practice-difficulty",
@@ -146,6 +163,24 @@ test("Practice controls filter rows and metadata stays display-only", () => {
   tree = render();
   const list = findElement(tree, (node) => node.type === "ul");
   assert.equal(list.props.children.length, 1);
+  const selected = findElement(
+    tree,
+    (node) => node.type === "button" && node.key === "system-design",
+  );
+  assert.equal(selected.props["aria-pressed"], true);
+  assert.equal(selected.props.children[2].props.children, 4);
+  const mobileSelect = findElement(tree, (node) => node.type === "select");
+  assert.equal(mobileSelect.props.value, "system-design");
+  mobileSelect.props.onValueChange("dsa");
+  tree = render();
+  assert.equal(
+    findElement(tree, (node) => node.type === "ul").props.children[0].key,
+    "dsa-payment",
+  );
+  findElement(tree, (node) => node.type === "select").props.onValueChange(
+    "system-design",
+  );
+  tree = render();
   assert.equal(list.props.children[0].key, "payment");
   const badges = findElement(tree, (node) => node.type === "metadata");
   assert.equal(badges.props.onClick, undefined);
@@ -164,6 +199,91 @@ test("Practice controls filter rows and metadata stays display-only", () => {
       (node) =>
         node.type === "p" &&
         node.props.children === "No problems match these filters.",
+    ),
+  );
+});
+
+test("new definitions flow through discovery and Practice navigation without UI registration", async () => {
+  const template = readFileSync(
+    "content/interviews/behavioral.md",
+    "utf8",
+  ).replace(/\r\n/g, "\n");
+  const documents = [
+    ["sql", "SQL", "database", 40],
+    ["payments-architecture", "Payments Architecture", "landmark", 10],
+    ["zeta", "Zeta", "unknown-icon", undefined],
+    ["beta", "Same name", undefined, undefined],
+    ["alpha", "Same name", undefined, undefined],
+  ].map(([id, name, icon, order]) =>
+    template
+      .replace("id: behavioral", `id: ${id}`)
+      .replace("name: Behavioral", `name: ${name}`)
+      .replace("icon: messages-square\n", icon ? `icon: ${icon}\n` : "")
+      .replace("order: 30\n", order === undefined ? "" : `order: ${order}\n`),
+  );
+  const { getInterviewDefinitions } = loadComponent(
+    "src/lib/interview/definitions.ts",
+    {
+      "node:fs/promises": {
+        readdir: async () =>
+          documents.map((_, i) => ({ name: `${i}.md`, isFile: () => true })),
+        readFile: async (filename) =>
+          documents[Number(filename.match(/(\d+)\.md$/)[1])],
+      },
+      "../config/config": { config: { interviews: { disabled: [] } } },
+    },
+  );
+  const definitions = await getInterviewDefinitions();
+  assert.deepEqual(
+    definitions.map(({ id }) => id),
+    ["payments-architecture", "sql", "alpha", "beta", "zeta"],
+  );
+  const loadedProblems = [problem("sql-query", { interview: "sql" })];
+  const { default: PracticePage } = loadComponent("src/app/practice/page.tsx", {
+    "@/lib/problems/loader": { getProblems: async () => loadedProblems },
+    "@/lib/interview/definitions": {
+      getInterviewDefinitions: async () => definitions,
+    },
+    "@/components/practice-problems": { PracticeProblems: "practice-problems" },
+  });
+  const page = await PracticePage();
+  const props = findElement(
+    page,
+    (node) => node.type === "practice-problems",
+  ).props;
+  assert.equal(props.interviewTypes.length, 5);
+  assert.equal(props.interviewTypes[1].icon, "database");
+  assert.equal(props.interviewTypes[1].order, 40);
+  assert.equal(props.interviewTypes[1].instructions, undefined);
+  const hooks = hookHarness();
+  const { PracticeProblems } = loadComponent(
+    "src/components/practice-problems.tsx",
+    { ...overrides, react: hooks.react },
+  );
+  let tree = hooks.render(PracticeProblems, props);
+  const item = (id) =>
+    findElement(tree, (node) => node.type === "button" && node.key === id);
+  assert.equal(item("sql").props.children[0].type, Database);
+  assert.equal(item("sql").props.children[1].props.children, "SQL");
+  assert.equal(item("sql").props.children[2].props.children, 1);
+  assert.equal(item("payments-architecture").props.children[0].type, Landmark);
+  assert.equal(
+    item("payments-architecture").props.children[2].props.children,
+    0,
+  );
+  assert.equal(item("zeta").props.children[0].type, CircleHelp);
+  assert.equal(item("alpha").props.children[0].type, CircleHelp);
+  item("sql").props.onClick();
+  tree = hooks.render(PracticeProblems, props);
+  assert.equal(
+    findElement(tree, (node) => node.type === "ul").props.children[0].key,
+    "sql-query",
+  );
+  const mobileSelect = findElement(tree, (node) => node.type === "select");
+  assert.equal(mobileSelect.props.value, "sql");
+  assert.ok(
+    mobileSelect.props.items.some(
+      ({ value, label }) => value === "sql" && label === "SQL (1)",
     ),
   );
 });

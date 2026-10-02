@@ -1,6 +1,9 @@
 ---
 id: system-design
 name: System Design
+description: Design scalable distributed systems
+icon: network
+order: 10
 version: 1
 workspace: diagram
 duration:

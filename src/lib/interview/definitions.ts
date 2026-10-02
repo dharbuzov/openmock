@@ -41,7 +41,12 @@ export async function getInterviewDefinitions({
       (definition) =>
         includeDisabled || !config.interviews.disabled.includes(definition.id),
     )
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort(
+      (a, b) =>
+        (a.order ?? Infinity) - (b.order ?? Infinity) ||
+        a.name.localeCompare(b.name) ||
+        a.id.localeCompare(b.id),
+    );
 }
 
 export async function getInterviewDefinition(
