@@ -29,7 +29,9 @@ const metadataSchema = z
     workspace: z.enum(workspaceTypes),
     duration: z.object({ defaultMinutes: z.number().int().positive() }),
     stages: z.array(slugSchema).min(1),
+    defaultLevel: z.enum(interviewLevelIds),
     levels: z.array(z.enum(interviewLevelIds)).min(1),
+    defaultMode: z.enum(interviewModes),
     modes: z.array(z.enum(interviewModes)).min(1),
     evaluation: z.object({
       recommendations: z.array(z.enum(hiringRecommendations)).min(1),
@@ -51,6 +53,18 @@ const metadataSchema = z
           message: `${label} must be unique`,
         });
     };
+    if (!value.levels.includes(value.defaultLevel))
+      context.addIssue({
+        code: "custom",
+        path: ["defaultLevel"],
+        message: "default level must reference a declared level",
+      });
+    if (!value.modes.includes(value.defaultMode))
+      context.addIssue({
+        code: "custom",
+        path: ["defaultMode"],
+        message: "default mode must reference a declared mode",
+      });
     unique(value.stages, ["stages"], "stage IDs");
     unique(value.levels, ["levels"], "levels");
     unique(value.modes, ["modes"], "modes");

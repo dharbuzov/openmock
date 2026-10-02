@@ -4,9 +4,8 @@ import { load } from "../../register-typescript.mjs";
 import { loadDefinition } from "../../content-fixtures.mjs";
 
 const evaluation = load("../src/lib/ai/evaluation.ts");
-const { finishInterview, startInterview } = load(
-  "../src/lib/interview/engine.ts",
-);
+const { startInterview } = load("../src/lib/interview/engine.ts");
+const { finishInterview } = load("../src/lib/interview/runner.ts");
 
 const problem = {
   id: "two-sum",
@@ -43,19 +42,25 @@ test("finishInterview returns evaluation without persisting it", async () => {
     finalAssessment: "Assessment",
     createdAt: new Date().toISOString(),
   };
+  const original = evaluation.evaluateInterview;
   evaluation.evaluateInterview = async () => result;
   globalThis.sessionStorage = {
     setItem() {
       throw new Error("engine attempted persistence");
     },
   };
-  const finished = await finishInterview({}, interview, problem, definition, {
-    type: "code",
-    language: "Java",
-    filename: "Solution.java",
-    code: "",
-  });
-  assert.equal(finished.evaluation, result);
-  assert.equal(finished.interview.status, "completed");
-  delete globalThis.sessionStorage;
+  try {
+    const finished = await finishInterview({}, interview, problem, definition, {
+      type: "code",
+      language: "Java",
+      filename: "Solution.java",
+      code: "",
+    });
+    assert.equal(finished.evaluation.status, "completed");
+    assert.equal(finished.evaluation.result, result);
+    assert.equal(finished.interview.status, "completed");
+  } finally {
+    evaluation.evaluateInterview = original;
+    delete globalThis.sessionStorage;
+  }
 });

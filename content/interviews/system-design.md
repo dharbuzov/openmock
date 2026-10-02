@@ -15,12 +15,14 @@ stages:
   - failure-scenarios
   - trade-offs
   - wrap-up
+defaultLevel: senior
 levels:
   - junior
   - middle
   - senior
   - staff
   - principal
+defaultMode: practice
 modes:
   - practice
   - mock

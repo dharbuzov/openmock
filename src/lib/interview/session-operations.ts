@@ -2,7 +2,7 @@ import type { Interview } from "./types";
 
 export type SessionState = {
   interview: Interview;
-  operation: "send" | "finish" | null;
+  operation: "send" | "finish" | "evaluate" | null;
 };
 export type SessionRequest = {
   controller: AbortController;
@@ -21,9 +21,11 @@ export class SessionOperations {
     this.state = { interview, operation: null };
   }
 
-  begin = (operation: "send" | "finish"): SessionRequest | null => {
-    if (this.request || this.state.interview.status !== "in-progress")
-      return null;
+  begin = (operation: "send" | "finish" | "evaluate"): SessionRequest | null => {
+    if (this.request) return null;
+    const requiredStatus = operation === "evaluate" ? "completed" : "in-progress";
+    if (this.state.interview.status !== requiredStatus) return null;
+    if (operation === "send" && this.state.interview.stage.current === null) return null;
     this.request = {
       controller: new AbortController(),
       interview: this.state.interview,

@@ -207,6 +207,8 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
   let evaluations = 0;
   let saved;
   let navigated;
+  let failEvaluation = false;
+  let persistedSession;
   const overrides = {
     "lucide-react": {
       Mic: "mic",
@@ -260,8 +262,8 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
         return workspace;
       },
     },
-    "@/lib/interview/engine": {
-      acceptCandidateMessage,
+    "@/lib/interview/engine": { acceptCandidateMessage },
+    "@/lib/interview/runner": {
       processCandidateMessage: async (
         _settings,
         interview,
@@ -282,13 +284,44 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
         _problem,
         _definition,
         snapshot,
+        _signal,
+        onCompleted,
       ) => {
         finishSnapshot = snapshot;
         evaluations++;
+        const completed = { ...interview, status: "completed" };
+        onCompleted?.(completed);
+        assert.equal(persistedSession.interview, completed);
         return {
-          interview: { ...interview, status: "completed" },
-          evaluation: { interviewId: interview.id },
+          interview: completed,
+          evaluation: failEvaluation
+            ? { status: "failed", error: { message: "Evaluation unavailable" } }
+            : { status: "completed", result: { interviewId: interview.id } },
         };
+      },
+      retryEvaluation: async (
+        _settings,
+        interview,
+        _problem,
+        _definition,
+        snapshot,
+      ) => {
+        assert.equal(interview.status, "completed");
+        assert.equal(snapshot, persistedSession.evaluationWorkspace);
+        evaluations++;
+        return {
+          interview,
+          evaluation: {
+            status: "completed",
+            result: { interviewId: interview.id },
+          },
+        };
+      },
+    },
+    "@/lib/interview/session-storage": {
+      readInterviewSession: () => persistedSession ?? null,
+      saveInterviewSession: (value) => {
+        persistedSession = value;
       },
     },
     "@/lib/interview/evaluation-storage": {
@@ -337,8 +370,19 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
   assert.equal(captures, 1);
   assert.equal(snapshots[1], snapshots[0]);
   assert.equal(state.interview.messages.length, 1);
+  failEvaluation = true;
   await element(finish(), (node) => node.type === "button").props.onClick();
   assert.equal(evaluations, 1);
+  assert.equal(state.interview.status, "completed");
+  assert.equal(persistedSession.interview.status, "completed");
+  assert.equal(navigated, undefined);
+  const retryEvaluationButton = element(
+    finish(),
+    (node) => node.type === "button",
+  );
+  assert.equal(retryEvaluationButton.props["aria-label"], "Retry evaluation");
+  await retryEvaluationButton.props.onClick();
+  assert.equal(evaluations, 2);
   assert.equal(captures, 2);
   assert.deepEqual(snapshots[0], workspace);
   assert.deepEqual(finishSnapshot, workspace);
@@ -350,7 +394,9 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
 test("page and API start restricted definitions; unsupported explicit API options return 400", async () => {
   const restricted = {
     ...definition,
+    defaultLevel: "junior",
     levels: [{ id: "junior", name: "Junior" }],
+    defaultMode: "mock",
     modes: ["mock"],
   };
   const overrides = {

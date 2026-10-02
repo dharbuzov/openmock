@@ -17,7 +17,9 @@ function document(
     workspace: "none",
     duration: { defaultMinutes: 30 },
     stages: ["introduction", "wrap-up"],
+    defaultLevel: "senior",
     levels: ["junior", "senior"],
+    defaultMode: "practice",
     modes: ["practice", "mock"],
     evaluation: {
       recommendations: ["hire", "mixed", "no-hire"],
@@ -122,5 +124,25 @@ test("presentation metadata is optional, preserved, and validated", () => {
     assert.throws(
       () => parseInterviewDefinitionDocument(document(invalid)),
       /order|icon|description/,
+    );
+});
+
+test("definitions require defaults referencing nonempty declared levels and modes", () => {
+  const valid = parseInterviewDefinitionDocument(
+    document({ defaultLevel: "junior", defaultMode: "mock" }),
+  );
+  assert.equal(valid.defaultLevel, "junior");
+  assert.equal(valid.defaultMode, "mock");
+  for (const invalid of [
+    { defaultLevel: undefined },
+    { defaultMode: undefined },
+    { defaultLevel: "staff" },
+    { modes: ["mock"] },
+    { levels: [] },
+    { modes: [] },
+  ])
+    assert.throws(
+      () => parseInterviewDefinitionDocument(document(invalid)),
+      /defaultLevel|defaultMode|levels|modes/,
     );
 });

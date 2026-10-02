@@ -62,7 +62,7 @@ const primitives = {
     InteractionModeControl: "interaction-control",
   },
 };
-function setupHarness() {
+function setupHarness(selectedDefinition = definition) {
   const hooks = hookHarness(),
     urls = [];
   let settingsOpened = 0;
@@ -77,7 +77,10 @@ function setupHarness() {
     "src/components/interview-setup.tsx",
     overrides,
   );
-  const form = hooks.render(InterviewSetup, { problem, definition });
+  const form = hooks.render(InterviewSetup, {
+    problem,
+    definition: selectedDefinition,
+  });
   return {
     urls,
     settingsOpened: () => settingsOpened,
@@ -447,4 +450,27 @@ test("shared inline AI form preserves saved-key masking and Remember API key beh
       window.sessionStorage.getItem("openmock:api-key:openai"),
       null,
     );
+  }));
+
+test("Setup reads default level and interview mode from the definition", () =>
+  browser(() => {
+    saveSettings({
+      provider: "ollama",
+      model: "qwen3:8b",
+      baseUrl: "http://localhost:11434",
+    });
+    const configured = {
+      ...definition,
+      defaultLevel: "junior",
+      defaultMode: "mock",
+    };
+    const harness = setupHarness(configured);
+    const tree = harness.render();
+    const levels = findElement(tree, (node) => node.type === "toggle-group");
+    assert.deepEqual(levels.props.value, ["junior"]);
+    button(tree).props.onClick();
+    const id = harness.urls[0].split("session=")[1];
+    const stored = readInterviewSession(id);
+    assert.equal(stored.interview.targetLevel, "junior");
+    assert.equal(stored.interview.mode, "mock");
   }));

@@ -215,3 +215,23 @@ Error serialization preserves sanitized messages, names, codes/statuses and boun
 causes without arbitrary SDK config/request objects. Sanitized stack frames appear
 in development or DEBUG/TRACE mode. Evaluation diagnostics include response length,
 parse/validation outcomes and sanitized issue paths/messages.
+
+## Interview lifecycle
+
+`lib/interview/engine.ts` owns state transitions and validates definition identity,
+workspace capability and active stages. It has no AI/settings/logging dependencies.
+`runner.ts` coordinates AI turns and evaluation with metadata-only operational logs;
+AI boundary DEBUG payload logging remains separate.
+
+Definitions explicitly declare `defaultLevel` and `defaultMode`, validated against
+their available arrays during loading. The final stage clears `stage.current` to
+`null`; further turns are rejected. Candidate completion is independent of evaluation.
+`finishInterview` returns a completed interview plus an evaluation outcome with
+`status: completed | failed`. A failed outcome is safe to display and never restores
+the interview to in-progress.
+
+The room persists the completed session and finish-time workspace even when evaluation
+fails. Its Retry evaluation action calls `retryEvaluation` on that same completed
+interview and snapshot, including after a reload. Successful evaluation keeps the existing
+results format and route. Definition edits change their revision, so existing sessions
+bound to an earlier revision must be restarted rather than silently migrated.

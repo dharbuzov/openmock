@@ -52,7 +52,10 @@ export function AIInterviewer() {
   const voice = useInterviewVoice({
     messages,
     busy: operation !== null,
-    active: interview.status === "in-progress" && !error,
+    active:
+      interview.status === "in-progress" &&
+      interview.stage.current !== null &&
+      !error,
     onDictation: (text) =>
       setAnswer((previous) =>
         [previous.trim(), text].filter(Boolean).join(" "),
@@ -69,6 +72,7 @@ export function AIInterviewer() {
     if (
       operation ||
       interview.status !== "in-progress" ||
+      interview.stage.current === null ||
       (!retry && !candidateAnswer.trim())
     )
       return;
@@ -82,8 +86,9 @@ export function AIInterviewer() {
     if (!request) return;
     setError("");
     try {
-      const { acceptCandidateMessage, processCandidateMessage } =
-        await import("@/lib/interview/engine");
+      const { acceptCandidateMessage } = await import("@/lib/interview/engine");
+      const { processCandidateMessage } =
+        await import("@/lib/interview/runner");
       if (!isCurrentOperation(request)) return;
       const next = retry
         ? request.interview
@@ -203,7 +208,9 @@ export function AIInterviewer() {
                 size="sm"
                 variant="outline"
                 disabled={
-                  operation !== null || interview.status !== "in-progress"
+                  operation !== null ||
+                  interview.status !== "in-progress" ||
+                  interview.stage.current === null
                 }
                 onClick={() => send(true)}
               >
@@ -266,7 +273,8 @@ export function AIInterviewer() {
               disabled={
                 !speechAvailable ||
                 operation !== null ||
-                interview.status !== "in-progress"
+                interview.status !== "in-progress" ||
+                interview.stage.current === null
               }
               aria-label={
                 mode === "live"
@@ -297,6 +305,7 @@ export function AIInterviewer() {
               disabled={
                 operation !== null ||
                 interview.status !== "in-progress" ||
+                interview.stage.current === null ||
                 !answer.trim()
               }
             >

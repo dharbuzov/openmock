@@ -54,3 +54,9 @@ test("both header badges follow the active stage and definition order without se
   assert.equal(render(false), "");
   assert.equal(render(true), "");
 });
+
+test("terminal stage explicitly displays stages complete", () => {
+  session.interview.stage.current = null;
+  assert.match(render(false), /Stages complete/);
+  assert.match(render(true), /Stages complete/);
+});

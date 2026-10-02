@@ -48,7 +48,9 @@ export type InterviewDefinition = {
   revision: string;
   workspace: WorkspaceType;
   stages: InterviewStage[];
+  defaultLevel: InterviewLevelId;
   levels: InterviewLevel[];
+  defaultMode: InterviewMode;
   modes: InterviewMode[];
   duration: { defaultMinutes: number };
   evaluation: EvaluationDefinition;
@@ -68,7 +70,7 @@ export type InterviewDefinitionReference = Pick<
   "id" | "version" | "revision"
 >;
 export type InterviewStageState = {
-  current: string;
+  current: string | null;
   completed: string[];
   startedAt: string;
 };
@@ -163,4 +165,13 @@ export type InterviewResult = {
   summary: string;
   finalAssessment: string;
   createdAt: string;
+};
+
+export type EvaluationOutcome =
+  | { status: "completed"; result: InterviewResult }
+  | { status: "failed"; error: { name: "EvaluationError"; message: string } };
+
+export type FinishedInterview = {
+  interview: Interview;
+  evaluation: EvaluationOutcome;
 };

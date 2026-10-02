@@ -3,9 +3,13 @@ import assert from "node:assert/strict";
 import { load } from "../../register-typescript.mjs";
 import { loadDefinition } from "../../content-fixtures.mjs";
 
-const { acceptCandidateMessage, applyInterviewTurn, startInterview } = load(
-  "../src/lib/interview/engine.ts",
-);
+const {
+  acceptCandidateMessage,
+  applyInterviewTurn,
+  startInterview,
+  completeInterview,
+  InterviewStateError,
+} = load("../src/lib/interview/engine.ts");
 
 const problem = {
   id: "url-shortener",
@@ -75,7 +79,7 @@ test("completed stages are recorded once", () => {
   assert.deepEqual(updated.stage.completed, ["requirements"]);
 });
 
-test("completing the final stage keeps a valid final-stage state", () => {
+test("completing the final stage clears the active stage", () => {
   const interview = {
     ...start(),
     stage: {
@@ -89,7 +93,7 @@ test("completing the final stage keeps a valid final-stage state", () => {
     definition,
     turn({ stageComplete: true }),
   );
-  assert.equal(updated.stage.current, "wrap-up");
+  assert.equal(updated.stage.current, null);
   assert.deepEqual(
     updated.stage.completed,
     definition.stages.map(({ id }) => id),
@@ -115,4 +119,50 @@ test("observation stage is assigned from the engine's current stage", () => {
     }),
   );
   assert.equal(updated.observations[0].stage, "requirements");
+});
+
+test("defaults come exclusively from the definition", () => {
+  const changed = {
+    ...definition,
+    defaultLevel: "principal",
+    defaultMode: "mock",
+  };
+  const interview = startInterview(problem, { definition: changed });
+  assert.equal(interview.targetLevel, "principal");
+  assert.equal(interview.mode, "mock");
+  const another = startInterview(problem, {
+    definition: { ...changed, defaultLevel: "middle", defaultMode: "practice" },
+  });
+  assert.equal(another.targetLevel, "middle");
+  assert.equal(another.mode, "practice");
+});
+
+test("terminal and unknown stages reject further turns", () => {
+  for (const current of [null, "unknown"]) {
+    const interview = { ...start(), stage: { ...start().stage, current } };
+    assert.throws(
+      () => applyInterviewTurn(interview, definition, turn()),
+      InterviewStateError,
+    );
+  }
+  const terminal = { ...start(), stage: { ...start().stage, current: null } };
+  assert.throws(
+    () => acceptCandidateMessage(terminal, "Another answer"),
+    /No active/,
+  );
+});
+
+test("completion is an independent domain transition and cannot happen twice", () => {
+  const initial = start();
+  const completed = completeInterview(initial);
+  assert.equal(initial.status, "in-progress");
+  assert.equal(completed.status, "completed");
+  assert.equal(completed.stage.current, null);
+  assert.equal(completed.endReason, "candidate-finished");
+  assert.ok(Number.isFinite(Date.parse(completed.completedAt)));
+  assert.throws(() => completeInterview(completed), InterviewStateError);
+  assert.throws(
+    () => applyInterviewTurn(completed, definition, turn()),
+    InterviewStateError,
+  );
 });

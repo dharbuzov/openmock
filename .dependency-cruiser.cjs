@@ -1,6 +1,14 @@
 module.exports = {
   forbidden: [
     {
+      name: "engine-independent-of-integrations",
+      severity: "error",
+      from: { path: "^src/lib/interview/engine\\.ts$" },
+      to: {
+        path: "^src/lib/(ai|settings|logging)/|(^|/)node_modules/(ai|@ai-sdk)(/|$)",
+      },
+    },
+    {
       name: "storage-independent-of-domains",
       severity: "error",
       from: { path: "^src/lib/storage/" },

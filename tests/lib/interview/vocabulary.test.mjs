@@ -20,7 +20,9 @@ test("definition parsing accepts the domain vocabulary and rejects unsupported v
   const metadata = {
     ...definition,
     stages: definition.stages.map(({ id }) => id),
+    defaultLevel: "senior",
     levels: interviewLevelIds,
+    defaultMode: "practice",
     modes: interviewModes,
     evaluation: {
       ...definition.evaluation,

@@ -9,6 +9,14 @@ export function CurrentStageBadge({
   numbered?: boolean;
 }) {
   const { interview, definition } = useInterviewSession();
+  if (interview.stage.current === null)
+    return (
+      <Badge variant="secondary">
+        {interview.status === "completed"
+          ? "Interview completed"
+          : "Stages complete"}
+      </Badge>
+    );
   const index = definition.stages.findIndex(
     (stage) => stage.id === interview.stage.current,
   );

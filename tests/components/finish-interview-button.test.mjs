@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-test("Finish caller persists the evaluation returned by the engine", () => {
+test("Finish caller persists the evaluation returned by the runner", () => {
   const source = readFileSync(
     new URL(
       "../../src/components/finish-interview-button.tsx",
@@ -10,8 +10,8 @@ test("Finish caller persists the evaluation returned by the engine", () => {
     ),
     "utf8",
   );
-  const finishCall = source.indexOf("await finishInterview(");
-  const saveCall = source.indexOf("saveEvaluation(finished.evaluation)");
+  const finishCall = source.indexOf("await run(");
+  const saveCall = source.indexOf("saveEvaluation(finished.evaluation.result)");
   assert.ok(finishCall >= 0);
   assert.ok(saveCall > finishCall);
 });

@@ -29,3 +29,19 @@ order: 40
 Icons resolve through the generic UI Lucide registry. Missing or unknown icons
 use CircleHelp. Every enabled definition appears, including those with zero
 problems. Add problems with `interview: sql` to populate that type's list.
+
+Each definition must explicitly declare defaults alongside its existing arrays:
+
+```yaml
+defaultLevel: senior
+levels:
+  - middle
+  - senior
+defaultMode: practice
+modes:
+  - practice
+  - mock
+```
+
+Both defaults must refer to entries in their respective non-empty arrays.
+Invalid defaults fail when the definition is loaded.

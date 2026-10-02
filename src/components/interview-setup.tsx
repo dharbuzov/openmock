@@ -54,13 +54,8 @@ function SetupForm({
   definition: InterviewDefinition;
 }) {
   const router = useRouter();
-  const levels = definition.levels.filter(({ id }) => id !== "junior");
-  const [level, setLevel] = useState<InterviewLevelId>(
-    () =>
-      levels.find(({ id }) => id === "senior")?.id ??
-      levels[0]?.id ??
-      definition.levels[0].id,
-  );
+  const levels = definition.levels;
+  const [level, setLevel] = useState<InterviewLevelId>(definition.defaultLevel);
   const [mode, setMode] = useState<InteractionMode>("chat");
   const openSettings = useOpenSettings();
   const snapshot = useSyncExternalStore(
