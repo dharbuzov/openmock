@@ -1,3 +1,4 @@
+import { logger } from "../logging/logger";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { parseProblemDocument } from "./schema";
@@ -12,6 +13,10 @@ export function validateProblemDefinitions(
   const definitionIds = new Set(definitions.map(({ id }) => id));
   for (const problem of problems) {
     if (!definitionIds.has(problem.interview)) {
+      logger.warn(
+        { problemId: problem.id, definitionId: problem.interview },
+        "Problem references unknown interview definition",
+      );
       throw new Error(
         `Problem ${problem.id} references unknown interview definition: ${problem.interview}`,
       );
@@ -37,8 +42,11 @@ async function discoverFiles(directory: string): Promise<string[]> {
 
 async function loadProblem(filename: string): Promise<Problem> {
   try {
-    return parseProblemDocument(await readFile(filename, "utf8"));
+    const parsed = parseProblemDocument(await readFile(filename, "utf8"));
+    logger.debug({ problemId: parsed.id }, "Problem parsed");
+    return parsed;
   } catch (error) {
+    logger.error({ err: error }, "Problem validation failed");
     throw new Error(
       `Invalid problem ${path.relative(process.cwd(), filename)}: ${error instanceof Error ? error.message : String(error)}`,
       { cause: error },
@@ -50,7 +58,9 @@ export async function getProblems(): Promise<Problem[]> {
   const files = await discoverFiles(
     path.join(process.cwd(), "content", "problems"),
   );
+  logger.debug({ count: files.length }, "Problems discovered");
   const problems = await Promise.all(files.map(loadProblem));
+  logger.debug({ count: problems.length }, "Problems loaded");
   const ids = new Set<string>();
   for (const problem of problems) {
     if (ids.has(problem.id))

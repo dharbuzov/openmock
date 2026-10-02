@@ -174,3 +174,44 @@ an initialized interview with status `201`. Invalid JSON or missing/invalid
 Copyright 2026 OpenMock contributors.
 
 Licensed under the [Apache License, Version 2.0](./LICENSE).
+
+## Logging
+
+OpenMock uses Pino through `src/lib/logging/logger.ts`. Browser AI requests remain
+direct BYOK requests; logs never go to a collector or the OpenMock backend.
+Next.js routes and content loaders run on Node; the interview engine is shared.
+There is no NestJS service.
+
+Levels: trace, debug, info, warn, error, fatal. Defaults are debug in development
+and info in production; invalid levels fall back to info. Set `LOG_LEVEL=debug`
+before starting Next.js. The same level is inlined into browser builds; rebuild
+production assets to change browser verbosity. `NEXT_PUBLIC_LOG_LEVEL` is an
+alternative browser setting when LOG_LEVEL is unset.
+
+Node logs are JSON on stdout. Enable `LOG_TO_FILE=true` to additionally write JSON
+to `LOG_FILE` (default `./logs/openmock.log`, relative to the working directory).
+Pino creates the directory. File logging falls back to stdout with a warning if
+opening the destination fails. Enable it only on hosts with writable persistent
+filesystems; serverless deployments should normally use stdout. Files are ignored
+by Git; deployment operators must manage retention/rotation. Browser logs are
+structured console objects and cannot write local files.
+
+Logging accepts a static event label and structured context. Targeted redaction
+removes credential fields (API keys, Authorization, cookies, tokens, passwords
+and provider credentials) and recognizable/configured secret values in strings.
+Normal prompts, messages, definitions, workspace data and model output remain
+intact without truncation. Getters and circular references are not serialized.
+
+At DEBUG/TRACE verbosity, every interviewer turn, evaluation and connection test
+logs a full AI request and response with a shared requestId and durationMs.
+Interview calls also include interviewId, stageId, targetLevel and workspace.
+For V3 providers, logs include the SDK provider parameters and raw provider result
+before parsing/schema validation, including available wire request/response bodies.
+Failures include the same request/available response at debug verbosity.
+Production INFO logs keep metadata, errors and evaluation diagnostics; payload
+logs require explicitly enabling DEBUG/TRACE.
+
+Error serialization preserves sanitized messages, names, codes/statuses and bounded
+causes without arbitrary SDK config/request objects. Sanitized stack frames appear
+in development or DEBUG/TRACE mode. Evaluation diagnostics include response length,
+parse/validation outcomes and sanitized issue paths/messages.

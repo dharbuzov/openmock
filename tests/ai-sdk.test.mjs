@@ -374,3 +374,160 @@ test("generic evaluator accepts competencies loaded from the behavioral definiti
     "positive",
   );
 });
+
+test("evaluation parse and schema failures preserve causes and safe diagnostics", async () => {
+  const { EvaluationError } = load("../src/lib/ai/evaluation.ts");
+  const { installLogger, wrapLogger } = load("../src/lib/logging/logger.ts");
+  const pino = (await import("pino")).default;
+  const logs = [];
+  installLogger(
+    wrapLogger(
+      pino(
+        { level: "debug" },
+        { write: (line) => logs.push(JSON.parse(line)) },
+      ),
+    ),
+  );
+  try {
+    const interview = startInterview(problem, { definition });
+    for (const text of [
+      "INVALID sk-THIS_MUST_NEVER_APPEAR",
+      JSON.stringify({ summary: "private model response" }),
+    ]) {
+      logs.length = 0;
+      await assert.rejects(
+        evaluateInterviewWithModel(
+          new MockLanguageModelV3({ doGenerate: mockResult(text) }),
+          {
+            interview,
+            problem,
+            definition,
+            workspace: {
+              type: "code",
+              language: "Java",
+              filename: "Solution.java",
+              code: "",
+            },
+          },
+        ),
+        (error) =>
+          error instanceof EvaluationError && error.cause !== undefined,
+      );
+      const failure = logs.find((entry) => entry.msg === "Evaluation failed");
+      assert.equal(failure.interviewId, interview.id);
+      assert.equal(failure.responseReceived, true);
+      assert.equal(failure.responseLength, text.length);
+      assert.equal(failure.validationSucceeded, false);
+      assert.equal(failure.parseSucceeded, text.startsWith("{"));
+      assert.ok(failure.err.cause);
+      if (text.startsWith("{")) assert.ok(failure.validationIssues.length > 0);
+      const serialized = JSON.stringify(logs);
+      assert.ok(!serialized.includes("sk-THIS_MUST_NEVER_APPEAR"));
+      if (text.startsWith("{"))
+        assert.ok(serialized.includes("private model response"));
+      const request = logs.find((entry) => entry.msg === "AI request");
+      const response = logs.find((entry) => entry.msg === "AI response");
+      assert.equal(request.requestId, response.requestId);
+      assert.ok(request.request.system);
+      assert.ok(request.request.providerRequest.prompt.length > 0);
+      assert.equal(
+        response.response.content[0].text,
+        text.startsWith("{") ? text : "INVALID [REDACTED]",
+      );
+    }
+  } finally {
+    installLogger(wrapLogger(pino({ level: "info" })));
+  }
+});
+
+test("shared AI boundary logs full successful payloads and correlates provider failures", async () => {
+  const { loggedGenerateText } = load("../src/lib/ai/logging.ts");
+  const { installLogger, wrapLogger } = load("../src/lib/logging/logger.ts");
+  const { protectCredentials } = load("../src/lib/logging/sanitize.ts");
+  const pino = (await import("pino")).default;
+  const logs = [];
+  const credential = "opaque-credential-value";
+  const release = protectCredentials([credential]);
+  installLogger(
+    wrapLogger(
+      pino(
+        { level: "debug" },
+        { write: (line) => logs.push(JSON.parse(line)) },
+      ),
+    ),
+  );
+  try {
+    const system = "System instructions ".repeat(800);
+    const content = "User workspace content " + credential;
+    const model = new MockLanguageModelV3({
+      doGenerate: mockResult("Complete response " + credential),
+    });
+    const result = await loggedGenerateText({
+      provider: "mock",
+      model: "mock-model",
+      operation: "connection-test",
+    })({
+      model,
+      system,
+      messages: [{ role: "user", content }],
+      maxRetries: 0,
+    });
+    const request = logs.find((entry) => entry.msg === "AI request");
+    const response = logs.find((entry) => entry.msg === "AI response");
+    assert.equal(request.request.system, system);
+    assert.equal(
+      request.request.messages[0].content,
+      "User workspace content [REDACTED]",
+    );
+    assert.equal(request.requestId, response.requestId);
+    assert.equal(
+      response.response.content[0].text,
+      "Complete response [REDACTED]",
+    );
+    assert.ok(response.durationMs >= 0);
+    assert.ok(result.text.includes(credential));
+    assert.ok(
+      model.doGenerateCalls[0].prompt.some((message) =>
+        JSON.stringify(message).includes(credential),
+      ),
+    );
+    assert.ok(!JSON.stringify(logs).includes(credential));
+
+    for (const level of ["debug", "info"]) {
+      logs.length = 0;
+      installLogger(
+        wrapLogger(
+          pino({ level }, { write: (line) => logs.push(JSON.parse(line)) }),
+        ),
+      );
+      const failing = new MockLanguageModelV3({
+        doGenerate: async () => {
+          throw new Error("Provider unavailable");
+        },
+      });
+      await assert.rejects(
+        loggedGenerateText({
+          operation: "interviewer-turn",
+          interviewId: "abc",
+        })({
+          model: failing,
+          system,
+          prompt: "User prompt",
+          maxRetries: 0,
+        }),
+        /Provider unavailable/,
+      );
+      const failure = logs.find((entry) => entry.msg === "AI request failed");
+      assert.equal(failure.err.message, "Provider unavailable");
+      assert.equal("request" in failure, level === "debug");
+      if (level === "debug")
+        assert.equal(
+          logs.find((entry) => entry.msg === "AI request").requestId,
+          failure.requestId,
+        );
+    }
+  } finally {
+    release();
+    installLogger(wrapLogger(pino({ level: "info" })));
+  }
+});

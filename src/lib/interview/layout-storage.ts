@@ -1,3 +1,4 @@
+import { logger } from "../logging/logger";
 import { localStorage } from "../storage/local-storage";
 import type { Storage } from "../storage/storage";
 
@@ -22,6 +23,10 @@ export class InterviewLayoutStorage {
       )
         return layout;
     } catch {
+      logger.warn(
+        { operation: "storage", reason: "unavailable-or-invalid" },
+        "Storage operation failed",
+      );
       /* Storage may be unavailable or contain an outdated preference. */
     }
     return defaultLayout;
@@ -30,6 +35,10 @@ export class InterviewLayoutStorage {
     try {
       this.storage.set(layoutKey, layout);
     } catch {
+      logger.warn(
+        { operation: "storage", reason: "unavailable-or-invalid" },
+        "Storage operation failed",
+      );
       /* Resizing still works when storage is unavailable. */
     }
   }

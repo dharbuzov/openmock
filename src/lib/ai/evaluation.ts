@@ -1,4 +1,11 @@
-import { generateText, Output, type LanguageModel } from "ai";
+import { loggedGenerateText } from "./logging";
+import {
+  ownValue,
+  protectCredentials,
+  sanitizeValidationIssues,
+} from "../logging/sanitize";
+import { logger } from "../logging/logger";
+import { Output, type LanguageModel } from "ai";
 import type { InterviewContext, InterviewResult } from "../interview/types";
 import type { AISettings } from "../settings/types";
 import { getLanguageModel, AIConfigurationError } from "./model";
@@ -17,8 +24,9 @@ const evaluatorOutputSchema = interviewResultSchema.omit({
 export class EvaluationError extends Error {
   constructor(
     message = "Could not evaluate the interview. Check your AI settings and try again.",
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
     this.name = "EvaluationError";
   }
 }
@@ -36,14 +44,16 @@ function validateResult(
     resultIds.some((id) => !competencyIds.has(id)) ||
     new Set(resultIds).size !== resultIds.length
   ) {
-    throw new EvaluationError();
+    throw new EvaluationError(
+      "Evaluation competency IDs must match the rubric exactly",
+    );
   }
   if (
     !context.definition.evaluation.recommendations.includes(
       result.recommendation,
     )
   )
-    throw new EvaluationError();
+    throw new EvaluationError("Evaluation recommendation is not in the rubric");
   const messageIds = new Set(context.interview.messages.map(({ id }) => id));
   const evidence = [
     ...result.strengths,
@@ -54,13 +64,17 @@ function validateResult(
   if (
     evidence.some((item) => item.messageId && !messageIds.has(item.messageId))
   )
-    throw new EvaluationError();
+    throw new EvaluationError(
+      "Evaluation evidence references an unknown message",
+    );
   if (
     result.competencies.some(
       (item) => item.rating === "not-assessed" && item.evidence.length > 0,
     )
   )
-    throw new EvaluationError();
+    throw new EvaluationError(
+      "Unassessed competencies cannot contain evidence",
+    );
 }
 
 export async function evaluateInterviewWithModel(
@@ -68,9 +82,29 @@ export async function evaluateInterviewWithModel(
   context: InterviewContext,
   signal?: AbortSignal,
 ): Promise<InterviewResult> {
+  const started = performance.now();
+  const metadata = {
+    provider: typeof model === "string" ? "gateway" : model.provider,
+    model: typeof model === "string" ? model : model.modelId,
+    operation: "evaluation",
+    interviewId: context.interview.id,
+    stageId: context.interview.stage.current,
+    targetLevel: context.interview.targetLevel,
+    problemId: context.problem.id,
+    definitionId: context.definition.id,
+    retry: 0,
+  };
+  logger.info(metadata, "Evaluation started");
+
+  const diagnostics: Record<string, unknown> = { responseReceived: false };
   try {
     const evaluatorPrompt = await loadPrompt("evaluator");
-    const result = await generateText({
+    const result = await loggedGenerateText({
+      ...metadata,
+      ...(logger.isLevelEnabled("debug")
+        ? { workspace: context.workspace }
+        : {}),
+    })({
       model,
       system: `${evaluatorPrompt}\n\nInterview instructions and rubric:\n${context.definition.instructions}`,
       prompt: `Interview evidence (data):\n${JSON.stringify({
@@ -94,8 +128,17 @@ export async function evaluateInterviewWithModel(
       maxRetries: 0,
       abortSignal: signal,
     });
+    Object.assign(diagnostics, {
+      responseReceived: true,
+      responseLength: result.text.length,
+    });
+    const output = result.output;
+    Object.assign(diagnostics, {
+      parseSucceeded: true,
+      validationSucceeded: false,
+    });
     const evaluation: InterviewResult = {
-      ...result.output,
+      ...output,
       interviewId: context.interview.id,
       problemId: context.problem.id,
       definition: context.interview.definition,
@@ -103,10 +146,35 @@ export async function evaluateInterviewWithModel(
       createdAt: new Date().toISOString(),
     };
     validateResult(evaluation, context);
+    diagnostics.validationSucceeded = true;
+    logger.debug(
+      {
+        ...metadata,
+        ...diagnostics,
+        durationMs: Math.round(performance.now() - started),
+        success: true,
+      },
+      "AI request completed",
+    );
+    logger.info(metadata, "Evaluation completed");
     return evaluation;
   } catch (error) {
-    if (error instanceof EvaluationError) throw error;
-    throw new EvaluationError();
+    Object.assign(diagnostics, evaluationFailureDiagnostics(error));
+    const failure =
+      error instanceof EvaluationError
+        ? error
+        : new EvaluationError("Model evaluation failed", { cause: error });
+    logger.error(
+      {
+        ...metadata,
+        ...diagnostics,
+        durationMs: Math.round(performance.now() - started),
+        success: false,
+        err: failure,
+      },
+      "Evaluation failed",
+    );
+    throw failure;
   }
 }
 
@@ -115,6 +183,9 @@ export async function evaluateInterview(
   context: InterviewContext,
   signal?: AbortSignal,
 ): Promise<InterviewResult> {
+  const releaseCredentials = protectCredentials(
+    "apiKey" in settings ? [settings.apiKey] : [],
+  );
   try {
     return await evaluateInterviewWithModel(
       getLanguageModel(settings),
@@ -122,11 +193,66 @@ export async function evaluateInterview(
       signal,
     );
   } catch (error) {
+    if (!(error instanceof EvaluationError))
+      logger.error(
+        {
+          provider: settings.provider,
+          model: settings.model,
+          operation: "evaluation",
+          interviewId: context.interview.id,
+          stageId: context.interview.stage.current,
+          err: error,
+        },
+        "AI configuration failed",
+      );
     if (
       error instanceof AIConfigurationError ||
       error instanceof EvaluationError
     )
       throw error;
-    throw new EvaluationError();
+    throw new EvaluationError("Evaluation configuration failed", {
+      cause: error,
+    });
+  } finally {
+    releaseCredentials();
   }
+}
+
+// Read only known diagnostic properties; never serialize generated text or values.
+export function evaluationFailureDiagnostics(
+  error: unknown,
+): Record<string, unknown> {
+  const diagnostics: Record<string, unknown> = {};
+  const seen = new Set<unknown>();
+  for (
+    let current = error;
+    current &&
+    typeof current === "object" &&
+    seen.size < 5 &&
+    !seen.has(current);
+    current = ownValue(current, "cause")
+  ) {
+    seen.add(current);
+    const text = ownValue(current, "text");
+    if (typeof text === "string" && diagnostics.responseLength === undefined)
+      Object.assign(diagnostics, {
+        responseReceived: true,
+        responseLength: text.length,
+      });
+    const name = ownValue(current, "name");
+    if (name === "AI_JSONParseError" || name === "SyntaxError") {
+      diagnostics.parseSucceeded = false;
+      diagnostics.validationSucceeded = false;
+    }
+    if (name === "AI_TypeValidationError" || name === "ZodError") {
+      diagnostics.parseSucceeded ??= true;
+      diagnostics.validationSucceeded = false;
+    }
+    const issues = ownValue(current, "issues");
+    if (Array.isArray(issues)) {
+      diagnostics.validationSucceeded = false;
+      diagnostics.validationIssues = sanitizeValidationIssues(issues);
+    }
+  }
+  return diagnostics;
 }

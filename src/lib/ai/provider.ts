@@ -1,4 +1,7 @@
-import { generateText, Output, type LanguageModel } from "ai";
+import { loggedGenerateText } from "./logging";
+import { protectCredentials } from "../logging/sanitize";
+import { logger } from "../logging/logger";
+import { Output, type LanguageModel } from "ai";
 import { z } from "zod";
 import type { InterviewContext, InterviewTurn } from "../interview/types";
 import type { AISettings } from "../settings/types";
@@ -34,6 +37,18 @@ export async function generateInterviewResponseWithModel(
   context: InterviewContext,
   signal?: AbortSignal,
 ): Promise<InterviewTurn> {
+  const metadata = {
+    provider: typeof model === "string" ? "gateway" : model.provider,
+    model: typeof model === "string" ? model : model.modelId,
+    operation: "interviewer-turn",
+    interviewId: context.interview.id,
+    stageId: context.interview.stage.current,
+    targetLevel: context.interview.targetLevel,
+    problemId: context.problem.id,
+    definitionId: context.definition.id,
+    retry: 0,
+  };
+
   try {
     const messages = [
       {
@@ -48,7 +63,12 @@ export async function generateInterviewResponseWithModel(
         content: message.content,
       })),
     ];
-    const result = await generateText({
+    const result = await loggedGenerateText({
+      ...metadata,
+      ...(logger.isLevelEnabled("debug")
+        ? { workspace: context.workspace }
+        : {}),
+    })({
       model,
       system: await interviewerSystemPrompt(context),
       messages,
@@ -74,6 +94,9 @@ export async function generateInterviewResponse(
   context: InterviewContext,
   signal?: AbortSignal,
 ): Promise<InterviewTurn> {
+  const releaseCredentials = protectCredentials(
+    "apiKey" in settings ? [settings.apiKey] : [],
+  );
   try {
     return await generateInterviewResponseWithModel(
       getLanguageModel(settings),
@@ -81,12 +104,26 @@ export async function generateInterviewResponse(
       signal,
     );
   } catch (error) {
+    if (!(error instanceof AIProviderError))
+      logger.error(
+        {
+          provider: settings.provider,
+          model: settings.model,
+          operation: "interviewer-turn",
+          interviewId: context.interview.id,
+          stageId: context.interview.stage.current,
+          err: error,
+        },
+        "AI configuration failed",
+      );
     if (
       error instanceof AIConfigurationError ||
       error instanceof AIProviderError
     )
       throw error;
     throw new AIProviderError();
+  } finally {
+    releaseCredentials();
   }
 }
 
@@ -94,8 +131,17 @@ export async function testAIConnection(
   settings: AISettings,
   signal?: AbortSignal,
 ): Promise<void> {
+  const releaseCredentials = protectCredentials(
+    "apiKey" in settings ? [settings.apiKey] : [],
+  );
+  const metadata = {
+    provider: settings.provider,
+    model: settings.model,
+    operation: "connection-test",
+    retry: 0,
+  };
   try {
-    const result = await generateText({
+    const result = await loggedGenerateText(metadata)({
       model: getLanguageModel(settings),
       prompt: "Reply with OK.",
       maxOutputTokens: 16,
@@ -106,5 +152,7 @@ export async function testAIConnection(
   } catch (error) {
     if (error instanceof AIConfigurationError) throw error;
     throw new AIProviderError("Connection failed");
+  } finally {
+    releaseCredentials();
   }
 }

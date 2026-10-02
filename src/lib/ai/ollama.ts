@@ -1,3 +1,4 @@
+import { logger } from "../logging/logger";
 import type { OllamaSettings } from "../settings/types";
 
 export class OllamaConnectionError extends Error {
@@ -40,6 +41,10 @@ export async function listOllamaModels(
       .map((model) => (typeof model.name === "string" ? model.name.trim() : ""))
       .filter((name): name is string => Boolean(name));
   } catch (error) {
+    logger.warn(
+      { provider: "ollama", operation: "list-models", err: error },
+      "Model discovery failed",
+    );
     if (
       error instanceof OllamaConnectionError ||
       (error instanceof DOMException && error.name === "AbortError")

@@ -1,3 +1,4 @@
+import { logger } from "../logging/logger";
 import { localStorage, sessionStorage } from "../storage/local-storage";
 import type { Storage } from "../storage/storage";
 import {
@@ -79,6 +80,10 @@ export class SettingsStorage {
         apiKey: this.readApiKey(provider, rememberApiKey),
       };
     } catch {
+      logger.warn(
+        { operation: "storage", reason: "unavailable-or-invalid" },
+        "Storage operation failed",
+      );
       return { ...defaultSettingsByProvider[provider] };
     }
   }
@@ -90,6 +95,10 @@ export class SettingsStorage {
         isProvider(provider) ? provider : defaultSettings.provider,
       );
     } catch {
+      logger.warn(
+        { operation: "storage", reason: "unavailable-or-invalid" },
+        "Storage operation failed",
+      );
       return { ...defaultSettings };
     }
   }

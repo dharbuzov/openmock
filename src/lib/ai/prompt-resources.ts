@@ -1,3 +1,4 @@
+import { logger } from "../logging/logger";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { PromptName } from "./prompt-loader";
@@ -11,6 +12,10 @@ export async function readPromptResource(
   try {
     prompt = (await readFile(filename, "utf8")).replace(/^\uFEFF/, "").trim();
   } catch (error) {
+    logger.error(
+      { operation: "read-prompt", name, err: error },
+      "Prompt resource loading failed",
+    );
     throw new Error(
       `Required prompt could not be loaded: content/prompts/${name}.md`,
       {

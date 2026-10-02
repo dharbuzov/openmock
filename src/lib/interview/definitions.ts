@@ -1,3 +1,4 @@
+import { logger } from "../logging/logger";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { parseInterviewDefinitionDocument } from "./definition-schema";
@@ -6,8 +7,13 @@ import { config } from "../config/config";
 
 async function loadDefinition(filename: string): Promise<InterviewDefinition> {
   try {
-    return parseInterviewDefinitionDocument(await readFile(filename, "utf8"));
+    const parsed = parseInterviewDefinitionDocument(
+      await readFile(filename, "utf8"),
+    );
+    logger.debug({ definitionId: parsed.id }, "Definition parsed");
+    return parsed;
   } catch (error) {
+    logger.error({ err: error }, "Definition validation failed");
     throw new Error(
       `Invalid interview definition ${path.relative(process.cwd(), filename)}: ${error instanceof Error ? error.message : String(error)}`,
       { cause: error },
@@ -29,7 +35,9 @@ export async function getInterviewDefinitions({
     )
     .map((entry) => path.join(directory, entry.name))
     .sort();
+  logger.debug({ count: files.length }, "Definitions discovered");
   const definitions = await Promise.all(files.map(loadDefinition));
+  logger.debug({ count: definitions.length }, "Definitions loaded");
   const ids = new Set<string>();
   for (const definition of definitions) {
     if (ids.has(definition.id))

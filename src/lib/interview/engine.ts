@@ -1,3 +1,4 @@
+import { logger } from "../logging/logger";
 import type { Problem } from "../problems/types";
 import type { AISettings } from "../settings/types";
 import type {
@@ -84,7 +85,7 @@ export function startInterview(
   if (!mode || !definition.modes.includes(mode))
     throw new InterviewOptionsError("Unsupported interview mode.");
   const startedAt = now();
-  return {
+  const interview: Interview = {
     id: newId(),
     problemId: problem.id,
     definition: {
@@ -100,6 +101,22 @@ export function startInterview(
     observations: [],
     startedAt,
   };
+  logger.info(
+    {
+      interviewId: interview.id,
+      problemId: problem.id,
+      definitionId: definition.id,
+      definitionVersion: definition.version,
+      targetLevel,
+      interactionMode: mode,
+    },
+    "Interview started",
+  );
+  logger.debug(
+    { interviewId: interview.id, stageId: firstStage },
+    "Stage entered",
+  );
+  return interview;
 }
 
 export function acceptCandidateMessage(
@@ -108,6 +125,10 @@ export function acceptCandidateMessage(
 ): Interview {
   const message = content.trim();
   if (interview.status !== "in-progress" || !message) return interview;
+  logger.debug(
+    { interviewId: interview.id, stageId: interview.stage.current },
+    "User turn received",
+  );
   return {
     ...interview,
     messages: [
@@ -130,6 +151,11 @@ export function buildInterviewContext(
   snapshot?: WorkspaceSnapshot,
 ): InterviewContext {
   assertDefinition(interview, definition);
+  if (snapshot)
+    logger.debug(
+      { interviewId: interview.id, workspaceType: snapshot.type },
+      "Workspace snapshot updated",
+    );
   if (interview.problemId !== problem.id || problem.interview !== definition.id)
     throw new Error("The problem does not match the interview definition.");
   return {
@@ -150,7 +176,13 @@ export function applyInterviewTurn(
   const stageIndex = definition.stages.findIndex(
     ({ id }) => id === currentStage,
   );
-  if (stageIndex < 0) throw new Error(`Unknown current stage: ${currentStage}`);
+  if (stageIndex < 0) {
+    logger.warn(
+      { interviewId: interview.id, stageId: currentStage },
+      "Invalid transition attempted",
+    );
+    throw new Error(`Unknown current stage: ${currentStage}`);
+  }
   const createdAt = now();
   const validCompetencies = new Set(
     definition.evaluation.competencies.map(({ id }) => id),
@@ -171,9 +203,23 @@ export function applyInterviewTurn(
   const completed = turn.stageComplete
     ? [...new Set([...interview.stage.completed, currentStage])]
     : interview.stage.completed;
+  logger.debug(
+    { interviewId: interview.id, stageId: currentStage },
+    "AI response received",
+  );
   const nextStage = turn.stageComplete
     ? (definition.stages[stageIndex + 1]?.id ?? currentStage)
     : currentStage;
+  if (turn.stageComplete)
+    logger.debug(
+      { interviewId: interview.id, stageId: currentStage, nextStage },
+      "State transition",
+    );
+  if (nextStage !== currentStage)
+    logger.debug(
+      { interviewId: interview.id, stageId: nextStage },
+      "Stage entered",
+    );
   return {
     ...interview,
     messages: [
@@ -233,8 +279,13 @@ export async function finishInterview(
   snapshot?: WorkspaceSnapshot,
   signal?: AbortSignal,
 ): Promise<FinishedInterview> {
-  if (interview.status !== "in-progress")
+  if (interview.status !== "in-progress") {
+    logger.warn(
+      { interviewId: interview.id, reason: "already-completed" },
+      "Invalid transition attempted",
+    );
     throw new Error("Only an in-progress interview can be finished.");
+  }
   const { evaluateInterview } = await import("../ai/evaluation");
   const evaluation = await evaluateInterview(
     settings,
@@ -247,5 +298,9 @@ export async function finishInterview(
     completedAt: now(),
     endReason: "candidate-finished" as const,
   };
+  logger.info(
+    { interviewId: interview.id, problemId: problem.id },
+    "Interview completed",
+  );
   return { interview: finished, evaluation };
 }

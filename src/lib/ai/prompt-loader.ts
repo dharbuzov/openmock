@@ -1,3 +1,4 @@
+import { logger } from "../logging/logger";
 export const promptNames = ["interviewer", "evaluator"] as const;
 export type PromptName = (typeof promptNames)[number];
 
@@ -21,6 +22,10 @@ export function loadPrompt(name: PromptName): Promise<string> {
       return prompt;
     })
     .catch((error: unknown) => {
+      logger.error(
+        { operation: "load-prompt", name, err: error },
+        "Prompt loading failed",
+      );
       prompts.delete(name);
       throw error;
     });

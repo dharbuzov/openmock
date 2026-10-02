@@ -1,3 +1,4 @@
+import { logger } from "../logging/logger";
 import { sessionStorage } from "../storage/local-storage";
 import type { Interview } from "./types";
 
@@ -22,6 +23,10 @@ export function readInterviewSession(id: string): InterviewRoomSession | null {
       return null;
     return session;
   } catch {
+    logger.warn(
+      { operation: "storage", reason: "unavailable-or-invalid" },
+      "Storage operation failed",
+    );
     return null;
   }
 }
