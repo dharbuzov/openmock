@@ -57,7 +57,8 @@ function fixture() {
     concerns: [],
     keyMoments: [],
     summary: "The candidate did not demonstrate the required competencies.",
-    finalAssessment: "no-hire",
+    finalAssessment:
+      "The candidate did not demonstrate sufficient evidence for the target level.",
     createdAt: "2026-10-02T12:12:01.000Z",
   };
   return { context, result };
@@ -261,7 +262,8 @@ test("original non-participation regression passes SDK validation, storage, and 
     );
     assert.match(html, /Requirements &amp; Scope/);
     assert.match(html, /12 min/);
-    assert.match(html, /0 \/ 8 demonstrated positively/);
+    assert.match(html, /0 of 8 demonstrated/);
+    assert.doesNotMatch(html, /demonstrated positively/);
     const prompt = JSON.stringify(model.doGenerateCalls[0].prompt);
     assert.match(prompt, /candidate-finished/);
     assert.match(prompt, /not-demonstrated/);
@@ -456,4 +458,178 @@ test("incomplete model evaluation logs an informational outcome without an error
     globalThis[loggerKey] = previousLogger;
     globalThis.fetch = previousFetch;
   }
+});
+
+test("scorecard promotes canonical recommendation and rationale and omits empty sections", () => {
+  const { context, result } = fixture();
+  const record = {
+    context: {
+      problemTitle: problem.title,
+      definitionName: definition.name,
+      levelName: "Staff",
+      competencies: definition.evaluation.competencies,
+      startedAt: context.interview.startedAt,
+      completedAt: context.interview.completedAt,
+    },
+    evaluation: { status: "completed", result },
+  };
+  const html = renderToStaticMarkup(
+    createElement(ResultsScorecard, {
+      record,
+      interviewId: context.interview.id,
+    }),
+  );
+  assert.match(html, /data-size="lg"/);
+  assert.match(
+    html,
+    /The candidate did not demonstrate sufficient evidence for the target level/,
+  );
+  assert.match(html, /0 of 8 demonstrated/);
+  assert.doesNotMatch(
+    html,
+    /demonstrated positively|>Strengths<|>Concerns<|>Key moments<|>Evidence<|No evidence recorded/,
+  );
+  assert.doesNotMatch(html, new RegExp(context.interview.id));
+  const varied = {
+    ...record,
+    evaluation: {
+      status: "completed",
+      result: {
+        ...result,
+        competencies: result.competencies.map((item, i) =>
+          i ? item : { ...item, rating: "not-assessed" },
+        ),
+      },
+    },
+  };
+  const variedHtml = renderToStaticMarkup(
+    createElement(ResultsScorecard, {
+      record: varied,
+      interviewId: context.interview.id,
+    }),
+  );
+  assert.match(variedHtml, />Not assessed</);
+  assert.match(variedHtml, />Not demonstrated</);
+  record.context.completedAt = "2026-10-02T13:04:00.000Z";
+  assert.match(
+    renderToStaticMarkup(
+      createElement(ResultsScorecard, {
+        record,
+        interviewId: context.interview.id,
+      }),
+    ),
+    /1 hr 4 min/,
+  );
+});
+
+test("evidence deduplication removes exact normalized duplicates and retains distinct citations", () => {
+  const { context, result } = fixture();
+  const first = {
+    observation: "Candidate identified core functionality.",
+    messageId: context.interview.messages[0].id,
+    stage: "requirements",
+  };
+  const evidence = [
+    first,
+    { ...first, observation: `  ${first.observation}  ` },
+    { ...first, observation: "Candidate clarified the expected scale." },
+    { ...first, stage: "wrap-up" },
+  ];
+  const { deduplicateResultEvidence, interviewResultSchema } = load(
+    "../src/lib/interview/result-schema.ts",
+  );
+  const input = {
+    ...result,
+    strengths: evidence,
+    concerns: evidence,
+    keyMoments: evidence,
+    competencies: result.competencies.map((item) => ({ ...item, evidence })),
+  };
+  const normalized = deduplicateResultEvidence(input);
+  for (const items of [
+    normalized.strengths,
+    normalized.concerns,
+    normalized.keyMoments,
+    ...normalized.competencies.map((item) => item.evidence),
+  ]) {
+    assert.equal(items.length, 3);
+    assert.deepEqual(items, [evidence[0], evidence[2], evidence[3]]);
+  }
+  assert.equal(input.strengths.length, 4);
+  globalThis.sessionStorage = storage();
+  try {
+    persistence.saveResultsRecord(
+      {
+        interview: context.interview,
+        evaluation: { status: "completed", result: input },
+      },
+      problem,
+      definition,
+    );
+    const parsed = persistence.parseResultsRecord(
+      persistence.readResultsRecordValue(context.interview.id),
+    );
+    assert.equal(parsed.evaluation.result.concerns.length, 3);
+  } finally {
+    delete globalThis.sessionStorage;
+  }
+  assert.equal(
+    interviewResultSchema.safeParse({ ...result, finalAssessment: "no-hire" })
+      .success,
+    false,
+  );
+});
+
+test("expanded competency panels show secondary evidence only when it exists", () => {
+  const { context, result } = fixture();
+  const accordion = loadComponent("src/components/ui/accordion.tsx");
+  const { ResultsScorecard: ExpandedScorecard } = loadComponent(
+    "src/components/interview-results.tsx",
+    {
+      "@/components/ui/accordion": {
+        ...accordion,
+        Accordion: (props) =>
+          createElement(accordion.Accordion, {
+            ...props,
+            defaultValue: result.competencies
+              .slice(0, 2)
+              .map((item) => item.competencyId),
+          }),
+      },
+    },
+  );
+  const record = {
+    context: {
+      problemTitle: problem.title,
+      definitionName: definition.name,
+      levelName: "Staff",
+      competencies: definition.evaluation.competencies,
+      startedAt: context.interview.startedAt,
+      completedAt: context.interview.completedAt,
+    },
+    evaluation: {
+      status: "completed",
+      result: {
+        ...result,
+        competencies: result.competencies.map((item, index) => ({
+          ...item,
+          evidence:
+            index === 0
+              ? [{ observation: "Candidate identified core functionality." }]
+              : [],
+        })),
+      },
+    },
+  };
+  const html = renderToStaticMarkup(
+    createElement(ExpandedScorecard, {
+      record,
+      interviewId: context.interview.id,
+    }),
+  );
+  assert.equal((html.match(/aria-expanded="true"/g) ?? []).length, 2);
+  assert.match(html, /Expected work was absent before the candidate finished/);
+  assert.match(html, /Candidate identified core functionality/);
+  assert.equal((html.match(/>Evidence</g) ?? []).length, 1);
+  assert.doesNotMatch(html, /No evidence recorded/);
 });

@@ -474,3 +474,66 @@ test("Setup reads default level and interview mode from the definition", () =>
     assert.equal(stored.interview.targetLevel, "junior");
     assert.equal(stored.interview.mode, "mock");
   }));
+
+test("Setup selects definition interview mode independently from Chat or Live interaction", () =>
+  browser(() => {
+    saveSettings({
+      provider: "ollama",
+      model: "qwen3:8b",
+      baseUrl: "http://localhost:11434",
+    });
+    const harness = setupHarness();
+    let tree = harness.render();
+    const modeGroup = (tree) =>
+      findElement(
+        tree,
+        (node) => node.props["aria-labelledby"] === "interview-mode-label",
+      );
+    assert.deepEqual(modeGroup(tree).props.value, [definition.defaultMode]);
+    assert.deepEqual(
+      modeGroup(tree).props.children.map((item) => item.props.value),
+      definition.modes,
+    );
+    modeGroup(tree).props.onValueChange(["mock"]);
+    findElement(
+      tree,
+      (node) => node.type === "interaction-control",
+    ).props.setMode("live");
+    tree = harness.render();
+    assert.deepEqual(modeGroup(tree).props.value, ["mock"]);
+    assert.equal(
+      findElement(tree, (node) => node.type === "interaction-control").props
+        .mode,
+      "live",
+    );
+    modeGroup(tree).props.onValueChange([]);
+    tree = harness.render();
+    assert.deepEqual(modeGroup(tree).props.value, ["mock"]);
+    button(tree).props.onClick();
+    const stored = readInterviewSession(harness.urls[0].split("session=")[1]);
+    assert.equal(stored.interview.mode, "mock");
+    assert.equal(stored.interactionMode, "live");
+  }));
+
+test("Setup renders only definition-supported interview modes and ignores unsupported choices", () =>
+  browser(() => {
+    const configured = {
+      ...definition,
+      modes: ["practice"],
+      defaultMode: "practice",
+    };
+    const harness = setupHarness(configured);
+    const modeGroup = (tree) =>
+      findElement(
+        tree,
+        (node) => node.props["aria-labelledby"] === "interview-mode-label",
+      );
+    let tree = harness.render();
+    assert.deepEqual(
+      modeGroup(tree).props.children.map((item) => item.props.value),
+      ["practice"],
+    );
+    modeGroup(tree).props.onValueChange(["mock"]);
+    tree = harness.render();
+    assert.deepEqual(modeGroup(tree).props.value, ["practice"]);
+  }));

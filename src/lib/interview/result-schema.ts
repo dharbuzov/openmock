@@ -4,6 +4,7 @@ import {
   hiringRecommendations,
   competencyRatings,
 } from "./types";
+import type { InterviewResult, EvaluationEvidence } from "./types";
 
 const definitionReferenceSchema = z.object({
   id: z.string(),
@@ -33,6 +34,45 @@ export const interviewResultSchema = z.object({
   concerns: z.array(evidenceSchema).max(8),
   keyMoments: z.array(evidenceSchema).max(10),
   summary: z.string().trim().min(1).max(1_000),
-  finalAssessment: z.string().trim().min(1).max(1_500),
+  finalAssessment: z
+    .string()
+    .trim()
+    .min(1)
+    .max(1_500)
+    .refine(
+      (value) =>
+        !hiringRecommendations.some(
+          (recommendation) => recommendation === value,
+        ),
+      "Final assessment must explain the recommendation, not repeat its enum value",
+    ),
   createdAt: z.string().datetime(),
 });
+
+export function deduplicateResultEvidence(
+  result: InterviewResult,
+): InterviewResult {
+  function unique(items: EvaluationEvidence[]): EvaluationEvidence[] {
+    const seen = new Set<string>();
+    return items.filter(({ observation, messageId, stage }) => {
+      const key = JSON.stringify([
+        observation.trim(),
+        messageId?.trim() ?? null,
+        stage?.trim() ?? null,
+      ]);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  return {
+    ...result,
+    competencies: result.competencies.map((item) => ({
+      ...item,
+      evidence: unique(item.evidence),
+    })),
+    strengths: unique(result.strengths),
+    concerns: unique(result.concerns),
+    keyMoments: unique(result.keyMoments),
+  };
+}

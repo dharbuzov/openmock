@@ -39,10 +39,33 @@ const ratingLabels: Record<CompetencyRating, string> = {
   "not-assessed": "Not assessed",
 };
 
+const recommendationVariants: Record<
+  HiringRecommendation,
+  "success" | "warning" | "destructive"
+> = {
+  "strong-hire": "success",
+  hire: "success",
+  mixed: "warning",
+  "no-hire": "destructive",
+  "strong-no-hire": "destructive",
+};
+const ratingVariants: Record<
+  CompetencyRating,
+  "success" | "warning" | "destructive" | "secondary"
+> = {
+  "strong-positive": "success",
+  positive: "success",
+  mixed: "warning",
+  negative: "destructive",
+  "strong-negative": "destructive",
+  "not-demonstrated": "destructive",
+  "not-assessed": "secondary",
+};
+
 function EvidenceList({ evidence }: { evidence: EvaluationEvidence[] }) {
   if (!evidence.length) return null;
   return (
-    <ul className="flex list-disc flex-col gap-2 pl-5 text-sm leading-6 text-muted-foreground">
+    <ul className="flex list-disc flex-col gap-2 pl-5 text-xs leading-5 text-muted-foreground">
       {evidence.map((item, index) => (
         <li key={index}>{item.observation}</li>
       ))}
@@ -61,6 +84,13 @@ export function ResultsScorecard({
   const elapsed = context.completedAt
     ? Date.parse(context.completedAt) - Date.parse(context.startedAt)
     : null;
+  const minutes = elapsed === null ? 0 : Math.round(elapsed / 60_000);
+  const duration =
+    elapsed !== null && elapsed < 60_000
+      ? "Less than 1 min"
+      : minutes < 60
+        ? `${minutes} min`
+        : `${Math.floor(minutes / 60)} hr${minutes % 60 ? ` ${minutes % 60} min` : ""}`;
   const result = evaluation.status === "completed" ? evaluation.result : null;
   const demonstrated =
     result?.competencies.filter(
@@ -75,20 +105,26 @@ export function ResultsScorecard({
         <div className="flex flex-wrap gap-2">
           <Badge variant="outline">{context.definitionName}</Badge>
           <Badge variant="outline">{context.levelName}</Badge>
-          <Badge variant="secondary">
+          <Badge
+            variant={
+              context.endReason === "error" || context.endReason === "abandoned"
+                ? "warning"
+                : "success"
+            }
+          >
             {context.endReason === "error" || context.endReason === "abandoned"
               ? "Interrupted"
               : "Completed"}
           </Badge>
           {elapsed !== null && Number.isFinite(elapsed) && elapsed >= 0 ? (
-            <Badge variant="outline">
-              {elapsed < 60_000
-                ? "Less than 1 min"
-                : `${Math.round(elapsed / 60_000)} min`}
-            </Badge>
+            <Badge variant="outline">{duration}</Badge>
           ) : null}
           {evaluation.status !== "completed" ? (
-            <Badge variant="outline">
+            <Badge
+              variant={
+                evaluation.status === "failed" ? "destructive" : "warning"
+              }
+            >
               {evaluation.status === "failed"
                 ? "Evaluation failed"
                 : "Evaluation incomplete"}
@@ -106,10 +142,18 @@ export function ResultsScorecard({
             aria-labelledby="recommendation"
             className="flex flex-col items-start gap-3"
           >
-            <h2 id="recommendation" className="text-sm font-medium">
+            <h2 id="recommendation" className="text-lg font-medium">
               Recommendation
             </h2>
-            <Badge>{recommendationLabels[result.recommendation]}</Badge>
+            <Badge
+              size="lg"
+              variant={recommendationVariants[result.recommendation]}
+            >
+              {recommendationLabels[result.recommendation]}
+            </Badge>
+            <p className="max-w-prose text-sm leading-6 text-muted-foreground">
+              {result.finalAssessment}
+            </p>
           </section>
           <Separator />
           <section
@@ -119,7 +163,7 @@ export function ResultsScorecard({
             <h2 id="evaluation-summary" className="text-lg font-medium">
               Summary
             </h2>
-            <p className="text-sm leading-6 text-muted-foreground">
+            <p className="max-w-prose text-sm leading-6 text-muted-foreground">
               {result.summary}
             </p>
           </section>
@@ -133,8 +177,7 @@ export function ResultsScorecard({
                 Competencies
               </h2>
               <span className="text-xs text-muted-foreground">
-                {demonstrated} / {result.competencies.length} demonstrated
-                positively
+                {demonstrated} of {result.competencies.length} demonstrated
               </span>
             </div>
             <Accordion defaultValue={[]} multiple>
@@ -145,20 +188,26 @@ export function ResultsScorecard({
                 if (!competency) return null;
                 return (
                   <AccordionItem key={id} value={id}>
-                    <AccordionTrigger>
-                      <span className="min-w-0 flex-1 break-words">{name}</span>
-                      <Badge variant="outline" className="ml-2 shrink-0">
-                        {ratingLabels[competency.rating]}
-                      </Badge>
+                    <AccordionTrigger className="items-center gap-3 py-3">
+                      <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                        <span className="min-w-0 break-words">{name}</span>
+                        <span className="flex w-36 shrink-0 justify-start">
+                          <Badge variant={ratingVariants[competency.rating]}>
+                            {ratingLabels[competency.rating]}
+                          </Badge>
+                        </span>
+                      </span>
                     </AccordionTrigger>
                     <AccordionContent>
-                      <div className="flex flex-col gap-3 pb-3">
+                      <div className="flex max-w-prose flex-col gap-4 px-1 pt-1 pb-6 sm:px-3">
                         <p className="text-sm leading-6 text-muted-foreground">
                           {competency.summary}
                         </p>
                         {competency.evidence.length ? (
                           <>
-                            <h3 className="text-sm font-medium">Evidence</h3>
+                            <h3 className="text-xs font-medium text-muted-foreground">
+                              Evidence
+                            </h3>
                             <EvidenceList evidence={competency.evidence} />
                           </>
                         ) : null}

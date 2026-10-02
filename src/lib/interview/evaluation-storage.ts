@@ -1,7 +1,10 @@
 import { logger } from "../logging/logger";
 import { deserialize, sessionStorage } from "../storage/local-storage";
 import type { Storage } from "../storage/storage";
-import { interviewResultSchema } from "./result-schema";
+import {
+  interviewResultSchema,
+  deduplicateResultEvidence,
+} from "./result-schema";
 import type { InterviewResult } from "./types";
 import { z } from "zod";
 import type { FinishedInterview, InterviewDefinition } from "./types";
@@ -59,7 +62,13 @@ export function saveResultsRecord(
       completedAt: finished.interview.completedAt,
       endReason: finished.interview.endReason,
     },
-    evaluation: finished.evaluation,
+    evaluation:
+      finished.evaluation.status === "completed"
+        ? {
+            ...finished.evaluation,
+            result: deduplicateResultEvidence(finished.evaluation.result),
+          }
+        : finished.evaluation,
   };
   sessionStorage.set(
     `openmock:results:v1:${finished.interview.id}`,
@@ -79,7 +88,13 @@ export function parseResultsRecord(value: string | null): ResultsRecord | null {
   if (!value) return null;
   try {
     const parsed = resultsRecordSchema.safeParse(deserialize<unknown>(value));
-    return parsed.success ? parsed.data : null;
+    if (!parsed.success) return null;
+    const record = parsed.data;
+    if (record.evaluation.status === "completed")
+      record.evaluation.result = deduplicateResultEvidence(
+        record.evaluation.result,
+      );
+    return record;
   } catch {
     return null;
   }

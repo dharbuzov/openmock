@@ -12,7 +12,10 @@ import type { AISettings } from "../settings/types";
 import { getLanguageModel, AIConfigurationError } from "./model";
 import { loadPrompt } from "./prompt-loader";
 
-import { interviewResultSchema } from "../interview/result-schema";
+import {
+  interviewResultSchema,
+  deduplicateResultEvidence,
+} from "../interview/result-schema";
 
 const evaluatorOutputSchema = interviewResultSchema.omit({
   interviewId: true,
@@ -240,7 +243,7 @@ export async function evaluateInterviewWithModel(
       "AI request completed",
     );
     logger.info(metadata, "Evaluation completed");
-    return evaluation;
+    return deduplicateResultEvidence(evaluation);
   } catch (error) {
     if (error instanceof IncompleteEvaluationError) {
       logger.info(

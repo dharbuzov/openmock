@@ -32,6 +32,7 @@ import { recognitionConstructor } from "@/lib/voice/browser";
 import type {
   InterviewDefinition,
   InterviewLevelId,
+  InterviewMode,
 } from "@/lib/interview/types";
 import type { Problem } from "@/lib/problems/types";
 
@@ -56,7 +57,11 @@ function SetupForm({
   const router = useRouter();
   const levels = definition.levels;
   const [level, setLevel] = useState<InterviewLevelId>(definition.defaultLevel);
-  const [mode, setMode] = useState<InteractionMode>("chat");
+  const [interviewMode, setInterviewMode] = useState<InterviewMode>(
+    definition.defaultMode,
+  );
+  const [interactionMode, setInteractionMode] =
+    useState<InteractionMode>("chat");
   const openSettings = useOpenSettings();
   const snapshot = useSyncExternalStore(
     subscribeSettings,
@@ -95,8 +100,9 @@ function SetupForm({
       const interview = startInterview(problem, {
         definition,
         targetLevel: level,
+        mode: interviewMode,
       });
-      saveInterviewSession({ interview, interactionMode: mode });
+      saveInterviewSession({ interview, interactionMode });
       router.push(`/interview/${problem.id}?session=${interview.id}`);
     } catch {
       startingRef.current = false;
@@ -193,14 +199,43 @@ function SetupForm({
           </Field>
 
           <Field>
+            <FieldLabel id="interview-mode-label">Interview mode</FieldLabel>
+            <ToggleGroup
+              aria-labelledby="interview-mode-label"
+              value={[interviewMode]}
+              onValueChange={(values) => {
+                const next = definition.modes.find(
+                  (value) => value === values[0],
+                );
+                if (next) setInterviewMode(next);
+              }}
+              variant="outline"
+              size="sm"
+              spacing={0}
+              className="flex-wrap"
+            >
+              {definition.modes.map((value) => (
+                <ToggleGroupItem key={value} value={value}>
+                  {value === "practice" ? "Practice" : "Mock"}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            <FieldDescription>
+              {interviewMode === "practice"
+                ? "Practice with guidance and hints."
+                : "Simulate a real interview with limited guidance."}
+            </FieldDescription>
+          </Field>
+
+          <Field>
             <FieldLabel>Interaction</FieldLabel>
             <InteractionModeControl
-              mode={mode}
-              setMode={setMode}
+              mode={interactionMode}
+              setMode={setInteractionMode}
               speechAvailable={speechAvailable}
             />
             <FieldDescription>
-              {mode === "chat"
+              {interactionMode === "chat"
                 ? "Turn-based conversation using text or microphone."
                 : "Continuous voice interaction with the AI interviewer."}
             </FieldDescription>
