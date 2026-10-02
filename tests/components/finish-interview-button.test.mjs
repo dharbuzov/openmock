@@ -11,7 +11,9 @@ test("Finish caller persists the evaluation returned by the runner", () => {
     "utf8",
   );
   const finishCall = source.indexOf("await run(");
-  const saveCall = source.indexOf("saveEvaluation(finished.evaluation.result)");
+  const saveCall = source.indexOf(
+    "saveResultsRecord(finished, problem, definition)",
+  );
   assert.ok(finishCall >= 0);
   assert.ok(saveCall > finishCall);
 });

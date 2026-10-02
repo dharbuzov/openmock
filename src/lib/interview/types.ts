@@ -23,6 +23,7 @@ export const competencyRatings = [
   "mixed",
   "negative",
   "strong-negative",
+  "not-demonstrated",
   "not-assessed",
 ] as const;
 
@@ -32,7 +33,11 @@ export type InterviewLevelId = (typeof interviewLevelIds)[number];
 export type InterviewLevel = { id: InterviewLevelId; name: string };
 export type InterviewMode = (typeof interviewModes)[number];
 export type HiringRecommendation = (typeof hiringRecommendations)[number];
-export type CompetencyDefinition = { id: string; name: string };
+export type CompetencyDefinition = {
+  id: string;
+  name: string;
+  required?: boolean;
+};
 export type EvaluationDefinition = {
   competencies: CompetencyDefinition[];
   recommendations: HiringRecommendation[];
@@ -169,6 +174,7 @@ export type InterviewResult = {
 
 export type EvaluationOutcome =
   | { status: "completed"; result: InterviewResult }
+  | { status: "incomplete"; reason: string }
   | { status: "failed"; error: { name: "EvaluationError"; message: string } };
 
 export type FinishedInterview = {

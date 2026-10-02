@@ -45,3 +45,12 @@ modes:
 
 Both defaults must refer to entries in their respective non-empty arrays.
 Invalid defaults fail when the definition is loaded.
+
+Evaluation competencies are expected and required by default. Set `required: false`
+on a competency only when it is optional for the interview's hiring decision.
+The evaluator determines whether a meaningful opportunity existed from the
+definition, interview path, messages, workspace, and end reason. Missing expected
+evidence despite an opportunity is `not-demonstrated` (a negative candidate signal).
+No meaningful opportunity is `not-assessed` (not automatically candidate failure).
+Keep the existing qualitative ratings and holistic recommendation; do not average
+ratings or use hiring recommendations to represent technical evaluation failure.

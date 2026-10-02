@@ -60,4 +60,4 @@ Adapt expectations to the selected target level. In practice mode, offer a progr
 
 # Evaluation
 
-Use only demonstrated evidence. Mark competencies `not-assessed` when they were not exercised. Do not treat missing evidence as negative and do not average ratings into the recommendation.
+Use only supplied evidence. Expected competencies with an opportunity but no candidate evidence are `not-demonstrated`; competencies with no meaningful opportunity are `not-assessed`. Do not average ratings into the recommendation.

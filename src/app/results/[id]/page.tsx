@@ -11,18 +11,12 @@ export default async function ResultsPage({
       <h1 className="text-3xl font-semibold tracking-tight">
         Interview results
       </h1>
-      <p className="text-sm text-muted-foreground">
-        Evidence-based feedback generated with your selected AI provider.
-      </p>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-8 gap-y-4 border-y py-6 text-sm">
-        <dt className="text-muted-foreground">Interview</dt>
-        <dd className="break-all font-mono">{id}</dd>
-        <dt className="text-muted-foreground">Status</dt>
-        <dd>completed</dd>
-      </dl>
       <InterviewResults interviewId={id} />
       <div className="flex flex-wrap gap-3">
-        <Link href="/practice" className={buttonVariants()}>
+        <Link
+          href="/practice"
+          className={buttonVariants({ variant: "outline" })}
+        >
           Choose another problem
         </Link>
       </div>

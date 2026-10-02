@@ -65,4 +65,4 @@ In practice mode, help the candidate make an example more concrete without writi
 
 # Evaluation
 
-Evaluate only behavior demonstrated in the conversation. Distinguish the candidate's own actions from team outcomes. Use `not-assessed` where evidence is insufficient, and ground every conclusion in a concrete message. Make a holistic recommendation rather than averaging competency ratings.
+Evaluate only behavior demonstrated in the conversation. Distinguish the candidate's own actions from team outcomes. Use `not-demonstrated` when expected behavior was not supplied despite an opportunity, and `not-assessed` only when no meaningful opportunity existed. Ground conclusions in actual behavior or explain the missing expected evidence. Make a holistic recommendation rather than averaging competency ratings.

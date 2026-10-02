@@ -325,8 +325,8 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
       },
     },
     "@/lib/interview/evaluation-storage": {
-      saveEvaluation: (value) => {
-        saved = value;
+      saveResultsRecord: (value) => {
+        saved = value.evaluation.result;
       },
     },
     "next/navigation": {

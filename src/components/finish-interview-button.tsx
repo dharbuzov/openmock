@@ -81,14 +81,14 @@ export function FinishInterviewButton() {
       );
       if (!isCurrentOperation(request)) return;
       if (retry) preserveCompletion(finished.interview);
+      const { saveResultsRecord } =
+        await import("@/lib/interview/evaluation-storage");
+      if (!isCurrentOperation(request)) return;
+      saveResultsRecord(finished, problem, definition);
       if (finished.evaluation.status === "failed") {
         setError(finished.evaluation.error.message);
         return;
       }
-      const { saveEvaluation } =
-        await import("@/lib/interview/evaluation-storage");
-      if (!isCurrentOperation(request)) return;
-      saveEvaluation(finished.evaluation.result);
       router.push(`/results/${finished.interview.id}`);
     } catch {
       if (isCurrentOperation(request))

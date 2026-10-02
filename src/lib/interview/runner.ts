@@ -105,7 +105,13 @@ export async function retryEvaluation(
     const { evaluateInterview } = await import("../ai/evaluation");
     const result = await evaluateInterview(settings, context, signal);
     return { interview, evaluation: { status: "completed", result } };
-  } catch {
+  } catch (error) {
+    const { IncompleteEvaluationError } = await import("../ai/evaluation");
+    if (error instanceof IncompleteEvaluationError)
+      return {
+        interview,
+        evaluation: { status: "incomplete", reason: error.message },
+      };
     // Detailed errors belong to the AI boundary. This result is safe for UI/storage.
     return {
       interview,

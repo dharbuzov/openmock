@@ -32,7 +32,9 @@ export class EvaluationError extends Error {
   }
 }
 
-function validateResult(
+export class IncompleteEvaluationError extends EvaluationError {}
+
+export function validateResult(
   result: InterviewResult,
   context: InterviewContext,
 ): void {
@@ -67,6 +69,20 @@ function validateResult(
     )
   )
     throw new EvaluationError("Evaluation recommendation is not in the rubric");
+  const required = context.definition.evaluation.competencies
+    .filter(({ required }) => required !== false)
+    .map(({ id }) =>
+      result.competencies.find(({ competencyId }) => competencyId === id)!,
+    );
+  if (
+    required.length &&
+    required.every(({ rating }) => rating === "not-demonstrated") &&
+    (result.recommendation === "hire" ||
+      result.recommendation === "strong-hire")
+  )
+    throw new EvaluationError(
+      "Hiring cannot be recommended when no required competency was demonstrated",
+    );
   const messageIds = new Set(context.interview.messages.map(({ id }) => id));
   const evidence = [
     ...result.strengths,
@@ -87,6 +103,21 @@ function validateResult(
   )
     throw new EvaluationError(
       "Unassessed competencies cannot contain evidence",
+    );
+  if (
+    result.competencies.some(
+      ({ rating, evidence }) =>
+        rating !== "not-assessed" &&
+        rating !== "not-demonstrated" &&
+        evidence.length === 0,
+    )
+  )
+    throw new EvaluationError(
+      "Performance ratings must contain candidate evidence",
+    );
+  if (result.competencies.every(({ rating }) => rating === "not-assessed"))
+    throw new IncompleteEvaluationError(
+      "The interview did not provide a meaningful opportunity for assessment.",
     );
 }
 
@@ -115,12 +146,22 @@ export async function evaluateInterviewWithModel(
     const competencyIds = context.definition.evaluation.competencies.map(
       ({ id }) => id,
     );
+    const messageIds = context.interview.messages.map(({ id }) => id);
+    const evidenceSchema = evaluatorOutputSchema.shape.strengths.element;
+    const referencedEvidenceSchema = messageIds.length
+      ? evidenceSchema.extend({ messageId: z.enum(messageIds).optional() })
+      : evidenceSchema.omit({ messageId: true });
+    const evidence = z.array(referencedEvidenceSchema);
     const schema = evaluatorOutputSchema.extend({
       recommendation: z.enum(context.definition.evaluation.recommendations),
+      strengths: evidence.max(8),
+      concerns: evidence.max(8),
+      keyMoments: evidence.max(10),
       competencies: z
         .array(
           evaluatorOutputSchema.shape.competencies.element.extend({
             competencyId: z.enum(competencyIds),
+            evidence: evidence.max(8),
           }),
         )
         .length(competencyIds.length)
@@ -155,6 +196,10 @@ export async function evaluateInterviewWithModel(
         messages: context.interview.messages,
         observations: context.interview.observations,
         completedStages: context.interview.stage.completed,
+        interviewStatus: context.interview.status,
+        endReason: context.interview.endReason,
+        startedAt: context.interview.startedAt,
+        completedAt: context.interview.completedAt,
         currentWorkspace: context.workspace,
       })}`,
       output: Output.object({
@@ -197,6 +242,17 @@ export async function evaluateInterviewWithModel(
     logger.info(metadata, "Evaluation completed");
     return evaluation;
   } catch (error) {
+    if (error instanceof IncompleteEvaluationError) {
+      logger.info(
+        {
+          ...metadata,
+          status: "incomplete",
+          durationMs: Math.round(performance.now() - started),
+        },
+        "Evaluation incomplete",
+      );
+      throw error;
+    }
     Object.assign(diagnostics, evaluationFailureDiagnostics(error));
     const failure =
       error instanceof EvaluationError

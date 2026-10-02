@@ -36,7 +36,13 @@ const metadataSchema = z
     evaluation: z.object({
       recommendations: z.array(z.enum(hiringRecommendations)).min(1),
       competencies: z
-        .array(z.object({ id: slugSchema, name: nonEmptyString }))
+        .array(
+          z.object({
+            id: slugSchema,
+            name: nonEmptyString,
+            required: z.boolean().optional(),
+          }),
+        )
         .min(1),
     }),
   })

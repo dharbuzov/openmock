@@ -118,4 +118,4 @@ Behave like a real interviewer. Do not teach or provide hints unless these instr
 
 # Evaluation
 
-Evaluate against the selected target level and only competencies actually exercised. Absence of evidence is not negative evidence; use `not-assessed` when evidence is insufficient. Ground every positive or negative assessment in concrete interview evidence. Make a holistic recommendation rather than averaging competency ratings.
+Evaluate against the selected target level. Use `not-demonstrated` when an expected competency had a reasonable opportunity but lacked candidate evidence; use `not-assessed` only when the process provided no meaningful opportunity. Ground every positive or negative assessment in concrete interview evidence. Make a holistic recommendation rather than averaging competency ratings.

@@ -175,11 +175,11 @@ test("system design context includes the normalized diagram through the generic 
   const evaluator = new MockLanguageModelV3({
     doGenerate: mockResult(
       JSON.stringify({
-        recommendation: "hire",
+        recommendation: "no-hire",
         competencies: systemDefinition.evaluation.competencies.map(
           ({ id }) => ({
             competencyId: id,
-            rating: "not-assessed",
+            rating: "not-demonstrated",
             summary: "No evidence.",
             evidence: [],
           }),
@@ -541,10 +541,10 @@ test("evaluation constrains competency IDs and count to each definition rubric",
       startInterview(currentProblem, { definition: rubric }),
     );
     const output = {
-      recommendation: rubric.evaluation.recommendations[0],
+      recommendation: "no-hire",
       competencies: rubric.evaluation.competencies.map(({ id }) => ({
         competencyId: id,
-        rating: "not-assessed",
+        rating: "not-demonstrated",
         summary: "No evidence was supplied.",
         evidence: [],
       })),
@@ -601,6 +601,105 @@ test("evaluation constrains competency IDs and count to each definition rubric",
           context,
         ),
       );
+    }
+  }
+});
+
+test("evaluation constrains every evidence message reference to the supplied transcript", async () => {
+  const { completeInterview, emptyWorkspaceSnapshot } = load(
+    "../src/lib/interview/engine.ts",
+  );
+  for (const hasMessages of [true, false]) {
+    const initial = startInterview(problem, { definition });
+    const interview = completeInterview(
+      hasMessages ? acceptCandidateMessage(initial, "I am finished.") : initial,
+    );
+    const output = {
+      recommendation: "no-hire",
+      competencies: definition.evaluation.competencies.map(({ id }) => ({
+        competencyId: id,
+        rating: "not-demonstrated",
+        summary: "Expected evidence was absent.",
+        evidence: [],
+      })),
+      strengths: [],
+      concerns: [],
+      keyMoments: [],
+      summary: "No substantive work was demonstrated.",
+      finalAssessment: "Expected work was absent.",
+    };
+    const context = {
+      interview,
+      definition,
+      problem,
+      workspace: emptyWorkspaceSnapshot(definition.workspace),
+    };
+    const model = new MockLanguageModelV3({
+      doGenerate: mockResult(JSON.stringify(output)),
+    });
+    await evaluateInterviewWithModel(model, context);
+    const properties =
+      model.doGenerateCalls[0].responseFormat.schema.properties;
+    for (const schema of [
+      properties.strengths.items,
+      properties.concerns.items,
+      properties.keyMoments.items,
+      properties.competencies.items.properties.evidence.items,
+    ]) {
+      if (hasMessages)
+        assert.deepEqual(
+          schema.properties.messageId.enum,
+          interview.messages.map(({ id }) => id),
+        );
+      else assert.equal(schema.properties.messageId, undefined);
+    }
+    if (hasMessages) {
+      for (const field of [
+        "strengths",
+        "concerns",
+        "keyMoments",
+        "competencies",
+      ]) {
+        const evidence = [
+          {
+            observation: "Candidate ended the interview.",
+            messageId: "invented-message-id",
+          },
+        ];
+        const invalid =
+          field === "competencies"
+            ? {
+                ...output,
+                competencies: output.competencies.map((item, i) =>
+                  i ? item : { ...item, evidence },
+                ),
+              }
+            : { ...output, [field]: evidence };
+        await assert.rejects(
+          evaluateInterviewWithModel(
+            new MockLanguageModelV3({
+              doGenerate: mockResult(JSON.stringify(invalid)),
+            }),
+            context,
+          ),
+        );
+      }
+      const valid = {
+        ...output,
+        concerns: [
+          {
+            observation: "Candidate ended the interview.",
+            messageId: interview.messages[0].id,
+          },
+        ],
+      };
+      const result = await evaluateInterviewWithModel(
+        new MockLanguageModelV3({
+          doGenerate: mockResult(JSON.stringify(valid)),
+        }),
+        context,
+      );
+      assert.equal(result.concerns[0].messageId, interview.messages[0].id);
     }
   }
 });
