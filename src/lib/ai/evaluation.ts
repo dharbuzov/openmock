@@ -5,6 +5,7 @@ import {
   sanitizeValidationIssues,
 } from "../logging/sanitize";
 import { logger } from "../logging/logger";
+import { z } from "zod";
 import { Output, type LanguageModel } from "ai";
 import type { InterviewContext, InterviewResult } from "../interview/types";
 import type { AISettings } from "../settings/types";
@@ -44,8 +45,20 @@ function validateResult(
     resultIds.some((id) => !competencyIds.has(id)) ||
     new Set(resultIds).size !== resultIds.length
   ) {
+    const missing = [...competencyIds].filter((id) => !resultIds.includes(id));
+    const unknown = resultIds.filter((id) => !competencyIds.has(id));
+    const duplicates = [
+      ...new Set(
+        resultIds.filter((id, index) => resultIds.indexOf(id) !== index),
+      ),
+    ];
     throw new EvaluationError(
       "Evaluation competency IDs must match the rubric exactly",
+      {
+        cause: new Error(
+          `Missing competency IDs: ${missing.join(", ") || "none"}; unknown IDs: ${unknown.join(", ") || "none"}; duplicate IDs: ${duplicates.join(", ") || "none"}`,
+        ),
+      },
     );
   }
   if (
@@ -99,6 +112,31 @@ export async function evaluateInterviewWithModel(
   const diagnostics: Record<string, unknown> = { responseReceived: false };
   try {
     const evaluatorPrompt = await loadPrompt("evaluator");
+    const competencyIds = context.definition.evaluation.competencies.map(
+      ({ id }) => id,
+    );
+    const schema = evaluatorOutputSchema.extend({
+      recommendation: z.enum(context.definition.evaluation.recommendations),
+      competencies: z
+        .array(
+          evaluatorOutputSchema.shape.competencies.element.extend({
+            competencyId: z.enum(competencyIds),
+          }),
+        )
+        .length(competencyIds.length)
+        .superRefine((items, validation) => {
+          const returned = items.map(({ competencyId }) => competencyId);
+          for (const id of competencyIds) {
+            const count = returned.filter((value) => value === id).length;
+            if (count !== 1)
+              validation.addIssue({
+                code: "custom",
+                path: [],
+                message: `Expected competency "${id}" exactly once; received ${count} entries`,
+              });
+          }
+        }),
+    });
     const result = await loggedGenerateText({
       ...metadata,
       ...(logger.isLevelEnabled("debug")
@@ -120,7 +158,7 @@ export async function evaluateInterviewWithModel(
         currentWorkspace: context.workspace,
       })}`,
       output: Output.object({
-        schema: evaluatorOutputSchema,
+        schema,
         name: "interview_result",
         description: "Holistic, evidence-based interview feedback.",
       }),

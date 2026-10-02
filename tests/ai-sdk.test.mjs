@@ -531,3 +531,76 @@ test("shared AI boundary logs full successful payloads and correlates provider f
     installLogger(wrapLogger(pino({ level: "info" })));
   }
 });
+
+test("evaluation constrains competency IDs and count to each definition rubric", async () => {
+  const { completeInterview } = load("../src/lib/interview/engine.ts");
+  for (const id of ["system-design", "dsa", "behavioral"]) {
+    const rubric = loadDefinition(id);
+    const currentProblem = { ...problem, interview: id };
+    const interview = completeInterview(
+      startInterview(currentProblem, { definition: rubric }),
+    );
+    const output = {
+      recommendation: rubric.evaluation.recommendations[0],
+      competencies: rubric.evaluation.competencies.map(({ id }) => ({
+        competencyId: id,
+        rating: "not-assessed",
+        summary: "No evidence was supplied.",
+        evidence: [],
+      })),
+      strengths: [],
+      concerns: [],
+      keyMoments: [],
+      summary: "Insufficient evidence.",
+      finalAssessment: "Further assessment is required.",
+    };
+    const context = {
+      interview,
+      problem: currentProblem,
+      definition: rubric,
+      workspace: load("../src/lib/interview/engine.ts").emptyWorkspaceSnapshot(
+        rubric.workspace,
+      ),
+    };
+    const model = new MockLanguageModelV3({
+      doGenerate: mockResult(JSON.stringify(output)),
+    });
+    const result = await evaluateInterviewWithModel(model, context);
+    assert.equal(
+      result.competencies.length,
+      rubric.evaluation.competencies.length,
+    );
+    assert.equal(interview.stage.current, null);
+    const schema = model.doGenerateCalls[0].responseFormat.schema;
+    assert.deepEqual(
+      schema.properties.competencies.items.properties.competencyId.enum,
+      rubric.evaluation.competencies.map(({ id }) => id),
+    );
+    assert.equal(
+      schema.properties.competencies.minItems,
+      rubric.evaluation.competencies.length,
+    );
+    assert.equal(
+      schema.properties.competencies.maxItems,
+      rubric.evaluation.competencies.length,
+    );
+    for (const competencies of [
+      output.competencies.slice(1),
+      output.competencies.map((item, index) =>
+        index === 0 ? { ...item, competencyId: "invented-id" } : item,
+      ),
+      output.competencies.map((item, index) =>
+        index === 0 ? output.competencies[1] : item,
+      ),
+    ]) {
+      await assert.rejects(
+        evaluateInterviewWithModel(
+          new MockLanguageModelV3({
+            doGenerate: mockResult(JSON.stringify({ ...output, competencies })),
+          }),
+          context,
+        ),
+      );
+    }
+  }
+});
