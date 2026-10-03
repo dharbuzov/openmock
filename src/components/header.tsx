@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { OpenMockLogo } from "@/components/openmock-logo";
+import { GitHubIcon } from "@/components/github-icon";
 import { buttonVariants } from "@/components/ui/button";
 import { SettingsButton } from "@/components/settings-provider";
 
@@ -20,8 +21,11 @@ export function Header() {
         >
           <a
             href="https://github.com/dharbuzov/openmock"
-            className={buttonVariants({ variant: "ghost", size: "sm" })}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-7 shrink-0 items-center gap-1.5 px-2.5 text-[0.8rem] font-medium hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-4"
           >
+            <GitHubIcon />
             GitHub
           </a>
           <Link

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { GitHubIcon } from "@/components/github-icon";
 import { buttonVariants } from "@/components/ui/button";
 
 const principles = [
@@ -256,10 +257,13 @@ export default function Home() {
             </Link>
             <a
               href="https://github.com/dharbuzov/openmock"
-              className={buttonVariants({ variant: "outline", size: "lg" })}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 px-2.5 text-sm font-medium hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-4"
             >
+              <GitHubIcon />
               View on GitHub{" "}
-              <ArrowUpRight aria-hidden="true" data-icon="inline-end" />
+              <ArrowUpRight aria-hidden="true" className="size-4 shrink-0" />
             </a>
           </div>
         </div>
