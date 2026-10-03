@@ -703,3 +703,109 @@ test("evaluation constrains every evidence message reference to the supplied tra
     }
   }
 });
+function streamModel(deltas, ending = "finish") {
+  return new MockLanguageModelV3({
+    doStream: {
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue({ type: "stream-start", warnings: [] });
+          controller.enqueue({ type: "text-start", id: "text" });
+          for (const delta of deltas)
+            controller.enqueue({ type: "text-delta", id: "text", delta });
+          if (ending === "error")
+            controller.enqueue({
+              type: "error",
+              error: Error("connection interrupted"),
+            });
+          else {
+            controller.enqueue({ type: "text-end", id: "text" });
+            controller.enqueue({
+              type: "finish",
+              finishReason: mockResult("").finishReason,
+              usage: mockResult("").usage,
+            });
+          }
+          controller.close();
+        },
+      }),
+    },
+  });
+}
+function streamingContext() {
+  return {
+    interview: acceptCandidateMessage(
+      startInterview(problem, { definition }),
+      "I would use a map.",
+    ),
+    problem,
+    definition,
+    workspace: {
+      type: "code",
+      language: "java",
+      filename: "Solution.java",
+      code: "",
+    },
+  };
+}
+
+test("real structured streaming exposes message text and waits for the validated final turn", async () => {
+  const updates = [];
+  const context = streamingContext();
+  const model = streamModel([
+    '{"message":"What',
+    " constraints matter?",
+    '","stageComplete":false,"observations":[]}',
+  ]);
+  const turn = await generateInterviewResponseWithModel(
+    model,
+    context,
+    undefined,
+    (text) => updates.push(text),
+  );
+  assert.ok(updates.length >= 2);
+  assert.equal(updates[0], "What");
+  assert.equal(updates.at(-1), "What constraints matter?");
+  assert.deepEqual(turn, {
+    message: "What constraints matter?",
+    stageComplete: false,
+    observations: [],
+  });
+  assert.equal(context.interview.messages.length, 1);
+  assert.equal(model.doGenerateCalls.length, 0);
+});
+
+test("streaming provider failures and invalid final output never become interviewer turns", async () => {
+  for (const model of [
+    streamModel(['{"message":"Partial'], "error"),
+    streamModel([
+      '{"message":"Partial","stageComplete":"yes","observations":[]}',
+    ]),
+  ]) {
+    const context = streamingContext();
+    await assert.rejects(
+      generateInterviewResponseWithModel(model, context, undefined, () => {}),
+      AIProviderError,
+    );
+    assert.equal(context.interview.messages.length, 1);
+    assert.equal(context.interview.stage.current, definition.stages[0].id);
+  }
+});
+
+test("a model without streaming returns a complete validated response without synthetic chunks", async () => {
+  const model = new MockLanguageModelV3({
+    doGenerate: mockResult(
+      '{"message":"Complete reply","stageComplete":false,"observations":[]}',
+    ),
+  });
+  model.doStream = undefined;
+  const updates = [];
+  const turn = await generateInterviewResponseWithModel(
+    model,
+    streamingContext(),
+    undefined,
+    (text) => updates.push(text),
+  );
+  assert.equal(turn.message, "Complete reply");
+  assert.deepEqual(updates, []);
+  assert.equal(model.doGenerateCalls.length, 1);
+});

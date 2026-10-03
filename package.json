@@ -23,6 +23,7 @@
     "@base-ui/react": "^1.8.0",
     "@excalidraw/excalidraw": "^0.18.1",
     "@monaco-editor/react": "^4.7.0",
+    "@shadcn/react": "^0.3.1",
     "ai": "^6.0.295",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",

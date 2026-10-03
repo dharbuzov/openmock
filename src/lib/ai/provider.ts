@@ -1,7 +1,7 @@
 import { loggedGenerateText } from "./logging";
 import { protectCredentials } from "../logging/sanitize";
 import { logger } from "../logging/logger";
-import { Output, type LanguageModel } from "ai";
+import { Output, streamText, type LanguageModel } from "ai";
 import { z } from "zod";
 import type { InterviewContext, InterviewTurn } from "../interview/types";
 import type { AISettings } from "../settings/types";
@@ -36,6 +36,7 @@ export async function generateInterviewResponseWithModel(
   model: LanguageModel,
   context: InterviewContext,
   signal?: AbortSignal,
+  onMessage?: (message: string) => void,
 ): Promise<InterviewTurn> {
   const metadata = {
     provider: typeof model === "string" ? "gateway" : model.provider,
@@ -63,12 +64,7 @@ export async function generateInterviewResponseWithModel(
         content: message.content,
       })),
     ];
-    const result = await loggedGenerateText({
-      ...metadata,
-      ...(logger.isLevelEnabled("debug")
-        ? { workspace: context.workspace }
-        : {}),
-    })({
+    const options = {
       model,
       system: await interviewerSystemPrompt(context),
       messages,
@@ -81,7 +77,49 @@ export async function generateInterviewResponseWithModel(
       maxOutputTokens: 1_500,
       maxRetries: 0,
       abortSignal: signal,
-    });
+    };
+    if (
+      onMessage &&
+      (typeof model === "string" || typeof model.doStream === "function")
+    ) {
+      const requestId = crypto.randomUUID();
+      const started = performance.now();
+      const logContext = { ...metadata, requestId };
+      logger.debug(
+        { ...logContext, request: { system: options.system, messages } },
+        "AI request",
+      );
+      const result = streamText({
+        ...options,
+        onError: ({ error }) =>
+          logger.error({ ...logContext, err: error }, "AI request failed"),
+        onFinish: ({ text, usage, finishReason }) =>
+          logger.debug(
+            {
+              ...logContext,
+              durationMs: Math.round(performance.now() - started),
+              response: { text, usage, finishReason },
+            },
+            "AI response",
+          ),
+      });
+      for await (const partial of result.partialOutputStream) {
+        // Partial text is UI-only. Stages and observations still require the final validated turn.
+        if (
+          !signal?.aborted &&
+          typeof partial.message === "string" &&
+          partial.message.length > 0
+        )
+          onMessage(partial.message);
+      }
+      return await result.output;
+    }
+    const result = await loggedGenerateText({
+      ...metadata,
+      ...(logger.isLevelEnabled("debug")
+        ? { workspace: context.workspace }
+        : {}),
+    })(options);
     return result.output;
   } catch (error) {
     if (error instanceof AIProviderError) throw error;
@@ -93,6 +131,7 @@ export async function generateInterviewResponse(
   settings: AISettings,
   context: InterviewContext,
   signal?: AbortSignal,
+  onMessage?: (message: string) => void,
 ): Promise<InterviewTurn> {
   const releaseCredentials = protectCredentials(
     "apiKey" in settings ? [settings.apiKey] : [],
@@ -102,6 +141,7 @@ export async function generateInterviewResponse(
       getLanguageModel(settings),
       context,
       signal,
+      onMessage,
     );
   } catch (error) {
     if (!(error instanceof AIProviderError))

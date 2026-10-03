@@ -235,9 +235,20 @@ test("Send retries reuse the captured workspace and Finish saves completion with
       useInterviewVoice: () => ({
         listening: false,
         error: "",
+        stopPlayback: () => {},
         toggleMicrophone: () => {},
       }),
     },
+    "@/components/ui/message-scroller": Object.fromEntries(
+      [
+        "MessageScrollerProvider",
+        "MessageScroller",
+        "MessageScrollerViewport",
+        "MessageScrollerContent",
+        "MessageScrollerItem",
+        "MessageScrollerButton",
+      ].map((name) => [name, name]),
+    ),
     "@/components/ui/tooltip": {
       Tooltip: "tooltip",
       TooltipTrigger: "tooltip-trigger",

@@ -11,6 +11,7 @@ export interface BrowserRecognition {
   onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
   start(): void;
+  stop(): void;
   abort(): void;
 }
 export function recognitionConstructor():

@@ -3,7 +3,7 @@
 import { CurrentStageBadge } from "./current-stage-badge";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { Mic, Square, ArrowDown, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -12,6 +12,17 @@ import {
   EmptyDescription,
   EmptyContent,
 } from "@/components/ui/empty";
+import {
+  MessageScrollerProvider,
+  MessageScroller,
+  MessageScrollerViewport,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerButton,
+  useMessageScroller,
+} from "@/components/ui/message-scroller";
+import { acceptCandidateMessage } from "@/lib/interview/engine";
+import { cn } from "cn";
 import { Textarea } from "@/components/ui/textarea";
 import { useOpenSettings } from "@/components/settings-provider";
 import {
@@ -32,6 +43,14 @@ import { useInterviewVoice } from "./use-interview-voice";
 const providerIssueSnapshot = () => aiSettingsIssue(readSettings());
 const serverProviderIssueSnapshot = () => "";
 
+function FollowSubmittedAnswer({ messageId }: { messageId?: string }) {
+  const { scrollToEnd } = useMessageScroller();
+  useEffect(() => {
+    if (messageId) scrollToEnd({ behavior: "auto" });
+  }, [messageId, scrollToEnd]);
+  return null;
+}
+
 export function AIInterviewer() {
   const {
     interview,
@@ -48,7 +67,7 @@ export function AIInterviewer() {
   const [answer, setAnswer] = useState("");
   const pending = operation === "send";
   const [error, setError] = useState("");
-  const end = useRef<HTMLDivElement>(null);
+  const [streamedResponse, setStreamedResponse] = useState("");
   const lastWorkspaceSnapshot = useRef<WorkspaceSnapshot | null>(null);
   const openSettings = useOpenSettings();
   const providerIssue = useSyncExternalStore(
@@ -76,16 +95,65 @@ export function AIInterviewer() {
         [previous.trim(), text].filter(Boolean).join(" "),
       ),
     onLiveAnswer: (text) => {
-      void send(false, text);
+      void send(false, text, true);
     },
   });
-  useEffect(() => {
-    end.current?.scrollIntoView({ block: "nearest" });
-  }, [messages, pending, error]);
+  const state = pending
+    ? messages.at(-1)?.role !== "candidate"
+      ? "submitting"
+      : streamedResponse
+        ? "interviewer-streaming"
+        : "interviewer-thinking"
+    : voice.transcribing
+      ? "transcribing"
+      : voice.listening
+        ? "user-listening"
+        : error || voice.error
+          ? "error"
+          : voice.speaking
+            ? "interviewer-speaking"
+            : answer.trim()
+              ? "user-typing"
+              : "idle";
+  const inputBlocked =
+    operation !== null ||
+    voice.transcribing ||
+    interview.status !== "in-progress" ||
+    interview.stage.current === null;
+  const lastCandidate =
+    messages.at(-1)?.role === "candidate" ? messages.at(-1) : undefined;
+  const transcriptMessages = messages.map((message, index) => ({
+    message,
+    key:
+      message.role === "interviewer"
+        ? `response-${messages[index - 1]?.id ?? message.id}`
+        : message.id,
+    pending: false,
+  }));
+  if (pending && lastCandidate)
+    transcriptMessages.push({
+      message: {
+        ...lastCandidate,
+        role: "interviewer",
+        content: streamedResponse,
+      },
+      key: `response-${lastCandidate.id}`,
+      pending: true,
+    });
+  const draft =
+    voice.listening || voice.transcribing
+      ? [answer.trim(), voice.partialTranscript].filter(Boolean).join(" ")
+      : answer;
 
-  async function send(retry = false, candidateAnswer = answer) {
+  async function send(
+    retry = false,
+    candidateAnswer = answer,
+    fromVoice = false,
+  ) {
     if (
       operation ||
+      (!fromVoice && (voice.transcribing || voice.listening)) ||
+      (error && !retry) ||
       interview.status !== "in-progress" ||
       interview.stage.current === null ||
       (!retry && !candidateAnswer.trim())
@@ -100,18 +168,21 @@ export function AIInterviewer() {
     const request = beginOperation("send");
     if (!request) return;
     setError("");
+    setStreamedResponse("");
+    voice.stopPlayback();
+    if (fromVoice && !retry) setAnswer(candidateAnswer);
     try {
-      const { acceptCandidateMessage } = await import("@/lib/interview/engine");
-      const { processCandidateMessage } =
-        await import("@/lib/interview/runner");
       if (!isCurrentOperation(request)) return;
       const next = retry
         ? request.interview
         : acceptCandidateMessage(request.interview, candidateAnswer);
-      if (!retry) lastWorkspaceSnapshot.current = captureWorkspace();
-      const workspaceSnapshot = lastWorkspaceSnapshot.current ?? undefined;
       commitOperation(request, next);
-      if (!retry) setAnswer("");
+      if (!retry || !lastWorkspaceSnapshot.current)
+        lastWorkspaceSnapshot.current = captureWorkspace();
+      const workspaceSnapshot = lastWorkspaceSnapshot.current ?? undefined;
+      const { processCandidateMessage } =
+        await import("@/lib/interview/runner");
+      if (!isCurrentOperation(request)) return;
       const result = await processCandidateMessage(
         settings,
         next,
@@ -119,13 +190,19 @@ export function AIInterviewer() {
         definition,
         workspaceSnapshot,
         request.controller.signal,
+        (content) => {
+          if (isCurrentOperation(request)) setStreamedResponse(content);
+        },
       );
-      commitOperation(request, result);
+      if (commitOperation(request, result)) {
+        setAnswer("");
+        setStreamedResponse("");
+      }
     } catch {
-      if (isCurrentOperation(request))
-        setError(
-          "Could not reach the interviewer. Check your AI settings and try again.",
-        );
+      if (isCurrentOperation(request)) {
+        setStreamedResponse("");
+        setError("Couldn’t get a response from the AI provider.");
+      }
     } finally {
       endOperation(request);
     }
@@ -134,6 +211,7 @@ export function AIInterviewer() {
   return (
     <section
       aria-labelledby="interviewer-heading"
+      data-conversation-state={state}
       className="flex h-full min-h-0 flex-col"
     >
       <div className="flex h-11 shrink-0 items-center justify-between gap-3 border-b px-4">
@@ -175,85 +253,140 @@ export function AIInterviewer() {
           </Tooltip>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-        {messages.length === 0 &&
-          (providerIssue ? (
-            <Empty className="items-start justify-start gap-3 rounded-none p-0 text-left">
-              <EmptyHeader className="items-start gap-1">
-                <EmptyTitle>AI provider not configured</EmptyTitle>
-                <EmptyDescription>
-                  Connect a provider to start the interview.
-                </EmptyDescription>
-              </EmptyHeader>
-              <EmptyContent className="items-start">
-                <Button size="sm" onClick={openSettings}>
-                  Configure provider
-                </Button>
-              </EmptyContent>
-            </Empty>
-          ) : (
-            <p className="text-sm leading-6 text-muted-foreground">
-              Begin by walking me through your initial approach, or introduce
-              yourself.
-            </p>
-          ))}
-        <ol
-          aria-label="Interview conversation"
-          aria-live="polite"
-          className="flex flex-col gap-7"
-        >
-          {messages.map((message) => (
-            <li
-              key={message.id}
-              className={
-                message.role === "candidate" ? "border-l-2 pl-3" : undefined
-              }
+      <MessageScrollerProvider autoScroll defaultScrollPosition="end">
+        <MessageScroller className="min-h-0 flex-1">
+          <MessageScrollerViewport
+            aria-label="Interview conversation"
+            className="p-4"
+          >
+            <MessageScrollerContent
+              className="gap-7"
+              aria-live="polite"
+              aria-relevant="additions"
+              role="log"
             >
-              <p className="mb-2 text-xs font-medium">
-                {message.role === "candidate" ? "You" : "AI Interviewer"}
-              </p>
-              <p className="whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">
-                {message.content}
-              </p>
-            </li>
-          ))}
-        </ol>
-        {pending && (
-          <p role="status" className="mt-4 text-xs text-muted-foreground">
-            Interviewer is thinking…
-          </p>
-        )}
-        {error && (
-          <div className="mt-4 flex flex-col gap-3">
-            <p role="alert" className="text-xs leading-5 text-muted-foreground">
-              {error}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={
-                  operation !== null ||
-                  interview.status !== "in-progress" ||
-                  interview.stage.current === null
-                }
-                onClick={() => send(true)}
-              >
-                Retry
-              </Button>
-              <Button size="sm" variant="ghost" onClick={openSettings}>
-                AI settings
-              </Button>
-            </div>
-          </div>
-        )}
-        {voice.error && (
-          <p role="alert" className="mt-4 text-xs text-muted-foreground">
-            {voice.error}
-          </p>
-        )}
-        <div ref={end} />
-      </div>
+              {messages.length === 0 && (
+                <MessageScrollerItem messageId="intro">
+                  {providerIssue ? (
+                    <Empty className="items-start justify-start gap-3 rounded-none p-0 text-left">
+                      <EmptyHeader className="items-start gap-1">
+                        <EmptyTitle>AI provider not configured</EmptyTitle>
+                        <EmptyDescription>
+                          Connect a provider to start the interview.
+                        </EmptyDescription>
+                      </EmptyHeader>
+                      <EmptyContent className="items-start">
+                        <Button size="sm" onClick={openSettings}>
+                          Configure provider
+                        </Button>
+                      </EmptyContent>
+                    </Empty>
+                  ) : (
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      Begin by walking me through your initial approach, or
+                      introduce yourself.
+                    </p>
+                  )}
+                </MessageScrollerItem>
+              )}
+              {transcriptMessages.map(
+                ({ message, key, pending: isPending }) => (
+                  <MessageScrollerItem
+                    messageId={key}
+                    key={key}
+                    className={
+                      message.role === "candidate"
+                        ? "border-l-2 pl-3"
+                        : undefined
+                    }
+                  >
+                    <p className="mb-2 text-xs font-medium">
+                      {message.role === "candidate" ? "You" : "Interviewer"}
+                    </p>
+                    <p className="min-h-6 whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">
+                      {isPending && !message.content ? (
+                        <span
+                          role="status"
+                          className="motion-safe:animate-pulse"
+                        >
+                          Thinking…
+                        </span>
+                      ) : (
+                        message.content
+                      )}
+                    </p>
+                  </MessageScrollerItem>
+                ),
+              )}
+              {error && (
+                <MessageScrollerItem
+                  messageId="provider-error"
+                  className="flex flex-col gap-3"
+                >
+                  <p
+                    role="alert"
+                    className="text-xs leading-5 text-muted-foreground"
+                  >
+                    {error}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={
+                        operation !== null ||
+                        interview.status !== "in-progress" ||
+                        interview.stage.current === null
+                      }
+                      onClick={() => send(true)}
+                    >
+                      Retry
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={openSettings}>
+                      AI settings
+                    </Button>
+                  </div>
+                </MessageScrollerItem>
+              )}
+              {voice.error && (
+                <MessageScrollerItem
+                  messageId="voice-error"
+                  className="flex flex-col items-start gap-2"
+                >
+                  <p role="alert" className="text-xs text-muted-foreground">
+                    {voice.error}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={voice.retry}
+                    disabled={inputBlocked}
+                  >
+                    {voice.failedOperation === "playback"
+                      ? "Retry audio"
+                      : "Retry microphone"}
+                  </Button>
+                </MessageScrollerItem>
+              )}
+            </MessageScrollerContent>
+          </MessageScrollerViewport>
+          <FollowSubmittedAnswer
+            messageId={
+              messages.findLast((message) => message.role === "candidate")?.id
+            }
+          />
+          <MessageScrollerButton
+            size="sm"
+            behavior="auto"
+            className="gap-1.5"
+            aria-label="Go to latest message"
+          >
+            <ArrowDown data-icon="inline-start" aria-hidden="true" /> New
+            message
+          </MessageScrollerButton>
+        </MessageScroller>
+      </MessageScrollerProvider>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -264,11 +397,39 @@ export function AIInterviewer() {
         <label htmlFor="interview-answer" className="sr-only">
           Your answer
         </label>
+        {(voice.listening || voice.transcribing) && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-2 text-xs text-muted-foreground"
+          >
+            {voice.listening && (
+              <span
+                aria-hidden="true"
+                className="size-1.5 rounded-full bg-success"
+              />
+            )}
+            <span>{voice.transcribing ? "Transcribing…" : "Listening…"}</span>
+            {voice.listening && (
+              <span className="ml-auto font-mono tabular-nums">
+                {String(Math.floor(voice.recordingSeconds / 60)).padStart(
+                  2,
+                  "0",
+                )}
+                :{String(voice.recordingSeconds % 60).padStart(2, "0")}
+              </span>
+            )}
+          </div>
+        )}
         <Textarea
           id="interview-answer"
           name="answer"
-          placeholder="Type your answer…"
-          value={answer}
+          placeholder={
+            voice.listening ? "Speak your answer…" : "Type your answer…"
+          }
+          value={draft}
+          disabled={inputBlocked}
+          readOnly={voice.listening}
           onChange={(event) => setAnswer(event.target.value)}
           onKeyDown={(event) => {
             if (
@@ -281,33 +442,27 @@ export function AIInterviewer() {
             }
           }}
           aria-describedby="answer-note"
-          className="max-h-36 min-h-24 resize-none"
+          className={cn(
+            "max-h-36 min-h-24 resize-none",
+            voice.listening && "border-success/30 bg-muted/30",
+          )}
         />
         <div className="flex items-center justify-between gap-2">
           <p
             id="answer-note"
             className="text-xs leading-5 text-muted-foreground"
           >
-            Shift+Enter for a new line
+            {voice.speaking
+              ? "Interviewer speaking · You can interrupt"
+              : "Shift+Enter for a new line"}
           </p>
           <div className="flex items-center gap-1">
             <Button
               type="button"
               variant="ghost"
-              size="icon-sm"
-              disabled={
-                !speechAvailable ||
-                operation !== null ||
-                interview.status !== "in-progress" ||
-                interview.stage.current === null
-              }
-              aria-label={
-                mode === "live"
-                  ? "Stop live listening"
-                  : voice.listening
-                    ? "Stop dictation"
-                    : "Dictate answer"
-              }
+              size={voice.listening ? "sm" : "icon-sm"}
+              disabled={!speechAvailable || inputBlocked}
+              aria-label={voice.listening ? "Stop recording" : "Dictate answer"}
               aria-pressed={voice.listening}
               title={
                 speechAvailable
@@ -319,7 +474,10 @@ export function AIInterviewer() {
               onClick={voice.toggleMicrophone}
             >
               {voice.listening ? (
-                <MicOff aria-hidden="true" />
+                <>
+                  <Square aria-hidden="true" data-icon="inline-start" />
+                  Stop
+                </>
               ) : (
                 <Mic aria-hidden="true" />
               )}
@@ -328,9 +486,9 @@ export function AIInterviewer() {
               type="submit"
               size="sm"
               disabled={
-                operation !== null ||
-                interview.status !== "in-progress" ||
-                interview.stage.current === null ||
+                inputBlocked ||
+                voice.listening ||
+                Boolean(error) ||
                 !answer.trim()
               }
             >

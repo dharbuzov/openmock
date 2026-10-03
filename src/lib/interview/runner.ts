@@ -21,6 +21,7 @@ export async function processCandidateMessage(
   definition: InterviewDefinition,
   snapshot?: WorkspaceSnapshot,
   signal?: AbortSignal,
+  onMessage?: (message: string) => void,
 ): Promise<Interview> {
   if (
     interview.status !== "in-progress" ||
@@ -44,7 +45,12 @@ export async function processCandidateMessage(
   };
   logger.debug(metadata, "User turn received");
   // The provider's Output.object Zod schema validates raw output before returning.
-  const turn = await generateInterviewResponse(settings, context, signal);
+  const turn = await generateInterviewResponse(
+    settings,
+    context,
+    signal,
+    onMessage,
+  );
   logger.debug(metadata, "AI response received");
   const updated = applyInterviewTurn(interview, definition, turn);
   logger.debug(metadata, "Interview turn applied");

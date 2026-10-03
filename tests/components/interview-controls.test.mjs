@@ -295,3 +295,166 @@ test("Chat dictation, Live submission, TTS muting, and microphone cleanup stay s
     globalThis.SpeechSynthesisUtterance = originalUtterance;
   }
 });
+
+function withVoiceBrowser(run) {
+  const saved = {
+    window: globalThis.window,
+    document: globalThis.document,
+    utterance: globalThis.SpeechSynthesisUtterance,
+  };
+  const recognitions = [],
+    audio = [],
+    dictated = [],
+    live = [];
+  let cancellations = 0;
+  class Recognition {
+    constructor() {
+      recognitions.push(this);
+    }
+    start() {
+      this.started = true;
+    }
+    stop() {
+      this.stopped = true;
+    }
+    abort() {
+      this.aborted = true;
+      this.onend?.();
+    }
+    result(text, isFinal = true) {
+      this.onresult?.({
+        resultIndex: 0,
+        results: [{ isFinal, 0: { transcript: text } }],
+      });
+    }
+  }
+  const controls = {
+    mode: "chat",
+    voiceEnabled: true,
+    speechAvailable: true,
+    playbackAvailable: true,
+    setMode: (mode) => {
+      controls.mode = mode;
+    },
+  };
+  const harness = voiceHarness(controls);
+  const props = {
+    messages: [],
+    busy: false,
+    active: true,
+    onDictation: (text) => dictated.push(text),
+    onLiveAnswer: (text) => live.push(text),
+  };
+  globalThis.window = {
+    SpeechRecognition: Recognition,
+    speechSynthesis: {
+      speak: (utterance) => {
+        audio.push(utterance);
+        utterance.onstart?.();
+      },
+      cancel: () => cancellations++,
+    },
+  };
+  globalThis.document = { documentElement: { lang: "en" } };
+  globalThis.SpeechSynthesisUtterance = class {
+    constructor(text) {
+      this.text = text;
+    }
+  };
+  try {
+    run({
+      render: () => harness.render(props),
+      recognitions,
+      audio,
+      dictated,
+      live,
+      controls,
+      props,
+      cancellations: () => cancellations,
+    });
+  } finally {
+    harness.dispose();
+    globalThis.window = saved.window;
+    globalThis.document = saved.document;
+    globalThis.SpeechSynthesisUtterance = saved.utterance;
+  }
+}
+
+test("interim speech stays in composer and Stop waits for one final transcript", () =>
+  withVoiceBrowser((h) => {
+    h.render().toggleMicrophone();
+    let state;
+    const recognition = h.recognitions.at(-1);
+    assert.equal(recognition.interimResults, true);
+    recognition.result("I would start", false);
+    state = h.render();
+    assert.equal(state.listening, true);
+    assert.equal(state.partialTranscript, "I would start");
+    assert.deepEqual(h.dictated, []);
+    state.toggleMicrophone();
+    state = h.render();
+    assert.equal(recognition.stopped, true);
+    assert.equal(state.listening, false);
+    assert.equal(state.transcribing, true);
+    recognition.result("I would start with requirements");
+    state = h.render();
+    assert.equal(state.transcribing, false);
+    assert.deepEqual(h.dictated, ["I would start with requirements"]);
+    assert.deepEqual(h.live, []);
+    recognition.onend?.();
+    h.render();
+    assert.equal(h.dictated.length, 1);
+  }));
+
+test("Live finalization preserves Live mode and mic interrupts interviewer playback", () =>
+  withVoiceBrowser((h) => {
+    h.controls.mode = "live";
+    h.render();
+    h.recognitions.at(-1).result("A live answer");
+    h.props.busy = true;
+    h.render();
+    assert.deepEqual(h.live, ["A live answer"]);
+    assert.equal(h.controls.mode, "live");
+    h.props.messages = [
+      { id: "reply", role: "interviewer", content: "What happened next?" },
+    ];
+    h.props.busy = false;
+    let state = h.render();
+    assert.equal(state.speaking, true);
+    const previousCount = h.recognitions.length;
+    const previousCancellations = h.cancellations();
+    state.toggleMicrophone();
+    state = h.render();
+    assert.equal(state.speaking, false);
+    assert.equal(state.listening, true);
+    assert.ok(h.recognitions.length > previousCount);
+    assert.ok(h.cancellations() > previousCancellations);
+    assert.equal(h.controls.mode, "live");
+    assert.equal(h.controls.voiceEnabled, true);
+    assert.equal(h.audio[0].onend, null);
+  }));
+
+test("voice failures are system errors and audio retry does not repeat conversation", () =>
+  withVoiceBrowser((h) => {
+    h.render();
+    h.props.messages = [
+      { id: "reply", role: "interviewer", content: "A response" },
+    ];
+    let state;
+    h.audio[0].onerror({ error: "network" });
+    state = h.render();
+    assert.match(state.error, /play/);
+    assert.equal(state.failedOperation, "playback");
+    state.retry();
+    state = h.render();
+    assert.equal(h.audio.length, 2);
+    assert.equal(state.error, "");
+    assert.equal(h.props.messages.length, 1);
+    state.toggleMicrophone();
+    h.render();
+    h.recognitions.at(-1).onerror({ error: "not-allowed" });
+    state = h.render();
+    assert.equal(state.failedOperation, "microphone");
+    assert.match(state.error, /permissions/);
+    assert.deepEqual(h.dictated, []);
+  }));
