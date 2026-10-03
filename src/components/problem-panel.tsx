@@ -166,11 +166,7 @@ export function ProblemPanel({ problem }: { problem: Problem }) {
           <h3 className="text-base font-medium tracking-tight">
             {problem.title}
           </h3>
-          <ProblemMetadataBadges
-            problem={problem}
-            showLevel={false}
-            showType={false}
-          />
+          <ProblemMetadataBadges problem={problem} showLabels />
         </div>
         <h3 className="mb-2 text-sm font-medium text-foreground">
           Description

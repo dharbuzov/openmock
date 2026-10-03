@@ -10,16 +10,13 @@ export interface ProblemMetadata {
   id: string;
   title: string;
   interview: string;
-  type?: string;
   difficulty: ProblemDifficulty;
-  level?: "junior" | "mid" | "senior" | "staff" | "principal";
   categories: string[];
   topics: string[];
   companies: ProblemCompany[];
-  tags: string[];
   interviewerContext?: string;
 
-  /** Compatibility metadata used by the current single-file code workspace. */
+  /** Problem-specific initial source for the single-file code workspace. */
   language?: string;
   starterCode?: string;
 }

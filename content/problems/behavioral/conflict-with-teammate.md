@@ -8,10 +8,8 @@ categories:
 topics:
   - conflict-resolution
   - communication
+  - self-reflection
 companies: []
-tags:
-  - teamwork
-  - reflection
 ---
 
 ## Description

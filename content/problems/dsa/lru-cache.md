@@ -24,9 +24,6 @@ starterCode: |
           // Update your cache here.
       }
   }
-tags:
-  - hash-map
-  - linked-list
 ---
 
 ## Description

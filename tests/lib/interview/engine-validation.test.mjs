@@ -18,7 +18,7 @@ const problem = {
   categories: [],
   topics: [],
   companies: [],
-  tags: [],
+
   content: "Design a shortener.",
 };
 const definition = loadDefinition("system-design");

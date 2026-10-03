@@ -33,7 +33,7 @@ const problem = {
   categories: ["algorithms"],
   topics: ["hash-map"],
   companies: [],
-  tags: [],
+
   content: "Return matching indices.",
   interviewerContext: "Probe duplicate values.",
   language: "java",
@@ -113,7 +113,7 @@ test("system design context includes the normalized diagram through the generic 
     categories: [],
     topics: [],
     companies: [],
-    tags: [],
+
     content: "Design a shortener.",
   };
   const interview = acceptCandidateMessage(
@@ -309,7 +309,7 @@ test("generic evaluator accepts competencies loaded from the behavioral definiti
     categories: [],
     topics: [],
     companies: [],
-    tags: [],
+
     content: "Tell me about a conflict.",
     interviewerContext: "Probe the candidate's contribution.",
   };

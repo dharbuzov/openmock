@@ -147,7 +147,6 @@ function SetupForm({
           <ProblemMetadataBadges
             problem={problem}
             topicLimit={3}
-            showLevel={false}
             showLabels
             typeLabel={definition.name}
             showCompanies

@@ -16,7 +16,6 @@ test("optional problem metadata arrays default safely", () => {
   assert.deepEqual(metadata.categories, []);
   assert.deepEqual(metadata.topics, []);
   assert.deepEqual(metadata.companies, []);
-  assert.deepEqual(metadata.tags, []);
 });
 
 test("company metadata preserves relation and optional provenance", () => {
@@ -52,18 +51,44 @@ test("problem works without Interviewer Context and preserves its explicit inter
   assert.equal(problem.interviewerContext, undefined);
 });
 
-test("legacy type and level frontmatter remains readable", () => {
-  const metadata = parseProblemMetadata({
-    id: "legacy-design",
-    title: "Legacy",
-    type: "system-design",
+test("removed problem fields are rejected, never used as fallbacks", () => {
+  const metadata = {
+    id: "queue",
+    title: "Queue",
+    interview: "system-design",
     difficulty: "easy",
-    level: "senior",
-    tags: ["systems"],
-  });
-  assert.equal(metadata.interview, "system-design");
-  assert.equal(metadata.difficulty, "easy");
-  assert.deepEqual(metadata.tags, ["systems"]);
+  };
+  for (const field of ["type", "level", "tags"]) {
+    assert.throws(
+      () =>
+        parseProblemMetadata({
+          ...metadata,
+          [field]: field === "tags" ? [] : "system-design",
+        }),
+      new RegExp(field),
+    );
+  }
+  const { interview, ...missingReference } = metadata;
+  assert.throws(() => parseProblemMetadata(missingReference), /interview/);
+});
+
+test("taxonomy requires slug IDs and rejects malformed arrays", () => {
+  const metadata = {
+    id: "queue",
+    title: "Queue",
+    interview: "system-design",
+    difficulty: "medium",
+  };
+  for (const field of ["categories", "topics", "companies"]) {
+    assert.throws(
+      () => parseProblemMetadata({ ...metadata, [field]: null }),
+      new RegExp(field),
+    );
+  }
+  assert.throws(
+    () => parseProblemMetadata({ ...metadata, topics: ["High Scale"] }),
+    /topics/,
+  );
 });
 
 test("difficulty is required and accepts only easy, medium, or hard", () => {

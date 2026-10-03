@@ -19,7 +19,7 @@ const problem = {
   categories: [],
   topics: [],
   companies: [],
-  tags: [],
+
   content: "Design a shortener.",
 };
 const definition = loadDefinition("system-design");
@@ -165,4 +165,18 @@ test("completion is an independent domain transition and cannot happen twice", (
     () => applyInterviewTurn(completed, definition, turn()),
     InterviewStateError,
   );
+});
+
+test("selected session choices override definition defaults for the same problem", () => {
+  const defaults = startInterview(problem, { definition });
+  const selected = startInterview(problem, {
+    definition,
+    targetLevel: "principal",
+    mode: "mock",
+  });
+  assert.equal(defaults.targetLevel, definition.defaultLevel);
+  assert.equal(defaults.mode, definition.defaultMode);
+  assert.equal(selected.targetLevel, "principal");
+  assert.equal(selected.mode, "mock");
+  assert.equal(selected.problemId, defaults.problemId);
 });

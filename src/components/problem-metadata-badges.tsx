@@ -12,27 +12,23 @@ function metadataLabel(value: string): string {
 export function ProblemMetadataBadges({
   problem,
   topicLimit = 2,
-  showLevel = true,
-  showType = true,
-  showLabels = !showLevel && !showType,
+  showLabels = false,
   typeLabel,
   showCompanies = false,
 }: {
   problem: Problem;
   topicLimit?: number;
-  showLevel?: boolean;
-  showType?: boolean;
   showLabels?: boolean;
   typeLabel?: string;
   showCompanies?: boolean;
 }) {
-  const topics = [...new Set([...problem.tags, ...problem.topics])];
+  const topics = [...new Set(problem.topics)];
   const difficultyClass = {
     easy: "border-success/15 bg-success/5 text-success",
     medium: "border-warning/15 bg-warning/5 text-warning",
     hard: "border-destructive/15 bg-destructive/5 text-destructive",
   };
-  const typeBadge = showType ? (
+  const typeBadge = typeLabel ? (
     <Badge
       variant="outline"
       className={cn(
@@ -41,9 +37,7 @@ export function ProblemMetadataBadges({
           "border-blue-200/70 bg-blue-50 text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300",
       )}
     >
-      <span className="truncate">
-        {typeLabel ?? metadataLabel(problem.type ?? problem.interview)}
-      </span>
+      <span className="truncate">{typeLabel}</span>
     </Badge>
   ) : null;
   return (
@@ -54,7 +48,7 @@ export function ProblemMetadataBadges({
           : "flex flex-col gap-1.5",
       )}
     >
-      {showLabels && showType && (
+      {showLabels && typeLabel && (
         <>
           <span className="text-xs leading-5 text-muted-foreground">Type</span>
           <div className="flex min-w-0 flex-wrap gap-1.5">{typeBadge}</div>
@@ -65,38 +59,26 @@ export function ProblemMetadataBadges({
           Difficulty
         </span>
       )}
-      {((showType && !showLabels) ||
-        problem.difficulty ||
-        (showLevel && problem.level)) && (
-        <div className="flex min-w-0 flex-wrap gap-1.5">
-          {!showLabels && typeBadge}
-          {problem.difficulty && (
-            <Badge
-              variant="outline"
-              className={cn(difficultyClass[problem.difficulty])}
-            >
-              <span
-                aria-hidden="true"
-                className="size-1 rounded-full bg-current"
-              />
-              {metadataLabel(problem.difficulty)}
-            </Badge>
-          )}
-          {showLevel && problem.level && (
-            <Badge
-              variant="outline"
-              className="border-violet-200/70 bg-violet-50 text-violet-800 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300"
-            >
-              {metadataLabel(problem.level)}
-            </Badge>
-          )}
-        </div>
-      )}
+      <div className="flex min-w-0 flex-wrap gap-1.5">
+        {!showLabels && typeBadge}
+        {problem.difficulty && (
+          <Badge
+            variant="outline"
+            className={cn(difficultyClass[problem.difficulty])}
+          >
+            <span
+              aria-hidden="true"
+              className="size-1 rounded-full bg-current"
+            />
+            {metadataLabel(problem.difficulty)}
+          </Badge>
+        )}
+      </div>
       {topics.length > 0 && (
         <>
           {showLabels && (
             <span className="text-xs leading-5 text-muted-foreground">
-              Tags
+              Topics
             </span>
           )}
           <div className="flex min-w-0 flex-wrap gap-1.5">

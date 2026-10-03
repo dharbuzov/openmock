@@ -32,7 +32,7 @@ test("behavioral content resolves with no workspace and starts in the generic en
     categories: [],
     topics: [],
     companies: [],
-    tags: [],
+
     content: "Tell me about a conflict.",
   };
   const interview = startInterview(problem, {

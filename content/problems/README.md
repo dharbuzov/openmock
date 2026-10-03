@@ -13,8 +13,11 @@ id: message-broker
 title: Design a Message Broker
 interview: system-design
 difficulty: medium
-tags:
-- distributed-systems
+categories:
+  - distributed-systems
+topics:
+  - messaging
+companies: []
 ---
 ```
 
@@ -23,11 +26,14 @@ Then write the problem using Markdown and open a pull request.
 The application recursively discovers `.md` files here, excluding `README.md`.
 Each file must have a unique lowercase, hyphen-separated `id`, a non-empty
 `title`, an interview definition id, a `difficulty` of `easy`, `medium`, or
-`hard`, and a non-empty Markdown body. `categories`, `topics`, `companies`,
-and `tags` are optional and default to empty arrays. Invalid content reports
-its file path. `type` can supply the interview definition id when `interview` is omitted.
-`difficulty` is required. Optional `level` is `junior`, `mid`, `senior`,
-`staff`, or `principal`. Companies accept names or objects with `id`,
+`hard`, and a non-empty Markdown body. `categories`, `topics`, and `companies`
+are optional and default to empty arrays. Categories are broad classifications;
+topics are specific concepts or skills. Both use lowercase, hyphen-separated IDs.
+Invalid content reports its file path. `interview` must reference an existing
+InterviewDefinition. Unknown fields are rejected; `type`, `level`, and `tags`
+are not problem metadata. Difficulty is intrinsic to the problem. Target level
+and mode belong to the session, initialized from user selections or definition
+defaults. Definition names supply the UI Type label. Companies accept names or objects with `id`,
 `relation`, and optional `source` provenance.
 The Markdown files are the only problem catalog; no TypeScript registration is needed.
 

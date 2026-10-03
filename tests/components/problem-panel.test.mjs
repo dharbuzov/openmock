@@ -30,11 +30,11 @@ test("candidate panel renders title, badges, description and example without hid
   for (const text of [
     problem.title,
     "Difficulty",
-    "Tags",
+    "Topics",
     "Medium",
-    "High Scale",
+    "Data Modeling",
     "Caching",
-    "+4",
+    "+2",
     "TinyURL",
     "short.ly/abc123",
   ])
@@ -80,26 +80,20 @@ test("description selection respects code fences and subsections and never falls
   );
 });
 
-test("frontmatter supports typed difficulty and level and company names", () => {
+test("frontmatter supports typed difficulty and company names", () => {
   const metadata = parseProblemMetadata({
     id: "example",
     title: "Example",
-    type: "sql",
+    interview: "sql",
     difficulty: "hard",
-    level: "staff",
     companies: ["Bitly"],
   });
   assert.equal(metadata.interview, "sql");
   assert.equal(metadata.difficulty, "hard");
-  assert.equal(metadata.level, "staff");
   assert.deepEqual(metadata.companies, [{ id: "Bitly", relation: "relevant" }]);
   assert.throws(
     () => parseProblemMetadata({ ...metadata, difficulty: "extreme" }),
     /difficulty/,
-  );
-  assert.throws(
-    () => parseProblemMetadata({ ...metadata, level: "expert" }),
-    /level/,
   );
 });
 

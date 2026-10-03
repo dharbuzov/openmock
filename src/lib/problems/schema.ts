@@ -9,7 +9,7 @@ const slugSchema = z
     "must be a lowercase, hyphen-separated slug",
   );
 const nonEmptyString = z.string().trim().min(1);
-const stringList = z.array(nonEmptyString).default([]);
+const stringList = z.array(slugSchema).default([]);
 
 const companySchema = z.object({
   id: nonEmptyString,
@@ -17,13 +17,11 @@ const companySchema = z.object({
   source: nonEmptyString.optional(),
 });
 
-const normalizedMetadataSchema = z.object({
+const normalizedMetadataSchema = z.strictObject({
   id: slugSchema,
   title: nonEmptyString,
   interview: slugSchema,
-  type: slugSchema.optional(),
   difficulty: z.enum(["easy", "medium", "hard"]),
-  level: z.enum(["junior", "mid", "senior", "staff", "principal"]).optional(),
   categories: stringList,
   topics: stringList,
   companies: z
@@ -37,7 +35,6 @@ const normalizedMetadataSchema = z.object({
       ]),
     )
     .default([]),
-  tags: stringList,
   interviewerContext: nonEmptyString.optional(),
   language: nonEmptyString.optional(),
   starterCode: nonEmptyString.optional(),
@@ -47,15 +44,7 @@ export function parseProblemMetadata(value: unknown): ProblemMetadata {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Frontmatter must be a YAML mapping.");
   }
-  const input = value as Record<string, unknown>;
-  const parsed = normalizedMetadataSchema.safeParse({
-    ...input,
-    interview: input.interview ?? input.type,
-    categories: input.categories ?? [],
-    topics: input.topics ?? [],
-    companies: input.companies ?? [],
-    tags: input.tags ?? [],
-  });
+  const parsed = normalizedMetadataSchema.safeParse(value);
   if (!parsed.success) {
     throw new Error(
       parsed.error.issues

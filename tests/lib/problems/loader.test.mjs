@@ -34,7 +34,7 @@ test("unknown interview references fail clearly", async () => {
             categories: [],
             topics: [],
             companies: [],
-            tags: [],
+
             content: "Prompt",
           },
         ],

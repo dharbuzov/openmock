@@ -32,19 +32,24 @@ import type { Problem } from "@/lib/problems/types";
 
 type Difficulty = "" | "easy" | "medium" | "hard";
 type Filters = {
-  category: string;
+  interview: string;
   difficulty: Difficulty;
   company: string;
   search: string;
+  category?: string;
+  topic?: string;
 };
 export function filterProblems(
   problems: Problem[],
   filters: Filters,
+  definitions: InterviewTypeSummary[] = [],
 ): Problem[] {
   const query = filters.search.trim().toLowerCase().replace(/\s+/g, " ");
   return problems.filter(
     (problem) =>
-      (!filters.category || problem.interview === filters.category) &&
+      (!filters.interview || problem.interview === filters.interview) &&
+      (!filters.category || problem.categories.includes(filters.category)) &&
+      (!filters.topic || problem.topics.includes(filters.topic)) &&
       (!filters.difficulty || problem.difficulty === filters.difficulty) &&
       (!filters.company ||
         problem.companies.some(({ id }) => id === filters.company)) &&
@@ -52,9 +57,13 @@ export function filterProblems(
         [
           problem.title,
           problemDescription(problem.content),
-          problem.type ?? problem.interview,
-          (problem.type ?? problem.interview).replace(/-/g, " "),
-          ...problem.tags,
+          problem.interview,
+          definitions.find(({ id }) => id === problem.interview)?.name ?? "",
+          ...problem.categories,
+          ...problem.topics,
+          ...[...problem.categories, ...problem.topics].map((id) =>
+            id.replace(/-/g, " "),
+          ),
           ...problem.companies.map(({ id }) => id),
         ]
           .join(" ")
@@ -87,7 +96,7 @@ export function PracticeProblems({
   problems: Problem[];
   interviewTypes: InterviewTypeSummary[];
 }) {
-  const [category, setCategory] = useState("");
+  const [interview, setInterview] = useState("");
   const [search, setSearch] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("");
   const [company, setCompany] = useState("");
@@ -95,12 +104,16 @@ export function PracticeProblems({
     { value: "", label: "All companies" },
     ...availableCompanies(problems),
   ];
-  const visible = filterProblems(problems, {
-    category,
-    search,
-    difficulty,
-    company,
-  });
+  const visible = filterProblems(
+    problems,
+    {
+      interview,
+      search,
+      difficulty,
+      company,
+    },
+    interviewTypes,
+  );
   const navigationItems = [
     {
       id: "",
@@ -128,9 +141,9 @@ export function PracticeProblems({
           {navigationItems.map(({ id, name, icon: Icon, count }) => (
             <Button
               key={id}
-              variant={category === id ? "secondary" : "ghost"}
-              aria-pressed={category === id}
-              onClick={() => setCategory(id)}
+              variant={interview === id ? "secondary" : "ghost"}
+              aria-pressed={interview === id}
+              onClick={() => setInterview(id)}
               className="h-auto w-full justify-start gap-2 py-2"
             >
               <Icon data-icon="inline-start" />
@@ -153,9 +166,10 @@ export function PracticeProblems({
               value: id || "__all__",
               label: `${name} (${count})`,
             }))}
-            value={category || "__all__"}
+            value={interview || "__all__"}
             onValueChange={(value) => {
-              if (value !== null) setCategory(value === "__all__" ? "" : value);
+              if (value !== null)
+                setInterview(value === "__all__" ? "" : value);
             }}
           >
             <SelectTrigger id="practice-interview-select" className="w-full">
@@ -268,7 +282,10 @@ export function PracticeProblems({
                   <ProblemMetadataBadges
                     problem={problem}
                     topicLimit={3}
-                    showLevel={false}
+                    typeLabel={
+                      interviewTypes.find(({ id }) => id === problem.interview)
+                        ?.name
+                    }
                   />
                 </div>
                 <ChevronRight

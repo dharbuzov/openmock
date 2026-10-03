@@ -2,9 +2,7 @@
 id: url-shortener
 title: Design a URL Shortener
 interview: system-design
-type: system-design
 difficulty: medium
-level: senior
 categories:
   - distributed-systems
   - backend
@@ -15,10 +13,6 @@ topics:
   - availability
 companies:
   - Bitly
-tags:
-  - high-scale
-  - caching
-  - databases
 ---
 
 ## Description

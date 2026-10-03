@@ -7,9 +7,6 @@ topics:
 - arrays
 - hash-maps
 companies: []
-tags:
-- array
-- hash-map
 title: Two Sum
 interview: dsa
 language: java

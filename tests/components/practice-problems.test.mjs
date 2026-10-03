@@ -53,10 +53,9 @@ function problem(id, options = {}) {
     title: id,
     interview: "system-design",
     difficulty: "medium",
-    tags: ["payments"],
-    topics: [],
+    categories: ["backend"],
+    topics: ["payments"],
     companies: [{ id: "Revolut", relation: "relevant" }],
-    interviewTypes: [],
     content:
       "## Description\nDesign a payment service.\n\n## Scale\nsecret-capacity",
     ...options,
@@ -71,18 +70,18 @@ const problems = [
   problem("dsa-payment", { interview: "dsa" }),
   problem("queue", {
     title: "Queue",
-    tags: [],
+    topics: [],
     content: "## Description\nDesign a queue.",
   }),
 ];
-const all = { category: "", difficulty: "", company: "", search: "" };
+const all = { interview: "", difficulty: "", company: "", search: "" };
 const ids = (filters) =>
   filterProblems(problems, { ...all, ...filters }).map(({ id }) => id);
 
-test("category, difficulty, canonical company and search combine with AND semantics", () => {
+test("interview, difficulty, canonical company and search combine with AND semantics", () => {
   assert.deepEqual(
     ids({
-      category: "system-design",
+      interview: "system-design",
       difficulty: "medium",
       company: "Revolut",
       search: "payment",
@@ -90,18 +89,19 @@ test("category, difficulty, canonical company and search combine with AND semant
     ["payment"],
   );
   assert.equal(ids(all).length, 5);
-  assert.equal(ids({ category: "dsa" }).length, 1);
+  assert.equal(ids({ interview: "dsa" }).length, 1);
   assert.equal(ids({ difficulty: "easy" }).length, 1);
   assert.deepEqual(ids({ company: "Google" }), ["other-company"]);
   assert.deepEqual(ids({ company: "revolut" }), []);
 });
 
-test("search matches title, candidate description, type, tags and companies without exposing hidden context", () => {
+test("search matches title, candidate description, definition, categories, topics and companies without exposing hidden context", () => {
   for (const search of [
     "payment",
     "SERVICE",
     "system-design",
     "payments",
+    "backend",
     "revolut",
   ])
     assert.ok(ids({ search }).includes("payment"), search);
@@ -278,5 +278,34 @@ test("new definitions flow through discovery and Practice navigation without UI 
     mobileSelect.props.items.some(
       ({ value, label }) => value === "sql" && label === "SQL (1)",
     ),
+  );
+});
+
+test("canonical categories and topics filter independently from interview IDs", () => {
+  assert.equal(ids({ category: "backend" }).length, 5);
+  assert.deepEqual(ids({ category: "system-design" }), []);
+  assert.equal(ids({ topic: "payments" }).length, 4);
+  assert.deepEqual(
+    ids({ interview: "dsa", category: "backend", topic: "payments" }),
+    ["dsa-payment"],
+  );
+});
+
+test("search resolves definition names and readable taxonomy labels", () => {
+  const definitions = [{ id: "dsa", name: "Data Structures and Algorithms" }];
+  assert.deepEqual(
+    filterProblems(
+      problems,
+      { ...all, search: "Data Structures and Algorithms" },
+      definitions,
+    ).map(({ id }) => id),
+    ["dsa-payment"],
+  );
+  assert.equal(
+    filterProblems([problem("cache", { topics: ["hash-maps"] })], {
+      ...all,
+      search: "hash maps",
+    }).length,
+    1,
   );
 });

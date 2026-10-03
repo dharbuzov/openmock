@@ -156,7 +156,7 @@ test("Setup uses existing AI configuration, safe summary, company semantics and 
       problem.title,
       "System Design",
       "Medium",
-      "High Scale",
+      "Data Modeling",
       "Caching",
       "Bitly",
       "Common at",
@@ -230,7 +230,7 @@ test("Start validates saved settings, creates selected level and initial mode on
         .find((value) => value.includes('"interview"'))
         .includes("test-key"),
     );
-    assert.equal(problem.level, "senior");
+    assert.ok(!Object.hasOwn(problem, "level"));
   }));
 
 test("missing AI settings show Configure AI and saved settings update the summary", () =>

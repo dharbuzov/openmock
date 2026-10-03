@@ -15,7 +15,7 @@ const problem = {
   categories: [],
   topics: [],
   companies: [],
-  tags: [],
+
   content: "Find indices.",
   language: "java",
   starterCode: "class Solution {}",
