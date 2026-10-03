@@ -1,5 +1,6 @@
 import type { InteractionMode } from "./interaction-mode-control";
 import Link from "next/link";
+import { OpenMockLogo } from "@/components/openmock-logo";
 import { ProblemPanel } from "@/components/problem-panel";
 import { Workspace } from "@/components/workspace/workspace";
 import { AIInterviewer } from "@/components/ai-interviewer";
@@ -42,9 +43,11 @@ export function InterviewRoom({
                 <div className="flex min-w-0 items-center gap-4 overflow-hidden">
                   <Link
                     href="/"
-                    className="hidden shrink-0 text-sm font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-4 sm:block"
+                    aria-label="OpenMock home"
+                    className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-4"
                   >
-                    OpenMock
+                    <OpenMockLogo />
+                    <span className="hidden sm:inline">OpenMock</span>
                   </Link>
                   <h1
                     className="hidden truncate border-l pl-4 text-sm font-medium lg:block"

@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "OpenMock",
+  icons: {
+    icon: { url: "/logo.svg", type: "image/svg+xml", sizes: "any" },
+  },
   description:
     "Free, open-source technical interview practice for software engineers.",
 };
