@@ -31,8 +31,10 @@ function SessionRoom({
   );
   useEffect(() => {
     if (!valid) router.replace(`/practice/${problem.id}/setup`);
-  }, [valid, problem.id, router]);
-  if (!session || !valid)
+    else if (session?.interview.status === "completed")
+      router.replace(`/interviews/${session.interview.id}/result`);
+  }, [valid, problem.id, router, session]);
+  if (!session || !valid || session.interview.status === "completed")
     return (
       <p role="status" className="p-6 text-sm text-muted-foreground">
         Opening interview…

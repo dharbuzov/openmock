@@ -1,8 +1,10 @@
 import { InterviewResultPage } from "@/components/interview-result-page";
 
-export default async function ResultsPage({
+export default async function ResultPage({
   params,
-}: PageProps<"/results/[id]">) {
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
   return <InterviewResultPage key={id} interviewId={id} />;
 }

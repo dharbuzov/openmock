@@ -8,9 +8,12 @@ const { SessionOperations } = load(
   "../src/lib/interview/session-operations.ts",
 );
 const { captureWorkspaceSnapshot } = load("../src/lib/interview/workspace.ts");
-const { startInterview, acceptCandidateMessage } = load(
-  "../src/lib/interview/engine.ts",
-);
+const {
+  startInterview,
+  acceptCandidateMessage,
+  buildInterviewContext,
+  completeInterview,
+} = load("../src/lib/interview/engine.ts");
 const { LocalStorage } = load("../src/lib/storage/local-storage.ts");
 const { saveEvaluation, readEvaluationValue, parseEvaluation } = load(
   "../src/lib/interview/evaluation-storage.ts",
@@ -169,7 +172,7 @@ function element(tree, predicate) {
   return null;
 }
 
-test("actual Send/Finish handlers exclude concurrent work and Retry reuses the captured workspace", async () => {
+test("Send retries reuse the captured workspace and Finish saves completion without evaluating", async () => {
   const { normalizeExcalidrawScene } = load(
     "../src/lib/diagram/normalize-excalidraw.ts",
   );
@@ -196,7 +199,6 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
         },
       ]),
   });
-  let finishSnapshot;
   let state = { interview: initial(), operation: null };
   const operations = new SessionOperations(state.interview, (next) => {
     state = next;
@@ -204,10 +206,7 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
   let releaseSend;
   let captures = 0;
   const snapshots = [];
-  let evaluations = 0;
-  let saved;
   let navigated;
-  let failEvaluation = false;
   let persistedSession;
   const overrides = {
     "lucide-react": {
@@ -241,6 +240,19 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
       TooltipContent: "tooltip-content",
     },
     "@/components/ui/button": { Button: "button" },
+    "@/components/ui/alert-dialog": Object.fromEntries(
+      [
+        "AlertDialog",
+        "AlertDialogTrigger",
+        "AlertDialogContent",
+        "AlertDialogHeader",
+        "AlertDialogTitle",
+        "AlertDialogDescription",
+        "AlertDialogFooter",
+        "AlertDialogCancel",
+        "AlertDialogAction",
+      ].map((name) => [name, name]),
+    ),
     "@/components/ui/textarea": { Textarea: "textarea" },
     "@/components/settings-provider": { useOpenSettings: () => () => {} },
     "@/lib/settings/storage": {
@@ -251,7 +263,7 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
       useInterviewSession: () => ({
         ...state,
         problem,
-        definition,
+        definition: { ...definition, workspace: "diagram" },
         beginOperation: operations.begin,
         commitOperation: operations.commit,
         endOperation: operations.end,
@@ -262,7 +274,11 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
         return workspace;
       },
     },
-    "@/lib/interview/engine": { acceptCandidateMessage },
+    "@/lib/interview/engine": {
+      acceptCandidateMessage,
+      buildInterviewContext,
+      completeInterview,
+    },
     "@/lib/interview/runner": {
       processCandidateMessage: async (
         _settings,
@@ -278,45 +294,6 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
           });
         return interview;
       },
-      finishInterview: async (
-        _settings,
-        interview,
-        _problem,
-        _definition,
-        snapshot,
-        _signal,
-        onCompleted,
-      ) => {
-        finishSnapshot = snapshot;
-        evaluations++;
-        const completed = { ...interview, status: "completed" };
-        onCompleted?.(completed);
-        assert.equal(persistedSession.interview, completed);
-        return {
-          interview: completed,
-          evaluation: failEvaluation
-            ? { status: "failed", error: { message: "Evaluation unavailable" } }
-            : { status: "completed", result: { interviewId: interview.id } },
-        };
-      },
-      retryEvaluation: async (
-        _settings,
-        interview,
-        _problem,
-        _definition,
-        snapshot,
-      ) => {
-        assert.equal(interview.status, "completed");
-        assert.equal(snapshot, persistedSession.evaluationWorkspace);
-        evaluations++;
-        return {
-          interview,
-          evaluation: {
-            status: "completed",
-            result: { interviewId: interview.id },
-          },
-        };
-      },
     },
     "@/lib/interview/session-storage": {
       readInterviewSession: () => persistedSession ?? null,
@@ -324,14 +301,9 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
         persistedSession = value;
       },
     },
-    "@/lib/interview/evaluation-storage": {
-      saveResultsRecord: (value) => {
-        saved = value.evaluation.result;
-      },
-    },
     "next/navigation": {
       useRouter: () => ({
-        push: (path) => {
+        replace: (path) => {
           navigated = path;
         },
       }),
@@ -355,10 +327,16 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
   });
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(state.operation, "send");
-  const finishButton = element(finish(), (node) => node.type === "button");
+  const finishButton = element(
+    finish(),
+    (node) => node.type === "AlertDialogTrigger",
+  );
   assert.equal(finishButton.props.disabled, true);
-  await finishButton.props.onClick();
-  assert.equal(evaluations, 0);
+  element(
+    finish(),
+    (node) => node.type === "AlertDialogAction",
+  ).props.onClick();
+  assert.equal(persistedSession, undefined);
   releaseSend(Error("temporary failure"));
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(state.operation, null);
@@ -370,25 +348,17 @@ test("actual Send/Finish handlers exclude concurrent work and Retry reuses the c
   assert.equal(captures, 1);
   assert.equal(snapshots[1], snapshots[0]);
   assert.equal(state.interview.messages.length, 1);
-  failEvaluation = true;
-  await element(finish(), (node) => node.type === "button").props.onClick();
-  assert.equal(evaluations, 1);
+  element(
+    finish(),
+    (node) => node.type === "AlertDialogAction",
+  ).props.onClick();
   assert.equal(state.interview.status, "completed");
   assert.equal(persistedSession.interview.status, "completed");
-  assert.equal(navigated, undefined);
-  const retryEvaluationButton = element(
-    finish(),
-    (node) => node.type === "button",
-  );
-  assert.equal(retryEvaluationButton.props["aria-label"], "Retry evaluation");
-  await retryEvaluationButton.props.onClick();
-  assert.equal(evaluations, 2);
   assert.equal(captures, 2);
   assert.deepEqual(snapshots[0], workspace);
-  assert.deepEqual(finishSnapshot, workspace);
-  assert.equal(saved.interviewId, state.interview.id);
+  assert.deepEqual(persistedSession.evaluationWorkspace, workspace);
   assert.equal(state.interview.status, "completed");
-  assert.equal(navigated, `/results/${state.interview.id}`);
+  assert.equal(navigated, `/interviews/${state.interview.id}/result`);
 });
 
 test("page and API start restricted definitions; unsupported explicit API options return 400", async () => {

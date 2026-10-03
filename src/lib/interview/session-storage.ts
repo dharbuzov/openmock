@@ -1,11 +1,17 @@
 import { logger } from "../logging/logger";
 import { sessionStorage } from "../storage/local-storage";
-import type { Interview, WorkspaceSnapshot } from "./types";
+import type {
+  Interview,
+  InterviewDefinition,
+  WorkspaceSnapshot,
+} from "./types";
+import type { Problem } from "../problems/types";
 
 export type InterviewRoomSession = {
   interview: Interview;
   interactionMode: "chat" | "live";
   evaluationWorkspace?: WorkspaceSnapshot;
+  evaluationContext?: { problem: Problem; definition: InterviewDefinition };
 };
 
 export function saveInterviewSession(session: InterviewRoomSession): void {

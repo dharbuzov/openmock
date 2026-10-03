@@ -12,6 +12,8 @@ import "./lib/ai/prompt-resources.test.mjs";
 import "./ai-sdk.test.mjs";
 import "./lib/interview/runner.test.mjs";
 import "./components/finish-interview-button.test.mjs";
+import "./components/interview-result-page.test.mjs";
+import "./lib/interview/evaluation-task.test.mjs";
 
 import "./lib/storage/storage.test.mjs";
 

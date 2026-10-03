@@ -121,7 +121,7 @@ test("Practice links to Setup and rendering Setup never creates a session", asyn
   });
   const html = renderToStaticMarkup(await Practice());
   assert.match(html, /href="\/practice\/url-shortener\/setup"/);
-  assert.match(html, />Choose</);
+  assert.match(html, /lucide-chevron-right/);
   assert.match(html, /Choose a problem to practice/);
   browser(() => {
     const harness = setupHarness();
