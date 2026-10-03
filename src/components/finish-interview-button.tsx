@@ -74,6 +74,7 @@ export function FinishInterviewButton() {
       <AlertDialogTrigger
         render={
           <Button
+            data-interview-finish
             size="icon-sm"
             className="sm:w-auto sm:px-2.5"
             variant="outline"

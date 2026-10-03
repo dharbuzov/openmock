@@ -23,10 +23,9 @@ export function ProblemMetadataBadges({
   const showLabels = !showLevel && !showType;
   const topics = [...new Set([...problem.tags, ...problem.topics])];
   const difficultyClass = {
-    easy: "border-green-200/70 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300",
-    medium:
-      "border-amber-200/70 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
-    hard: "border-red-200/70 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300",
+    easy: "border-success/15 bg-success/5 text-success",
+    medium: "border-warning/15 bg-warning/5 text-warning",
+    hard: "border-destructive/15 bg-destructive/5 text-destructive",
   };
   return (
     <div

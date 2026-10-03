@@ -2,16 +2,23 @@
 
 import { CurrentStageBadge } from "./current-stage-badge";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@/components/ui/empty";
 import { Textarea } from "@/components/ui/textarea";
 import { useOpenSettings } from "@/components/settings-provider";
 import {
   useInterviewSession,
   useCaptureWorkspace,
 } from "@/components/interview-session-context";
-import { readSettings } from "@/lib/settings/storage";
+import { readSettings, subscribeSettings } from "@/lib/settings/storage";
 import { aiSettingsIssue } from "@/lib/settings/types";
 import type { WorkspaceSnapshot } from "@/lib/interview/types";
 import {
@@ -21,6 +28,9 @@ import {
 } from "@/components/ui/tooltip";
 import { useInterviewControls } from "./interview-controls-context";
 import { useInterviewVoice } from "./use-interview-voice";
+
+const providerIssueSnapshot = () => aiSettingsIssue(readSettings());
+const serverProviderIssueSnapshot = () => "";
 
 export function AIInterviewer() {
   const {
@@ -41,6 +51,11 @@ export function AIInterviewer() {
   const end = useRef<HTMLDivElement>(null);
   const lastWorkspaceSnapshot = useRef<WorkspaceSnapshot | null>(null);
   const openSettings = useOpenSettings();
+  const providerIssue = useSyncExternalStore(
+    subscribeSettings,
+    providerIssueSnapshot,
+    serverProviderIssueSnapshot,
+  );
   const {
     mode,
     setMode,
@@ -161,17 +176,27 @@ export function AIInterviewer() {
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-        {messages.length === 0 && (
-          <div className="flex flex-col gap-3">
+        {messages.length === 0 &&
+          (providerIssue ? (
+            <Empty className="items-start justify-start gap-3 rounded-none p-0 text-left">
+              <EmptyHeader className="items-start gap-1">
+                <EmptyTitle>AI provider not configured</EmptyTitle>
+                <EmptyDescription>
+                  Connect a provider to start the interview.
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent className="items-start">
+                <Button size="sm" onClick={openSettings}>
+                  Configure provider
+                </Button>
+              </EmptyContent>
+            </Empty>
+          ) : (
             <p className="text-sm leading-6 text-muted-foreground">
               Begin by walking me through your initial approach, or introduce
               yourself.
             </p>
-            <Button variant="outline" size="sm" onClick={openSettings}>
-              Configure AI provider
-            </Button>
-          </div>
-        )}
+          ))}
         <ol
           aria-label="Interview conversation"
           aria-live="polite"

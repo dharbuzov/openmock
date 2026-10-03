@@ -29,11 +29,11 @@ export function CurrentStageBadge({
       .replace(/\b\w/g, (letter) => letter.toUpperCase());
   const label = numbered ? `Stage ${index + 1} · ${name}` : name;
   return (
-    <Badge
-      variant="secondary"
-      className="min-w-0 max-w-full shrink"
-      title={label}
-    >
+    <Badge variant="stage" className="min-w-0 max-w-full shrink" title={label}>
+      <span
+        aria-hidden="true"
+        className="size-1 shrink-0 rounded-full bg-current"
+      />
       <span className="truncate">{label}</span>
     </Badge>
   );

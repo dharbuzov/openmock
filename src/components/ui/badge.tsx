@@ -8,6 +8,10 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
+        level:
+          "border-interview-level/15 bg-interview-level/5 text-interview-level",
+        stage:
+          "border-interview-stage/15 bg-interview-stage/5 text-interview-stage",
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         secondary:
           "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",

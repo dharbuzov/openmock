@@ -59,13 +59,17 @@ export function InterviewRoom({
                     className="hidden min-w-0 items-center gap-1.5 border-l pl-4 sm:flex"
                   >
                     <Badge variant="outline">{definition.name}</Badge>
-                    <Badge variant="secondary">
+                    <Badge variant="level">
                       {level?.name ?? interview.targetLevel}
                     </Badge>
                     <Badge
                       variant="secondary"
                       className="text-muted-foreground"
                     >
+                      <span
+                        aria-hidden="true"
+                        className="size-1 shrink-0 rounded-full bg-success"
+                      />
                       {interview.mode.charAt(0).toUpperCase() +
                         interview.mode.slice(1)}
                     </Badge>

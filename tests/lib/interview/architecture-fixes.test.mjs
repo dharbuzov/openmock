@@ -139,6 +139,9 @@ function renderComponent(filename, name, overrides) {
   let index = 0;
   const react = {
     useEffect() {},
+    useSyncExternalStore(_subscribe, snapshot) {
+      return snapshot();
+    },
     useState(initialValue) {
       const slot = index++;
       if (!(slot in slots)) slots[slot] = initialValue;
@@ -208,6 +211,7 @@ test("Send retries reuse the captured workspace and Finish saves completion with
   const snapshots = [];
   let navigated;
   let persistedSession;
+  let providerIssue = "API key required.";
   const overrides = {
     "lucide-react": {
       Mic: "mic",
@@ -240,6 +244,15 @@ test("Send retries reuse the captured workspace and Finish saves completion with
       TooltipContent: "tooltip-content",
     },
     "@/components/ui/button": { Button: "button" },
+    "@/components/ui/empty": Object.fromEntries(
+      [
+        "Empty",
+        "EmptyHeader",
+        "EmptyTitle",
+        "EmptyDescription",
+        "EmptyContent",
+      ].map((name) => [name, "div"]),
+    ),
     "@/components/ui/alert-dialog": Object.fromEntries(
       [
         "AlertDialog",
@@ -258,7 +271,7 @@ test("Send retries reuse the captured workspace and Finish saves completion with
     "@/lib/settings/storage": {
       readSettings: () => ({ provider: "ollama", model: "local" }),
     },
-    "@/lib/settings/types": { aiSettingsIssue: () => "" },
+    "@/lib/settings/types": { aiSettingsIssue: () => providerIssue },
     "@/components/interview-session-context": {
       useInterviewSession: () => ({
         ...state,
@@ -318,6 +331,18 @@ test("Send retries reuse the captured workspace and Finish saves completion with
     "src/components/finish-interview-button.tsx",
     "FinishInterviewButton",
     overrides,
+  );
+  const configureButton = element(
+    send(),
+    (node) =>
+      node.type === "button" && node.props.children === "Configure provider",
+  );
+  assert.ok(configureButton);
+  assert.equal(configureButton.props.variant, undefined);
+  providerIssue = "";
+  assert.equal(
+    element(send(), (node) => node.props.children === "Configure provider"),
+    null,
   );
   element(send(), (node) => node.type === "textarea").props.onChange({
     target: { value: "Answer" },
