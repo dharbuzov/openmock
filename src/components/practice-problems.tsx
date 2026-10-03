@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { LayoutGrid } from "lucide-react";
+import { ChevronRight, LayoutGrid } from "lucide-react";
 import { resolveIcon } from "./lucide-icon-registry";
 import type { InterviewTypeSummary } from "@/lib/interview/types";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -259,9 +259,19 @@ export function PracticeProblems({
         </p>
         <ul>
           {visible.map((problem, index) => (
-            <li key={problem.id} className="group relative">
+            <li key={problem.id}>
               {index > 0 && <Separator />}
-              <div className="flex items-center justify-between gap-4 py-5 group-hover:bg-muted/50 group-focus-within:bg-muted/50">
+              <Link
+                href={`/practice/${problem.id}/setup`}
+                aria-label={`Practice ${problem.title}`}
+                className="group flex items-center justify-between gap-4 py-5 hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-2 focus-visible:outline-ring"
+                onKeyDown={(event) => {
+                  if (event.key === " ") {
+                    event.preventDefault();
+                    if (!event.repeat) event.currentTarget.click();
+                  }
+                }}
+              >
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <h2 className="text-sm font-medium">{problem.title}</h2>
                   <ProblemMetadataBadges
@@ -273,18 +283,11 @@ export function PracticeProblems({
                     showLevel={false}
                   />
                 </div>
-                <Link
-                  href={`/practice/${problem.id}/setup`}
-                  aria-label={`Choose ${problem.title}`}
-                  className={buttonVariants({
-                    variant: "outline",
-                    size: "sm",
-                    className: "after:absolute after:inset-0",
-                  })}
-                >
-                  Choose
-                </Link>
-              </div>
+                <ChevronRight
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-muted-foreground group-hover:text-foreground group-focus-visible:text-foreground"
+                />
+              </Link>
             </li>
           ))}
         </ul>
