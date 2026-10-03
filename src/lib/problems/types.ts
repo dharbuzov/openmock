@@ -1,4 +1,4 @@
-export type ProblemComplexity = "low" | "medium" | "high";
+export type ProblemDifficulty = "easy" | "medium" | "hard";
 
 export type ProblemCompany = {
   id: string;
@@ -10,9 +10,8 @@ export interface ProblemMetadata {
   id: string;
   title: string;
   interview: string;
-  complexity: ProblemComplexity;
   type?: string;
-  difficulty?: "easy" | "medium" | "hard";
+  difficulty: ProblemDifficulty;
   level?: "junior" | "mid" | "senior" | "staff" | "principal";
   categories: string[];
   topics: string[];

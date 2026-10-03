@@ -2,7 +2,6 @@
 id: url-shortener
 title: Design a URL Shortener
 interview: system-design
-complexity: medium
 type: system-design
 difficulty: medium
 level: senior

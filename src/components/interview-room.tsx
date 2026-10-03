@@ -1,6 +1,7 @@
 import type { InteractionMode } from "./interaction-mode-control";
 import Link from "next/link";
 import { OpenMockLogo } from "@/components/openmock-logo";
+import { Badge } from "@/components/ui/badge";
 import { ProblemPanel } from "@/components/problem-panel";
 import { Workspace } from "@/components/workspace/workspace";
 import { AIInterviewer } from "@/components/ai-interviewer";
@@ -26,6 +27,10 @@ export function InterviewRoom({
   definition: InterviewDefinition;
   initialMode?: InteractionMode;
 }) {
+  const level = definition.levels.find(
+    ({ id }) => id === interview.targetLevel,
+  );
+
   return (
     <InterviewCodeProvider key={interview.id}>
       <InterviewSessionProvider
@@ -49,12 +54,22 @@ export function InterviewRoom({
                     <OpenMockLogo />
                     <span className="hidden sm:inline">OpenMock</span>
                   </Link>
-                  <h1
-                    className="hidden truncate border-l pl-4 text-sm font-medium lg:block"
-                    title={problem.title}
+                  <div
+                    aria-label="Interview context"
+                    className="hidden min-w-0 items-center gap-1.5 border-l pl-4 sm:flex"
                   >
-                    {problem.title}
-                  </h1>
+                    <Badge variant="outline">{definition.name}</Badge>
+                    <Badge variant="secondary">
+                      {level?.name ?? interview.targetLevel}
+                    </Badge>
+                    <Badge
+                      variant="secondary"
+                      className="text-muted-foreground"
+                    >
+                      {interview.mode.charAt(0).toUpperCase() +
+                        interview.mode.slice(1)}
+                    </Badge>
+                  </div>
                 </div>
                 <InterviewControls />
                 <div className="flex min-w-0 items-center justify-end gap-1 sm:gap-3">

@@ -14,7 +14,7 @@ const problem = {
   id: "url-shortener",
   title: "URL Shortener",
   interview: "system-design",
-  complexity: "low",
+  difficulty: "easy",
   categories: [],
   topics: [],
   companies: [],

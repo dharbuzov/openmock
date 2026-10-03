@@ -29,14 +29,19 @@ test("candidate panel renders title, badges, description and example without hid
   );
   for (const text of [
     problem.title,
-    "System Design",
+    "Difficulty",
+    "Tags",
     "Medium",
-    "Senior",
+    "High Scale",
+    "Caching",
+    "+4",
     "TinyURL",
     "short.ly/abc123",
   ])
     assert.ok(html.includes(text), text);
   for (const text of [
+    "System Design",
+    "Senior",
     "Functional Requirements",
     "Non-Functional Requirements",
     "100 million",
@@ -62,6 +67,7 @@ test("candidate panel renders title, badges, description and example without hid
   assert.match(context.problem.content, /Functional Requirements/);
   assert.match(context.problem.content, /100 million/);
   assert.match(context.problem.interviewerContext, /hot URLs/);
+  assert.equal(context.problem.difficulty, "medium");
 });
 
 test("description selection respects code fences and subsections and never falls back to full content", () => {
@@ -84,7 +90,7 @@ test("frontmatter supports typed difficulty and level and company names", () => 
     companies: ["Bitly"],
   });
   assert.equal(metadata.interview, "sql");
-  assert.equal(metadata.complexity, "high");
+  assert.equal(metadata.difficulty, "hard");
   assert.equal(metadata.level, "staff");
   assert.deepEqual(metadata.companies, [{ id: "Bitly", relation: "relevant" }]);
   assert.throws(

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { load, JSON_SCHEMA } from "js-yaml";
-import type { Problem, ProblemComplexity, ProblemMetadata } from "./types";
+import type { Problem, ProblemMetadata } from "./types";
 
 const slugSchema = z
   .string()
@@ -21,9 +21,8 @@ const normalizedMetadataSchema = z.object({
   id: slugSchema,
   title: nonEmptyString,
   interview: slugSchema,
-  complexity: z.enum(["low", "medium", "high"]),
   type: slugSchema.optional(),
-  difficulty: z.enum(["easy", "medium", "hard"]).optional(),
+  difficulty: z.enum(["easy", "medium", "hard"]),
   level: z.enum(["junior", "mid", "senior", "staff", "principal"]).optional(),
   categories: stringList,
   topics: stringList,
@@ -44,19 +43,6 @@ const normalizedMetadataSchema = z.object({
   starterCode: nonEmptyString.optional(),
 });
 
-function legacyComplexity(level: unknown): ProblemComplexity {
-  if (typeof level !== "string") return "low";
-  switch (level.trim().toLowerCase()) {
-    case "medium":
-      return "medium";
-    case "hard":
-    case "high":
-      return "high";
-    default:
-      return "low";
-  }
-}
-
 export function parseProblemMetadata(value: unknown): ProblemMetadata {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Frontmatter must be a YAML mapping.");
@@ -65,7 +51,6 @@ export function parseProblemMetadata(value: unknown): ProblemMetadata {
   const parsed = normalizedMetadataSchema.safeParse({
     ...input,
     interview: input.interview ?? input.type,
-    complexity: input.complexity ?? legacyComplexity(input.difficulty),
     categories: input.categories ?? [],
     topics: input.topics ?? [],
     companies: input.companies ?? [],

@@ -43,7 +43,7 @@ const overrides = {
   "./problem-metadata-badges": { ProblemMetadataBadges: "metadata" },
   "next/link": { __esModule: true, default: "a" },
 };
-const { filterProblems, availableCompanies, problemDifficulty } = loadComponent(
+const { filterProblems, availableCompanies } = loadComponent(
   "src/components/practice-problems.tsx",
   overrides,
 );
@@ -52,7 +52,6 @@ function problem(id, options = {}) {
     id,
     title: id,
     interview: "system-design",
-    complexity: "medium",
     difficulty: "medium",
     tags: ["payments"],
     topics: [],
@@ -108,12 +107,6 @@ test("search matches title, candidate description, type, tags and companies with
     assert.ok(ids({ search }).includes("payment"), search);
   assert.equal(ids({ search: "secret-capacity" }).length, 0);
   assert.equal(ids({ search: "   " }).length, 5);
-  assert.equal(
-    problemDifficulty(
-      problem("legacy", { difficulty: undefined, complexity: "high" }),
-    ),
-    "hard",
-  );
 });
 
 test("companies are deduplicated from loaded metadata and retain canonical values", () => {

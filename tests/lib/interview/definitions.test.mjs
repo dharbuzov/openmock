@@ -28,7 +28,7 @@ test("behavioral content resolves with no workspace and starts in the generic en
     id: "conflict-with-teammate",
     title: "Conflict",
     interview: "behavioral",
-    complexity: "medium",
+    difficulty: "medium",
     categories: [],
     topics: [],
     companies: [],

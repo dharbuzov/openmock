@@ -37,14 +37,6 @@ type Filters = {
   company: string;
   search: string;
 };
-export function problemDifficulty(problem: Problem): Exclude<Difficulty, ""> {
-  return (
-    problem.difficulty ??
-    ({ low: "easy", medium: "medium", high: "hard" } as const)[
-      problem.complexity
-    ]
-  );
-}
 export function filterProblems(
   problems: Problem[],
   filters: Filters,
@@ -53,8 +45,7 @@ export function filterProblems(
   return problems.filter(
     (problem) =>
       (!filters.category || problem.interview === filters.category) &&
-      (!filters.difficulty ||
-        problemDifficulty(problem) === filters.difficulty) &&
+      (!filters.difficulty || problem.difficulty === filters.difficulty) &&
       (!filters.company ||
         problem.companies.some(({ id }) => id === filters.company)) &&
       (!query ||
@@ -275,10 +266,7 @@ export function PracticeProblems({
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <h2 className="text-sm font-medium">{problem.title}</h2>
                   <ProblemMetadataBadges
-                    problem={{
-                      ...problem,
-                      difficulty: problemDifficulty(problem),
-                    }}
+                    problem={problem}
                     topicLimit={3}
                     showLevel={false}
                   />

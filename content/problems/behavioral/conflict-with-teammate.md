@@ -2,7 +2,7 @@
 id: conflict-with-teammate
 title: Conflict with a Teammate
 interview: behavioral
-complexity: medium
+difficulty: medium
 categories:
   - collaboration
 topics:

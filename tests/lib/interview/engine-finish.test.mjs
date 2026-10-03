@@ -11,7 +11,7 @@ const problem = {
   id: "two-sum",
   title: "Two Sum",
   interview: "dsa",
-  complexity: "low",
+  difficulty: "easy",
   categories: [],
   topics: [],
   companies: [],

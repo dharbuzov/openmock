@@ -1,6 +1,6 @@
 ---
 id: two-sum
-complexity: low
+difficulty: easy
 categories:
 - algorithms
 topics:

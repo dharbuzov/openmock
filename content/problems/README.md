@@ -12,7 +12,7 @@ Add frontmatter:
 id: message-broker
 title: Design a Message Broker
 interview: system-design
-complexity: medium
+difficulty: medium
 tags:
 - distributed-systems
 ---
@@ -22,12 +22,11 @@ Then write the problem using Markdown and open a pull request.
 
 The application recursively discovers `.md` files here, excluding `README.md`.
 Each file must have a unique lowercase, hyphen-separated `id`, a non-empty
-`title`, an interview definition id, a `complexity` of `low`, `medium`, or
-`high`, and a non-empty Markdown body. `categories`, `topics`, `companies`,
+`title`, an interview definition id, a `difficulty` of `easy`, `medium`, or
+`hard`, and a non-empty Markdown body. `categories`, `topics`, `companies`,
 and `tags` are optional and default to empty arrays. Invalid content reports
 its file path. `type` can supply the interview definition id when `interview` is omitted.
-Optional `difficulty` is `easy`, `medium`, or `hard`; it supplies complexity
-when that field is omitted. Optional `level` is `junior`, `mid`, `senior`,
+`difficulty` is required. Optional `level` is `junior`, `mid`, `senior`,
 `staff`, or `principal`. Companies accept names or objects with `id`,
 `relation`, and optional `source` provenance.
 The Markdown files are the only problem catalog; no TypeScript registration is needed.

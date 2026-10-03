@@ -2,7 +2,7 @@
 id: lru-cache
 title: LRU Cache
 interview: dsa
-complexity: medium
+difficulty: medium
 categories:
   - algorithms
 topics:

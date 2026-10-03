@@ -162,11 +162,15 @@ export function ProblemPanel({ problem }: { problem: Problem }) {
         role="region"
         aria-label="Problem description"
       >
-        <div className="mb-6 flex flex-col gap-2">
+        <div className="mb-4 flex flex-col gap-3">
           <h3 className="text-base font-medium tracking-tight">
             {problem.title}
           </h3>
-          <ProblemMetadataBadges problem={problem} />
+          <ProblemMetadataBadges
+            problem={problem}
+            showLevel={false}
+            showType={false}
+          />
         </div>
         <h3 className="mb-2 text-sm font-medium text-foreground">
           Description

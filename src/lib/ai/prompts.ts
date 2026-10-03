@@ -34,7 +34,7 @@ export function interviewContext(context: InterviewContext): string {
     problem: {
       id: context.problem.id,
       title: context.problem.title,
-      complexity: context.problem.complexity,
+      difficulty: context.problem.difficulty,
       categories: context.problem.categories,
       topics: context.problem.topics,
       content: context.problem.content,

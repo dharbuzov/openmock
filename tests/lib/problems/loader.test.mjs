@@ -30,7 +30,7 @@ test("unknown interview references fail clearly", async () => {
             id: "unknown",
             title: "Unknown",
             interview: "missing",
-            complexity: "low",
+            difficulty: "easy",
             categories: [],
             topics: [],
             companies: [],

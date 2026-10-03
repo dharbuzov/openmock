@@ -11,7 +11,7 @@ test("optional problem metadata arrays default safely", () => {
     id: "queue",
     title: "Queue",
     interview: "system-design",
-    complexity: "medium",
+    difficulty: "medium",
   });
   assert.deepEqual(metadata.categories, []);
   assert.deepEqual(metadata.topics, []);
@@ -24,7 +24,7 @@ test("company metadata preserves relation and optional provenance", () => {
     id: "queue",
     title: "Queue",
     interview: "system-design",
-    complexity: "high",
+    difficulty: "hard",
     companies: [
       { id: "example-co", relation: "reported", source: "candidate report" },
     ],
@@ -36,7 +36,7 @@ test("company metadata preserves relation and optional provenance", () => {
 
 test("interviewer context remains metadata and never becomes candidate content", () => {
   const problem = parseProblemDocument(
-    `---\nid: queue\ntitle: Queue\ninterview: system-design\ncomplexity: low\n---\n# Candidate prompt\n\nDesign a queue.\n\n# Interviewer Context\n\nAsk about backpressure.`,
+    `---\nid: queue\ntitle: Queue\ninterview: system-design\ndifficulty: easy\n---\n# Candidate prompt\n\nDesign a queue.\n\n# Interviewer Context\n\nAsk about backpressure.`,
   );
   assert.equal(problem.interviewerContext, "Ask about backpressure.");
   assert.equal(problem.content, "# Candidate prompt\n\nDesign a queue.");
@@ -45,7 +45,7 @@ test("interviewer context remains metadata and never becomes candidate content",
 
 test("problem works without Interviewer Context and preserves its explicit interview reference", () => {
   const problem = parseProblemDocument(
-    `---\nid: collaboration\ntitle: Collaboration\ninterview: behavioral\ncomplexity: medium\n---\nTell me about collaboration.`,
+    `---\nid: collaboration\ntitle: Collaboration\ninterview: behavioral\ndifficulty: medium\n---\nTell me about collaboration.`,
   );
   assert.equal(problem.interview, "behavioral");
   assert.equal(problem.content, "Tell me about collaboration.");
@@ -57,10 +57,28 @@ test("legacy type and level frontmatter remains readable", () => {
     id: "legacy-design",
     title: "Legacy",
     type: "system-design",
+    difficulty: "easy",
     level: "senior",
     tags: ["systems"],
   });
   assert.equal(metadata.interview, "system-design");
-  assert.equal(metadata.complexity, "low");
+  assert.equal(metadata.difficulty, "easy");
   assert.deepEqual(metadata.tags, ["systems"]);
+});
+
+test("difficulty is required and accepts only easy, medium, or hard", () => {
+  const input = { id: "queue", title: "Queue", interview: "system-design" };
+  assert.throws(() => parseProblemMetadata(input), /difficulty/);
+  for (const difficulty of ["low", "high", "extreme", null]) {
+    assert.throws(
+      () => parseProblemMetadata({ ...input, difficulty }),
+      /difficulty/,
+    );
+  }
+  for (const difficulty of ["easy", "medium", "hard"]) {
+    assert.equal(
+      parseProblemMetadata({ ...input, difficulty }).difficulty,
+      difficulty,
+    );
+  }
 });
