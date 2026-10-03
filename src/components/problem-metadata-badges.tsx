@@ -14,19 +14,38 @@ export function ProblemMetadataBadges({
   topicLimit = 2,
   showLevel = true,
   showType = true,
+  showLabels = !showLevel && !showType,
+  typeLabel,
+  showCompanies = false,
 }: {
   problem: Problem;
   topicLimit?: number;
   showLevel?: boolean;
   showType?: boolean;
+  showLabels?: boolean;
+  typeLabel?: string;
+  showCompanies?: boolean;
 }) {
-  const showLabels = !showLevel && !showType;
   const topics = [...new Set([...problem.tags, ...problem.topics])];
   const difficultyClass = {
     easy: "border-success/15 bg-success/5 text-success",
     medium: "border-warning/15 bg-warning/5 text-warning",
     hard: "border-destructive/15 bg-destructive/5 text-destructive",
   };
+  const typeBadge = showType ? (
+    <Badge
+      variant="outline"
+      className={cn(
+        "max-w-full",
+        !showLabels &&
+          "border-blue-200/70 bg-blue-50 text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300",
+      )}
+    >
+      <span className="truncate">
+        {typeLabel ?? metadataLabel(problem.type ?? problem.interview)}
+      </span>
+    </Badge>
+  ) : null;
   return (
     <div
       className={cn(
@@ -35,23 +54,22 @@ export function ProblemMetadataBadges({
           : "flex flex-col gap-1.5",
       )}
     >
+      {showLabels && showType && (
+        <>
+          <span className="text-xs leading-5 text-muted-foreground">Type</span>
+          <div className="flex min-w-0 flex-wrap gap-1.5">{typeBadge}</div>
+        </>
+      )}
       {showLabels && problem.difficulty && (
         <span className="text-xs leading-5 text-muted-foreground">
           Difficulty
         </span>
       )}
-      {(showType || problem.difficulty || (showLevel && problem.level)) && (
+      {((showType && !showLabels) ||
+        problem.difficulty ||
+        (showLevel && problem.level)) && (
         <div className="flex min-w-0 flex-wrap gap-1.5">
-          {showType && (
-            <Badge
-              variant="outline"
-              className="max-w-full border-blue-200/70 bg-blue-50 text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300"
-            >
-              <span className="truncate">
-                {metadataLabel(problem.type ?? problem.interview)}
-              </span>
-            </Badge>
-          )}
+          {!showLabels && typeBadge}
           {problem.difficulty && (
             <Badge
               variant="outline"
@@ -100,6 +118,24 @@ export function ProblemMetadataBadges({
                 +{topics.length - topicLimit}
               </Badge>
             )}
+          </div>
+        </>
+      )}
+      {showCompanies && problem.companies.length > 0 && (
+        <>
+          <span className="text-xs leading-5 text-muted-foreground">
+            Common at
+          </span>
+          <div className="flex min-w-0 flex-wrap gap-1.5">
+            {problem.companies.map(({ id }) => (
+              <Badge
+                key={id}
+                variant="outline"
+                className="max-w-full text-muted-foreground"
+              >
+                <span className="truncate">{metadataLabel(id)}</span>
+              </Badge>
+            ))}
           </div>
         </>
       )}

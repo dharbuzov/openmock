@@ -35,6 +35,7 @@ const primitives = {
       "Field",
       "FieldGroup",
       "FieldDescription",
+      "FieldContent",
       "FieldLabel",
       "FieldSet",
       "FieldLegend",
@@ -425,15 +426,37 @@ test("shared inline AI form preserves saved-key masking and Remember API key beh
     );
     const props = { initialSettings: readSettings(), onSaved: () => saved++ };
     let tree = hooks.render(AISettingsForm, props);
+    findElement(
+      tree,
+      (node) => node.props.id === "settings-interviewer-voice",
+    ).props.onCheckedChange(false);
+    tree = hooks.render(AISettingsForm, props);
+    for (const provider of ["anthropic", "openai"]) {
+      findElement(
+        tree,
+        (node) =>
+          node.type === "select" &&
+          ["openai", "anthropic"].includes(node.props.value),
+      ).props.onValueChange(provider);
+      tree = hooks.render(AISettingsForm, props);
+      assert.equal(
+        findElement(
+          tree,
+          (node) => node.props.id === "settings-interviewer-voice",
+        ).props.checked,
+        false,
+      );
+    }
     let key = findElement(tree, (node) => node.props.id === "settings-api-key");
     assert.equal(key.props.type, "password");
     assert.equal(key.props.value, "");
     assert.match(key.props.placeholder, /Key saved/);
     key.props.onChange({ target: { value: "replacement-key" } });
     tree = hooks.render(AISettingsForm, props);
-    findElement(tree, (node) => node.type === "switch").props.onCheckedChange(
-      true,
-    );
+    findElement(
+      tree,
+      (node) => node.props.id === "settings-remember",
+    ).props.onCheckedChange(true);
     tree = hooks.render(AISettingsForm, props);
     findElement(
       tree,
@@ -442,6 +465,7 @@ test("shared inline AI form preserves saved-key masking and Remember API key beh
     assert.equal(saved, 1);
     assert.equal(readSettings().apiKey, "replacement-key");
     assert.equal(readSettings().rememberApiKey, true);
+    assert.equal(readSettings().interviewerVoiceEnabled, false);
     assert.equal(
       window.localStorage.getItem("openmock:api-key:openai"),
       "replacement-key",

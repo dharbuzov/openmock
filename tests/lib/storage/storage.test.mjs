@@ -114,12 +114,14 @@ test("settings preserve provider preferences, keys and key lifetime", () => {
     assert.equal(domain.readSettings().model, "gpt-4.1");
     domain.saveSettings({
       provider: "ollama",
+      interviewerVoiceEnabled: true,
       baseUrl: " http://localhost:11434 ",
       model: "local",
     });
     assert.equal(keys.get("openmock:api-key:openai"), "openai-secret");
     assert.deepEqual(preferences.get("openmock:ai-preferences"), {
       provider: "ollama",
+      interviewerVoiceEnabled: true,
       openai: { model: "gpt-4.1", rememberApiKey },
       ollama: { baseUrl: "http://localhost:11434", model: "local" },
     });
@@ -151,6 +153,31 @@ test("settings preserve provider preferences, keys and key lifetime", () => {
       openai: { model: "unknown" },
     });
     assert.deepEqual(domain.readSettings(), defaultSettings);
+  }
+});
+
+test("interviewer voice defaults safely and survives storage recreation for every provider", () => {
+  const preferences = memory();
+  const domain = new SettingsStorage(preferences, memory(), memory());
+  for (const value of [undefined, null, "false", 0]) {
+    preferences.set("openmock:ai-preferences", {
+      interviewerVoiceEnabled: value,
+    });
+    assert.equal(domain.readSettings().interviewerVoiceEnabled, true);
+  }
+  for (const interviewerVoiceEnabled of [false, true]) {
+    domain.saveSettings({ ...defaultSettings, interviewerVoiceEnabled });
+    const restarted = new SettingsStorage(preferences, memory(), memory());
+    assert.equal(
+      restarted.readSettings().interviewerVoiceEnabled,
+      interviewerVoiceEnabled,
+    );
+    for (const provider of ["openai", "anthropic", "ollama"]) {
+      assert.equal(
+        restarted.readProviderSettings(provider).interviewerVoiceEnabled,
+        interviewerVoiceEnabled,
+      );
+    }
   }
 });
 
@@ -210,6 +237,7 @@ test("current settings JSON and raw keys remain readable and writable", () => {
       JSON.parse(window.localStorage.getItem("openmock:ai-preferences")),
       {
         provider: "openai",
+        interviewerVoiceEnabled: true,
         openai: { model: "gpt-4.1", rememberApiKey: true },
       },
     );

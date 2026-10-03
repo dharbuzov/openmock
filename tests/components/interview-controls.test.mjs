@@ -2,7 +2,54 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
-import { load } from "../register-typescript.mjs";
+import { load, storage } from "../register-typescript.mjs";
+import {
+  hookHarness,
+  loadComponent,
+  findElement,
+} from "../helpers/components.mjs";
+
+test("new interviews use the saved voice default and speaker changes stay in the session", () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = { localStorage: storage(), sessionStorage: storage() };
+  try {
+    const { readSettings, saveSettings } = load(
+      "../src/lib/settings/storage.ts",
+    );
+    saveSettings({ ...readSettings(), interviewerVoiceEnabled: false });
+    function room() {
+      const hooks = hookHarness();
+      const { InterviewControlsProvider } = loadComponent(
+        "src/components/interview-controls-context.tsx",
+        {
+          react: hooks.react,
+          "@/components/ui/tooltip": { TooltipProvider: "div" },
+        },
+      );
+      return () =>
+        findElement(
+          hooks.render(InterviewControlsProvider, { children: null }),
+          (node) => typeof node.props?.value?.voiceEnabled === "boolean",
+        ).props.value;
+    }
+    const first = room();
+    assert.equal(first().voiceEnabled, false);
+    first().setVoiceEnabled(true);
+    assert.equal(first().voiceEnabled, true);
+    assert.equal(readSettings().interviewerVoiceEnabled, false);
+    assert.equal(room()().voiceEnabled, false);
+    saveSettings({ ...readSettings(), interviewerVoiceEnabled: true });
+    const next = room();
+    assert.equal(next().voiceEnabled, true);
+    next().setVoiceEnabled(false);
+    assert.equal(next().voiceEnabled, false);
+    assert.equal(readSettings().interviewerVoiceEnabled, true);
+    assert.equal(room()().voiceEnabled, true);
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});
 
 const { InterviewTimer, formatElapsed } = load("../src/lib/interview/timer.ts");
 const { finalTranscript } = load("../src/lib/voice/browser.ts");

@@ -17,6 +17,7 @@ export const themeStorageKey = "openmock:theme";
 const preferencesKey = "openmock:ai-preferences";
 
 type StoredPreferences = {
+  interviewerVoiceEnabled?: boolean;
   provider?: AIProviderId;
   openai?: { model?: string; rememberApiKey?: boolean };
   anthropic?: { model?: string; rememberApiKey?: boolean };
@@ -53,9 +54,14 @@ export class SettingsStorage {
   readProviderSettings(provider: AIProviderId): AISettings {
     try {
       const preferences = this.readPreferences();
+      const interviewerVoiceEnabled =
+        typeof preferences.interviewerVoiceEnabled === "boolean"
+          ? preferences.interviewerVoiceEnabled
+          : defaultSettings.interviewerVoiceEnabled;
       if (provider === "ollama") {
         return {
           provider,
+          interviewerVoiceEnabled,
           baseUrl:
             preferences.ollama?.baseUrl?.trim() ||
             defaultOllamaSettings.baseUrl,
@@ -75,6 +81,7 @@ export class SettingsStorage {
       const rememberApiKey = saved?.rememberApiKey === true;
       return {
         provider,
+        interviewerVoiceEnabled,
         model,
         rememberApiKey,
         apiKey: this.readApiKey(provider, rememberApiKey),
@@ -106,6 +113,7 @@ export class SettingsStorage {
   saveSettings(settings: AISettings): void {
     const preferences = this.readPreferences();
     preferences.provider = settings.provider;
+    preferences.interviewerVoiceEnabled = settings.interviewerVoiceEnabled;
 
     if (settings.provider === "ollama") {
       preferences.ollama = {

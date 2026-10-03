@@ -30,7 +30,11 @@ export const anthropicModels = withConfiguredModel("anthropic", [
   { value: "claude-opus-5", label: "Claude Opus 5" },
 ]);
 
-interface CloudAISettings {
+interface InterviewPreferences {
+  interviewerVoiceEnabled: boolean;
+}
+
+interface CloudAISettings extends InterviewPreferences {
   model: string;
   apiKey: string;
   rememberApiKey: boolean;
@@ -44,7 +48,7 @@ export interface AnthropicSettings extends CloudAISettings {
   provider: "anthropic";
 }
 
-export interface OllamaSettings {
+export interface OllamaSettings extends InterviewPreferences {
   provider: "ollama";
   baseUrl: string;
   model: string;
@@ -55,6 +59,7 @@ export type CloudProviderId =
   OpenAISettings["provider"] | AnthropicSettings["provider"];
 
 export const defaultOllamaSettings: OllamaSettings = {
+  interviewerVoiceEnabled: true,
   provider: "ollama",
   baseUrl: "http://localhost:11434",
   model: config.ai.provider === "ollama" ? config.ai.model : "",
@@ -62,6 +67,7 @@ export const defaultOllamaSettings: OllamaSettings = {
 
 export const defaultSettingsByProvider: Record<AIProviderId, AISettings> = {
   openai: {
+    interviewerVoiceEnabled: true,
     provider: "openai",
     model:
       config.ai.provider === "openai" ? config.ai.model : openAIModels[0].value,
@@ -69,6 +75,7 @@ export const defaultSettingsByProvider: Record<AIProviderId, AISettings> = {
     rememberApiKey: false,
   },
   anthropic: {
+    interviewerVoiceEnabled: true,
     provider: "anthropic",
     model:
       config.ai.provider === "anthropic"

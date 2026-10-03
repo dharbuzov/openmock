@@ -3,7 +3,6 @@
 import { useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -134,38 +133,25 @@ function SetupForm({
         </TooltipProvider>
       </div>
       <h1 className="text-3xl font-semibold tracking-tight">Interview Setup</h1>
-      <div className="col-span-2 grid min-w-0 items-start gap-8 md:col-span-1 md:col-start-2 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] md:gap-10">
+      <div className="col-span-2 grid min-w-0 items-start gap-8 md:col-span-1 md:col-start-2 md:grid-cols-[minmax(0,0.35fr)_minmax(0,0.65fr)] md:gap-10">
         <section
           aria-label="Problem context"
           className="flex min-w-0 flex-col gap-3"
         >
-          <h2 className="text-lg font-medium tracking-tight">
-            {problem.title}
-          </h2>
-          <p className="text-sm leading-6 text-muted-foreground">{summary}</p>
+          <div className="flex flex-col gap-1.5">
+            <h2 className="text-lg font-medium tracking-tight">
+              {problem.title}
+            </h2>
+            <p className="text-sm leading-6 text-muted-foreground">{summary}</p>
+          </div>
           <ProblemMetadataBadges
             problem={problem}
             topicLimit={3}
             showLevel={false}
+            showLabels
+            typeLabel={definition.name}
+            showCompanies
           />
-          {problem.companies.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="mr-1 text-xs text-muted-foreground">
-                {problem.companies.every(
-                  ({ relation }) => relation === "reported",
-                )
-                  ? "Asked at"
-                  : "Common at"}
-              </span>
-              {problem.companies.map((company) => (
-                <Badge key={company.id} variant="outline">
-                  {company.id
-                    .replace(/-/g, " ")
-                    .replace(/\b\w/g, (letter) => letter.toUpperCase())}
-                </Badge>
-              ))}
-            </div>
-          )}
         </section>
         <section
           aria-label="Interview configuration"
@@ -173,9 +159,6 @@ function SetupForm({
         >
           <Field>
             <FieldLabel id="target-level-label">Target level</FieldLabel>
-            <FieldDescription>
-              Choose the level you want to be evaluated against.
-            </FieldDescription>
             <ToggleGroup
               aria-labelledby="target-level-label"
               value={[level]}
@@ -196,6 +179,9 @@ function SetupForm({
                 ),
               )}
             </ToggleGroup>
+            <FieldDescription>
+              Choose the level you want to be evaluated against.
+            </FieldDescription>
           </Field>
 
           <Field>
@@ -253,7 +239,7 @@ function SetupForm({
                   <>
                     {aiProviders.find(({ value }) => value === provider)?.label}{" "}
                     · {model}{" "}
-                    <span className="ml-2 whitespace-nowrap text-xs">
+                    <span className="ml-2 whitespace-nowrap text-xs text-success">
                       ✓ Ready
                     </span>
                   </>

@@ -17,6 +17,7 @@ import {
   FieldSet,
   FieldLegend,
   FieldDescription,
+  FieldContent,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -87,7 +88,10 @@ export function AISettingsForm({
     if (provider === settings.provider) return;
     controller.current?.abort();
     controller.current = null;
-    setSettings(readProviderSettings(provider));
+    setSettings({
+      ...readProviderSettings(provider),
+      interviewerVoiceEnabled: settings.interviewerVoiceEnabled,
+    });
     setKeyInput("");
     setRemoveKey(false);
     setFeedback("");
@@ -189,6 +193,30 @@ export function AISettingsForm({
           <Separator />
         </>
       )}
+
+      <FieldSet>
+        <FieldLegend variant="label">Interview</FieldLegend>
+        <Field orientation="horizontal">
+          <FieldContent>
+            <FieldLabel htmlFor="settings-interviewer-voice">
+              Interviewer voice
+            </FieldLabel>
+            <FieldDescription id="settings-interviewer-voice-description">
+              Automatically read interviewer responses aloud.
+            </FieldDescription>
+          </FieldContent>
+          <Switch
+            id="settings-interviewer-voice"
+            aria-describedby="settings-interviewer-voice-description"
+            checked={settings.interviewerVoiceEnabled}
+            onCheckedChange={(interviewerVoiceEnabled) =>
+              setSettings({ ...settings, interviewerVoiceEnabled })
+            }
+            size="sm"
+          />
+        </Field>
+      </FieldSet>
+      <Separator />
 
       <FieldSet disabled={testing}>
         {appearance && <FieldLegend variant="label">AI Provider</FieldLegend>}
@@ -416,7 +444,8 @@ export function SettingsDialog({
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
-            Appearance and your AI provider, on this browser.
+            Appearance, interview preferences, and your AI provider, on this
+            browser.
           </DialogDescription>
         </DialogHeader>
         <AISettingsForm

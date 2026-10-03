@@ -11,6 +11,7 @@ import {
 import { InterviewTimer } from "@/lib/interview/timer";
 import { recognitionConstructor } from "@/lib/voice/browser";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { readSettings } from "@/lib/settings/storage";
 
 import type { InteractionMode } from "./interaction-mode-control";
 type Controls = {
@@ -37,7 +38,9 @@ export function InterviewControlsProvider({
   const [timer] = useState(() => new InterviewTimer());
   const [paused, setPaused] = useState(true);
   const [mode, setMode] = useState<InteractionMode>(initialMode);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useState(
+    () => readSettings().interviewerVoiceEnabled,
+  );
   const speechAvailable = useSyncExternalStore(
     subscribeCapabilities,
     () => Boolean(recognitionConstructor()),
