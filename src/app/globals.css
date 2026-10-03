@@ -124,6 +124,11 @@
 }
 
 @layer base {
+  /* next/font's generated classes override these statically declared fallbacks. */
+  :root {
+    --font-geist-sans: Arial, Helvetica, sans-serif;
+    --font-geist-mono: ui-monospace, monospace;
+  }
   * {
     @apply border-border outline-ring/50;
   }
