@@ -139,6 +139,9 @@ function renderComponent(filename, name, overrides) {
   let index = 0;
   const react = {
     useEffect() {},
+    useEffectEvent(callback) {
+      return callback;
+    },
     useSyncExternalStore(_subscribe, snapshot) {
       return snapshot();
     },
@@ -221,6 +224,8 @@ test("Send retries reuse the captured workspace and Finish saves completion with
       Check: "check",
     },
     "./current-stage-badge": { CurrentStageBadge: "stage-badge" },
+    "./recording-controls": { RecordingControls: "recording-controls" },
+    "@/components/ui/spinner": { Spinner: "spinner" },
     "./interview-controls-context": {
       useInterviewControls: () => ({
         mode: "chat",
@@ -233,6 +238,7 @@ test("Send retries reuse the captured workspace and Finish saves completion with
     },
     "./use-interview-voice": {
       useInterviewVoice: () => ({
+        recordingState: "idle",
         listening: false,
         error: "",
         stopPlayback: () => {},

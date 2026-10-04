@@ -480,3 +480,107 @@ function voiceHarness(controls) {
     },
   };
 }
+
+test("Cancel discards recording without Whisper and clears microphone resources", async () =>
+  withBrowser(async ({ recordings, tracks }) => {
+    const h = voiceHarness(controls()),
+      input = props();
+    let calls = 0;
+    globalThis.fetch = async () => {
+      calls++;
+      throw Error("unexpected Whisper call");
+    };
+    try {
+      h.render(input).toggleMicrophone();
+      await flush();
+      assert.equal(h.render(input).recordingState, "recording");
+      assert.ok(h.render(input).microphoneStream);
+      h.render(input).cancelRecording();
+      await flush();
+      assert.equal(calls, 0);
+      assert.equal(recordings[0].state, "inactive");
+      assert.equal(tracks[0].stopped, true);
+      assert.equal(h.render(input).microphoneStream, null);
+      assert.equal(h.render(input).recordingState, "idle");
+    } finally {
+      h.dispose();
+    }
+  }));
+
+test("recorded Send transcribes once, skips dictation, and exposes its explicit pending state", async () =>
+  withBrowser(async ({ tracks }) => {
+    const h = voiceHarness(controls()),
+      dictated = [],
+      sent = [];
+    const input = {
+      ...props((text) => dictated.push(text)),
+      onRecordedAnswer: (text) => sent.push(text),
+    };
+    let complete,
+      calls = 0;
+    globalThis.fetch = () => {
+      calls++;
+      return new Promise((resolve) => (complete = resolve));
+    };
+    try {
+      h.render(input).toggleMicrophone();
+      await flush();
+      h.render(input).stopRecording("send");
+      h.render(input).stopRecording("send");
+      assert.equal(h.render(input).recordingState, "transcribing-for-send");
+      assert.equal(tracks[0].stopped, true);
+      complete(Response.json({ text: "Use Kafka", language: "en" }));
+      await flush();
+      assert.deepEqual(sent, ["Use Kafka"]);
+      assert.deepEqual(dictated, []);
+      assert.equal(calls, 1);
+      assert.equal(h.render(input).recordingState, "idle");
+    } finally {
+      h.dispose();
+    }
+  }));
+
+test("failed recorded Send returns idle without submitting empty text", async () =>
+  withBrowser(async () => {
+    const h = voiceHarness(controls()),
+      sent = [];
+    const input = { ...props(), onRecordedAnswer: (text) => sent.push(text) };
+    globalThis.fetch = async () =>
+      Response.json({ text: "   ", language: "en" });
+    try {
+      h.render(input).toggleMicrophone();
+      await flush();
+      h.render(input).stopRecording("send");
+      await flush();
+      assert.deepEqual(sent, []);
+      assert.equal(h.render(input).recordingState, "idle");
+      assert.match(h.render(input).error, /transcribe/);
+    } finally {
+      h.dispose();
+    }
+  }));
+
+test("starting microphone during interviewer playback cancels audio and starts recording", async () =>
+  withBrowser(async ({ played, tracks }) => {
+    const h = voiceHarness(controls()),
+      input = props();
+    globalThis.fetch = async () =>
+      new Response("wav", { headers: { "Content-Type": "audio/wav" } });
+    try {
+      h.render(input);
+      input.messages = [
+        { id: "response", role: "interviewer", content: "Why?" },
+      ];
+      h.render(input);
+      await flush();
+      assert.equal(h.render(input).speaking, true);
+      h.render(input).startRecording();
+      await flush();
+      assert.equal(played[0].paused, true);
+      assert.equal(h.render(input).recordingState, "recording");
+      assert.equal(tracks[0].stopped, false);
+    } finally {
+      h.dispose();
+    }
+    assert.equal(tracks[0].stopped, true);
+  }));

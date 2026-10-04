@@ -2,8 +2,14 @@
 
 import { CurrentStageBadge } from "./current-stage-badge";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Mic, Square, ArrowDown, Volume2, VolumeX } from "lucide-react";
+import {
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { Mic, ArrowDown, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -22,7 +28,8 @@ import {
   useMessageScroller,
 } from "@/components/ui/message-scroller";
 import { acceptCandidateMessage } from "@/lib/interview/engine";
-import { cn } from "cn";
+import { Spinner } from "@/components/ui/spinner";
+import { RecordingControls } from "./recording-controls";
 import { Textarea } from "@/components/ui/textarea";
 import { useOpenSettings } from "@/components/settings-provider";
 import {
@@ -39,6 +46,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useInterviewControls } from "./interview-controls-context";
 import { useInterviewVoice } from "./use-interview-voice";
+import { logger } from "@/lib/logging/logger";
 
 const providerIssueSnapshot = () => aiSettingsIssue(readSettings());
 const serverProviderIssueSnapshot = () => "";
@@ -65,6 +73,9 @@ export function AIInterviewer() {
   const { messages } = interview;
   const captureWorkspace = useCaptureWorkspace();
   const [answer, setAnswer] = useState("");
+  const answerInput = useRef<HTMLTextAreaElement>(null);
+  const composer = useRef<HTMLFormElement>(null);
+  const [composerHeight, setComposerHeight] = useState(136);
   const pending = operation === "send";
   const [error, setError] = useState("");
   const [streamedResponse, setStreamedResponse] = useState("");
@@ -92,7 +103,20 @@ export function AIInterviewer() {
       setAnswer((previous) =>
         [previous.trim(), text].filter(Boolean).join(" "),
       ),
+    onRecordedAnswer: (text) => {
+      void send(false, [answer.trim(), text].filter(Boolean).join(" "), true);
+    },
   });
+  const previousRecordingState = useRef(voice.recordingState);
+  useEffect(() => {
+    if (
+      voice.recordingState === "idle" &&
+      previousRecordingState.current !== "idle"
+    ) {
+      answerInput.current?.focus();
+    }
+    previousRecordingState.current = voice.recordingState;
+  }, [voice.recordingState]);
   const state = pending
     ? messages.at(-1)?.role !== "candidate"
       ? "submitting"
@@ -115,6 +139,79 @@ export function AIInterviewer() {
     voice.transcribing ||
     interview.status !== "in-progress" ||
     interview.stage.current === null;
+  const microphoneShortcut = useSyncExternalStore(
+    () => () => {},
+    () =>
+      typeof navigator !== "undefined" &&
+      /Mac|iPhone|iPad/.test(navigator.platform)
+        ? "⌘M"
+        : "Ctrl+M",
+    () => "Ctrl+M",
+  );
+  function startRecording() {
+    if (!speechAvailable || inputBlocked || error) return;
+    if (composer.current) setComposerHeight(composer.current.clientHeight - 32);
+    voice.startRecording();
+  }
+  const cancelRecording = voice.cancelRecording;
+  const stopAndReview = voice.stopAndReview;
+  const stopAndSend = voice.stopAndSend;
+  const hotkey = useEffectEvent((event: KeyboardEvent) => {
+    if (
+      !(event.ctrlKey || event.metaKey) ||
+      (event.code !== "KeyM" && event.key.toLowerCase() !== "m")
+    )
+      return;
+    // This listener belongs to the mounted interview room, including hidden panes.
+    if (!document.querySelector("[data-interview-room]")) return;
+    // Keep the browser shortcut from running, including during transcription.
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const reason = event.altKey
+      ? "alt-modifier"
+      : event.isComposing
+        ? "composing"
+        : event.repeat
+          ? "key-repeat"
+          : voice.transcribing
+            ? "transcribing"
+            : operation
+              ? "interview-busy"
+              : interview.status !== "in-progress" ||
+                  interview.stage.current === null
+                ? "interview-inactive"
+                : error
+                  ? "provider-error"
+                  : !speechAvailable
+                    ? "microphone-unavailable"
+                    : !voice.listening && voice.isRecordingPending()
+                      ? "microphone-request-pending"
+                      : null;
+    const action = reason
+      ? "ignore"
+      : voice.listening
+        ? "stop-and-review"
+        : "start-recording";
+    if (process.env.NODE_ENV !== "production")
+      logger.debug(
+        {
+          key: event.key,
+          code: event.code,
+          recordingState: voice.recordingState,
+          action,
+          ignoredReason: reason,
+        },
+        "Microphone shortcut detected",
+      );
+    if (reason) return;
+    if (action === "stop-and-review") stopAndReview();
+    else startRecording();
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.addEventListener("keydown", hotkey, true);
+    return () => window.removeEventListener("keydown", hotkey, true);
+  }, []);
   const lastCandidate =
     messages.at(-1)?.role === "candidate" ? messages.at(-1) : undefined;
   const transcriptMessages = messages.map((message, index) => ({
@@ -135,17 +232,14 @@ export function AIInterviewer() {
       key: `response-${lastCandidate.id}`,
       pending: true,
     });
-  const draft =
-    voice.listening || voice.transcribing
-      ? [answer.trim(), voice.partialTranscript].filter(Boolean).join(" ")
-      : answer;
-
-  async function send(retry = false) {
-    const candidateAnswer = answer;
+  async function send(
+    retry = false,
+    candidateAnswer = answer,
+    fromRecording = false,
+  ) {
     if (
       operation ||
-      voice.transcribing ||
-      voice.listening ||
+      (!fromRecording && (voice.transcribing || voice.listening)) ||
       (error && !retry) ||
       interview.status !== "in-progress" ||
       interview.stage.current === null ||
@@ -154,6 +248,7 @@ export function AIInterviewer() {
       return;
     const settings = readSettings();
     if (aiSettingsIssue(settings)) {
+      if (fromRecording) setAnswer(candidateAnswer);
       if (mode === "live") setMode("chat");
       openSettings();
       return;
@@ -169,6 +264,7 @@ export function AIInterviewer() {
         ? request.interview
         : acceptCandidateMessage(request.interview, candidateAnswer);
       commitOperation(request, next);
+      if (fromRecording) setAnswer("");
       if (!retry || !lastWorkspaceSnapshot.current)
         lastWorkspaceSnapshot.current = captureWorkspace();
       const workspaceSnapshot = lastWorkspaceSnapshot.current ?? undefined;
@@ -386,114 +482,123 @@ export function AIInterviewer() {
         </MessageScroller>
       </MessageScrollerProvider>
       <form
+        ref={composer}
+        onKeyDownCapture={(event) => {
+          if (event.nativeEvent.isComposing) return;
+          if (voice.transcribing && event.key === "Enter") {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          if (
+            !voice.listening ||
+            (event.key !== "Enter" && event.key !== "Escape")
+          )
+            return;
+          // Capture before the focused recording button can activate itself.
+          event.preventDefault();
+          event.stopPropagation();
+          if (event.repeat) return;
+          if (event.key === "Escape") cancelRecording();
+          else stopAndSend();
+        }}
         onSubmit={(event) => {
           event.preventDefault();
-          void send();
+          if (voice.listening) stopAndSend();
+          else if (!voice.transcribing) void send();
         }}
         className="flex shrink-0 flex-col gap-3 border-t p-4"
       >
-        <label htmlFor="interview-answer" className="sr-only">
-          Your answer
-        </label>
-        {(voice.listening || voice.transcribing) && (
+        {voice.listening ? (
+          <div
+            className="flex items-center"
+            style={{ minHeight: composerHeight }}
+          >
+            <RecordingControls
+              stream={voice.microphoneStream}
+              seconds={voice.recordingSeconds}
+              onCancel={cancelRecording}
+              onStop={stopAndReview}
+              onSend={stopAndSend}
+              microphoneShortcut={microphoneShortcut}
+            />
+          </div>
+        ) : voice.transcribing ? (
           <div
             role="status"
             aria-live="polite"
-            className="flex items-center gap-2 text-xs text-muted-foreground"
+            className="flex items-center justify-center gap-2 text-xs text-muted-foreground"
+            style={{ minHeight: composerHeight }}
           >
-            {voice.listening && (
-              <span
-                aria-hidden="true"
-                className="size-1.5 rounded-full bg-success"
-              />
-            )}
-            <span>{voice.transcribing ? "Transcribing…" : "Recording…"}</span>
-            {voice.listening && (
-              <span className="ml-auto font-mono tabular-nums">
-                {String(Math.floor(voice.recordingSeconds / 60)).padStart(
-                  2,
-                  "0",
-                )}
-                :{String(voice.recordingSeconds % 60).padStart(2, "0")}
-              </span>
-            )}
+            <Spinner aria-hidden="true" /> Transcribing…
           </div>
+        ) : (
+          <>
+            <label htmlFor="interview-answer" className="sr-only">
+              Your answer
+            </label>
+            <Textarea
+              ref={answerInput}
+              id="interview-answer"
+              name="answer"
+              placeholder="Type your answer…"
+              value={answer}
+              disabled={inputBlocked}
+              onChange={(event) => setAnswer(event.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  void send();
+                }
+              }}
+              aria-describedby="answer-note"
+              className="max-h-36 min-h-24 resize-none"
+            />
+            <div className="flex items-center justify-between gap-2">
+              <p
+                id="answer-note"
+                className="text-xs leading-5 text-muted-foreground"
+              >
+                {voice.speaking
+                  ? "Interviewer speaking"
+                  : "Shift+Enter for a new line"}
+              </p>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={!speechAvailable || inputBlocked}
+                  aria-label="Dictate answer"
+                  title={
+                    speechAvailable
+                      ? `Start recording — ${microphoneShortcut}`
+                      : "Microphone recording is unavailable in this browser"
+                  }
+                  onClick={startRecording}
+                >
+                  <Mic aria-hidden="true" />
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={
+                    inputBlocked ||
+                    voice.listening ||
+                    Boolean(error) ||
+                    !answer.trim()
+                  }
+                >
+                  Send
+                </Button>
+              </div>
+            </div>
+          </>
         )}
-        <Textarea
-          id="interview-answer"
-          name="answer"
-          placeholder={
-            voice.listening ? "Speak your answer…" : "Type your answer…"
-          }
-          value={draft}
-          disabled={inputBlocked}
-          readOnly={voice.listening}
-          onChange={(event) => setAnswer(event.target.value)}
-          onKeyDown={(event) => {
-            if (
-              event.key === "Enter" &&
-              !event.shiftKey &&
-              !event.nativeEvent.isComposing
-            ) {
-              event.preventDefault();
-              void send();
-            }
-          }}
-          aria-describedby="answer-note"
-          className={cn(
-            "max-h-36 min-h-24 resize-none",
-            voice.listening && "border-success/30 bg-muted/30",
-          )}
-        />
-        <div className="flex items-center justify-between gap-2">
-          <p
-            id="answer-note"
-            className="text-xs leading-5 text-muted-foreground"
-          >
-            {voice.speaking
-              ? "Interviewer speaking"
-              : "Shift+Enter for a new line"}
-          </p>
-          <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size={voice.listening ? "sm" : "icon-sm"}
-              disabled={!speechAvailable || inputBlocked || voice.speaking}
-              aria-label={voice.listening ? "Stop recording" : "Dictate answer"}
-              aria-pressed={voice.listening}
-              title={
-                speechAvailable
-                  ? voice.listening
-                    ? "Stop microphone"
-                    : "Dictate answer"
-                  : "Microphone recording is unavailable in this browser"
-              }
-              onClick={voice.toggleMicrophone}
-            >
-              {voice.listening ? (
-                <>
-                  <Square aria-hidden="true" data-icon="inline-start" />
-                  Stop
-                </>
-              ) : (
-                <Mic aria-hidden="true" />
-              )}
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={
-                inputBlocked ||
-                voice.listening ||
-                Boolean(error) ||
-                !answer.trim()
-              }
-            >
-              Send
-            </Button>
-          </div>
-        </div>
       </form>
     </section>
   );

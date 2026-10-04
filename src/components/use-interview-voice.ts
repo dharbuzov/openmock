@@ -12,11 +12,15 @@ import { SpeechStream, SpeechLatency } from "@/lib/voice/speech-stream";
 import type { InterviewMessage } from "@/lib/interview/types";
 import { useInterviewControls } from "./interview-controls-context";
 
+export type RecordingState =
+  "idle" | "recording" | "transcribing-for-edit" | "transcribing-for-send";
+
 export function useInterviewVoice({
   messages,
   busy,
   active,
   onDictation,
+  onRecordedAnswer,
   finishing = false,
 }: {
   messages: InterviewMessage[];
@@ -24,11 +28,17 @@ export function useInterviewVoice({
   finishing?: boolean;
   active: boolean;
   onDictation: (text: string) => void;
+  onRecordedAnswer?: (text: string) => void;
 }) {
   const { voiceEnabled, speechAvailable, playbackAvailable } =
     useInterviewControls();
-  const [listening, setListening] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
+  const [recordingState, setRecordingState] = useState<RecordingState>("idle");
+  const [microphoneStream, setMicrophoneStream] = useState<MediaStream | null>(
+    null,
+  );
+  const listening = recordingState === "recording";
+  const transcribing = recordingState.startsWith("transcribing-");
+  const recordingIntent = useRef<"edit" | "send">("edit");
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [speaking, setSpeaking] = useState(false);
   const [error, setError] = useState("");
@@ -48,13 +58,21 @@ export function useInterviewVoice({
   const playbackGeneration = useRef(0);
   const spoken = useRef(messages.at(-1)?.id);
   const playbackMessage = useRef<InterviewMessage | null>(null);
-  const deliver = (text: string) => {
-    if (active && !busy && text.trim()) onDictation(text.trim());
+  const deliver = (text: string, intent: "edit" | "send") => {
+    if (active && !busy && text.trim()) {
+      if (intent === "send") onRecordedAnswer?.(text.trim());
+      else onDictation(text.trim());
+    }
   };
+  const deliverLatest = useRef(deliver);
+  useEffect(() => {
+    deliverLatest.current = deliver;
+  }, [active, busy, onDictation, onRecordedAnswer]);
 
   function releaseMicrophone() {
     stream.current?.getTracks().forEach((track) => track.stop());
     stream.current = null;
+    setMicrophoneStream(null);
     if (recordingTimer.current) clearTimeout(recordingTimer.current);
     recordingTimer.current = null;
   }
@@ -70,8 +88,15 @@ export function useInterviewVoice({
       if (recorder.state !== "inactive") recorder.stop();
     }
     releaseMicrophone();
-    setListening(false);
-    setTranscribing(false);
+    setRecordingState("idle");
+  }
+  function stopRecording(intent: "edit" | "send" = "edit") {
+    if (recording.current?.state !== "recording") return;
+    recordingIntent.current = intent;
+    setRecordingState(
+      intent === "send" ? "transcribing-for-send" : "transcribing-for-edit",
+    );
+    recording.current.stop();
   }
   function stopPlayback() {
     playbackGeneration.current++;
@@ -209,14 +234,7 @@ export function useInterviewVoice({
   }, [listening]);
 
   async function startMicrophone() {
-    if (
-      busy ||
-      !active ||
-      !speechAvailable ||
-      speaking ||
-      recordingRequest.current
-    )
-      return;
+    if (busy || !active || !speechAvailable || recordingRequest.current) return;
     const request = new AbortController();
     stopPlayback();
     recordingRequest.current = request;
@@ -230,6 +248,8 @@ export function useInterviewVoice({
         return;
       }
       stream.current = media;
+      setMicrophoneStream(media);
+      recordingIntent.current = "edit";
       const mimeType = [
         "audio/webm;codecs=opus",
         "audio/mp4",
@@ -258,16 +278,20 @@ export function useInterviewVoice({
       recorder.onstop = async () => {
         recording.current = null;
         releaseMicrophone();
-        setListening(false);
-        setTranscribing(true);
+        const intent = recordingIntent.current;
+        setRecordingState(
+          intent === "send" ? "transcribing-for-send" : "transcribing-for-edit",
+        );
         try {
           const result = await new LocalWhisper(settings.baseUrl).transcribe(
             new Blob(chunks, { type: recorder.mimeType }),
             AbortSignal.any([request.signal, AbortSignal.timeout(180_000)]),
           );
           if (request.signal.aborted) return;
-          if (!result.text) throw new Error("No speech detected.");
-          deliver(result.text);
+          if (!result.text.trim()) throw new Error("No speech detected.");
+          recordingRequest.current = null;
+          setRecordingState("idle");
+          deliverLatest.current(result.text, intent);
         } catch {
           if (!request.signal.aborted) {
             setFailedOperation("microphone");
@@ -278,15 +302,15 @@ export function useInterviewVoice({
         } finally {
           if (!request.signal.aborted) {
             recordingRequest.current = null;
-            setTranscribing(false);
+            setRecordingState("idle");
           }
         }
       };
       recorder.start(1000);
       setRecordingSeconds(0);
-      setListening(true);
+      setRecordingState("recording");
       recordingTimer.current = setTimeout(() => {
-        if (recorder.state === "recording") recorder.stop();
+        stopRecording("edit");
       }, 120_000);
     } catch {
       if (request.signal.aborted) return;
@@ -298,6 +322,14 @@ export function useInterviewVoice({
     }
   }
   return {
+    recordingState,
+    isRecordingPending: () => recordingRequest.current !== null,
+    microphoneStream,
+    stopRecording,
+    cancelRecording,
+    startRecording: () => void startMicrophone(),
+    stopAndReview: () => stopRecording("edit"),
+    stopAndSend: () => stopRecording("send"),
     listening,
     transcribing,
     partialTranscript: "",
@@ -314,7 +346,7 @@ export function useInterviewVoice({
       else void startMicrophone();
     },
     toggleMicrophone: () => {
-      if (recording.current?.state === "recording") recording.current.stop();
+      if (recording.current?.state === "recording") stopRecording("edit");
       else void startMicrophone();
     },
   };

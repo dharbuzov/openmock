@@ -40,6 +40,15 @@ export function hookHarness() {
     effects = [];
   let index = 0;
   const react = {
+    useEffectEvent(callback) {
+      const slot = index++;
+      slots[slot] ??= {
+        callback,
+        fn: (...args) => slots[slot].callback(...args),
+      };
+      slots[slot].callback = callback;
+      return slots[slot].fn;
+    },
     useState(initial) {
       const slot = index++;
       if (!(slot in slots))
@@ -79,6 +88,9 @@ export function hookHarness() {
   };
   return {
     react,
+    dispose() {
+      slots.forEach((slot) => slot?.cleanup?.());
+    },
     render(component, props) {
       index = 0;
       const result = component(props);

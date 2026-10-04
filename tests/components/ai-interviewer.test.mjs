@@ -39,8 +39,17 @@ function conversation() {
   let voiceProps;
   let stoppedPlayback = 0;
   const speechChunks = [];
+  const shortcutLogs = [];
   let speechFinished = 0;
   const voice = {
+    recordingState: "idle",
+    microphoneStream: null,
+    stopRecording: () => {},
+    startRecording: () => {},
+    isRecordingPending: () => false,
+    stopAndReview: () => {},
+    stopAndSend: () => {},
+    cancelRecording: () => {},
     listening: false,
     transcribing: false,
     speaking: false,
@@ -61,6 +70,11 @@ function conversation() {
   };
   const overrides = {
     react: hooks.react,
+    "@/lib/logging/logger": {
+      logger: { debug: (metadata) => shortcutLogs.push(metadata) },
+    },
+    "./recording-controls": { RecordingControls: "recording-controls" },
+    "@/components/ui/spinner": { Spinner: "spinner" },
     "./current-stage-badge": { CurrentStageBadge: "stage" },
     "./use-interview-voice": {
       useInterviewVoice: (props) => {
@@ -157,6 +171,8 @@ function conversation() {
     voiceProps: () => voiceProps,
     stoppedPlayback: () => stoppedPlayback,
     speechChunks,
+    shortcutLogs,
+    dispose: hooks.dispose,
     speechFinished: () => speechFinished,
   };
 }
@@ -282,23 +298,28 @@ test("nonstreaming responses still replace Thinking in the same slot", async () 
 
 test("composer shows recording time and transcription locks; dictated text uses typed Send", async () => {
   const h = conversation();
+  h.voice.recordingState = "recording";
   h.voice.listening = true;
   h.voice.partialTranscript = "I would clarify";
   h.voice.recordingSeconds = 8;
   let tree = h.render();
   assert.equal(tree.props["data-conversation-state"], "user-listening");
-  assert.equal(textarea(tree).props.value, "I would clarify");
-  assert.equal(textarea(tree).props.readOnly, true);
-  assert.ok(
-    findElement(tree, (node) => node.props["aria-label"] === "Stop recording"),
+  assert.equal(textarea(tree), null);
+  assert.equal(
+    findElement(tree, (node) => node.type === "recording-controls").props
+      .seconds,
+    8,
   );
-  assert.equal(sendButton(tree).props.disabled, true);
+  assert.equal(sendButton(tree), null);
   h.voice.listening = false;
+  h.voice.recordingState = "transcribing-for-edit";
   h.voice.transcribing = true;
   tree = h.render();
   assert.equal(tree.props["data-conversation-state"], "transcribing");
-  assert.equal(textarea(tree).props.disabled, true);
-  assert.equal(sendButton(tree).props.disabled, true);
+  assert.equal(textarea(tree), null);
+  assert.equal(sendButton(tree), null);
+  assert.ok(findElement(tree, (node) => node.type === "spinner"));
+  h.voice.recordingState = "idle";
   h.voice.transcribing = false;
   h.voice.partialTranscript = "";
   h.voice.speaking = true;
@@ -307,7 +328,7 @@ test("composer shows recording time and transcription locks; dictated text uses 
   assert.equal(
     findElement(tree, (node) => node.props["aria-label"] === "Dictate answer")
       .props.disabled,
-    true,
+    false,
   );
   assert.equal(textarea(tree).props.disabled, false);
   h.voice.speaking = false;
@@ -329,4 +350,183 @@ test("composer shows recording time and transcription locks; dictated text uses 
   assert.equal(h.state().interview.messages[0].content, "Final utterance");
   h.requests[0].resolve();
   await flush();
+});
+
+test("recorded Send uses the existing candidate path without putting transcript in the textarea", async () => {
+  const h = conversation();
+  textarea(h.render()).props.onChange({ target: { value: "Typed context" } });
+  h.voice.recordingState = "transcribing-for-send";
+  h.voice.transcribing = true;
+  h.render();
+  h.voiceProps().onRecordedAnswer("Recorded answer");
+  h.voice.recordingState = "idle";
+  h.voice.transcribing = false;
+  const tree = h.render();
+  assert.equal(h.state().interview.messages.length, 1);
+  assert.equal(
+    h.state().interview.messages[0].content,
+    "Typed context Recorded answer",
+  );
+  assert.equal(textarea(tree).props.value, "");
+  assert.equal(textarea(tree).props.disabled, true);
+  await flush();
+  assert.equal(h.requests.length, 1);
+  h.requests[0].resolve();
+  await flush();
+  assert.equal(h.state().interview.messages.length, 2);
+});
+
+test("recording and transcription failure preserve the original typed draft", () => {
+  const h = conversation();
+  textarea(h.render()).props.onChange({ target: { value: "Keep my draft" } });
+  h.voice.listening = true;
+  h.voice.recordingState = "recording";
+  assert.equal(textarea(h.render()), null);
+  h.voice.listening = false;
+  h.voice.recordingState = "idle";
+  h.voice.error = "Could not transcribe";
+  assert.equal(textarea(h.render()).props.value, "Keep my draft");
+  assert.equal(h.state().interview.messages.length, 0);
+});
+
+test("recording Enter captures before focused Cancel and uses the Send action", () => {
+  const h = conversation();
+  let sent = 0,
+    cancelled = 0;
+  h.voice.stopAndSend = () => sent++;
+  h.voice.cancelRecording = () => cancelled++;
+  h.voice.listening = true;
+  h.voice.recordingState = "recording";
+  const form = findElement(h.render(), (node) => node.type === "form");
+  let prevented = 0,
+    stopped = 0;
+  const event = {
+    key: "Enter",
+    nativeEvent: { isComposing: false },
+    preventDefault() {
+      prevented++;
+    },
+    stopPropagation() {
+      stopped++;
+    },
+  };
+  form.props.onKeyDownCapture(event);
+  assert.equal(sent, 1);
+  assert.equal(cancelled, 0);
+  assert.equal(prevented, 1);
+  assert.equal(stopped, 1);
+  form.props.onKeyDownCapture({ ...event, repeat: true });
+  assert.equal(sent, 1);
+  form.props.onKeyDownCapture({ ...event, key: "Escape" });
+  assert.equal(cancelled, 1);
+  h.voice.listening = false;
+  h.voice.transcribing = true;
+  const pending = findElement(h.render(), (node) => node.type === "form");
+  pending.props.onKeyDownCapture(event);
+  pending.props.onSubmit({ preventDefault() {} });
+  assert.equal(sent, 1);
+  assert.equal(h.state().interview.messages.length, 0);
+});
+
+test("one room shortcut listener survives renders, matches physical M, and logs ignored reasons", () => {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const originalDocument = Object.getOwnPropertyDescriptor(
+    globalThis,
+    "document",
+  );
+  const listeners = new Set();
+  let room = true;
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      addEventListener(name, callback, capture) {
+        assert.equal(name, "keydown");
+        assert.equal(capture, true);
+        listeners.add(callback);
+      },
+      removeEventListener(name, callback, capture) {
+        assert.equal(capture, true);
+        listeners.delete(callback);
+      },
+    },
+  });
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: { querySelector: () => (room ? {} : null) },
+  });
+  const h = conversation();
+  let starts = 0,
+    reviews = 0,
+    prevented = 0,
+    stopped = 0;
+  h.voice.startRecording = () => starts++;
+  h.voice.stopAndReview = () => reviews++;
+  const key = (overrides = {}) => {
+    const event = {
+      key: "ь",
+      code: "KeyM",
+      ctrlKey: true,
+      preventDefault() {
+        prevented++;
+      },
+      stopImmediatePropagation() {
+        stopped++;
+      },
+      ...overrides,
+    };
+    for (const listener of listeners) listener(event);
+  };
+  try {
+    h.render();
+    assert.equal(listeners.size, 1);
+    key();
+    assert.equal(starts, 1);
+    h.voice.recordingState = "recording";
+    h.voice.listening = true;
+    h.render();
+    h.render();
+    assert.equal(listeners.size, 1);
+    key({ ctrlKey: false, metaKey: true });
+    assert.equal(reviews, 1);
+    h.voice.listening = false;
+    h.voice.transcribing = true;
+    h.voice.recordingState = "transcribing-for-edit";
+    h.render();
+    key();
+    key();
+    assert.equal(reviews, 1);
+    assert.equal(starts, 1);
+    assert.equal(h.shortcutLogs.at(-1).ignoredReason, "transcribing");
+    h.voice.transcribing = false;
+    h.voice.recordingState = "idle";
+    h.voice.isRecordingPending = () => true;
+    h.render();
+    key();
+    assert.equal(
+      h.shortcutLogs.at(-1).ignoredReason,
+      "microphone-request-pending",
+    );
+    h.voice.isRecordingPending = () => false;
+    h.voice.speaking = true;
+    h.render();
+    key();
+    assert.equal(
+      starts,
+      2,
+      "playback does not silently block microphone input",
+    );
+    room = false;
+    key();
+    assert.equal(starts, 2);
+    assert.equal(prevented, stopped);
+  } finally {
+    h.dispose();
+    assert.equal(listeners.size, 0);
+    if (originalWindow)
+      Object.defineProperty(globalThis, "window", originalWindow);
+    else delete globalThis.window;
+    if (originalDocument)
+      Object.defineProperty(globalThis, "document", originalDocument);
+    else delete globalThis.document;
+  }
 });

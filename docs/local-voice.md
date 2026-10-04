@@ -101,6 +101,18 @@ For the full flow:
 2. Click the microphone, allow permission, speak, and click Stop.
 3. Wait for Transcribing; review/edit the resulting candidate draft.
 4. Click Send. This is exactly the typed-answer submission path.
+   Alternatively, use the recording bar's Send arrow to transcribe and submit
+   directly. Cancel (X or Escape) discards audio and preserves your typed draft
+   without calling Whisper. The monochrome waveform reflects microphone volume.
+   Keyboard: Ctrl+M (⌘M on macOS) starts recording, or stops it for review.
+   Enter during recording transcribes and sends; Escape cancels. Repeated Enter
+   or microphone shortcuts during transcription are ignored. In the normal
+   composer, Enter sends and Shift+Enter inserts a new line.
+   The microphone shortcut works across the room, including the diagram workspace,
+   and matches the physical M key on non-Latin layouts. Starting recording stops
+   any interviewer audio. Development logs named `Microphone shortcut detected`
+   include the key/code, recording state, selected action, and ignored reason;
+   these diagnostics are disabled in production.
 5. Confirm audio begins during the streamed response, and the complete final
    interviewer text remains visible unchanged.
 6. Disable interviewer voice, then send another answer. No TTS request should appear.
