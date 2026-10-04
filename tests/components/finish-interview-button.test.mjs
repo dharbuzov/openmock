@@ -66,7 +66,6 @@ function harness({ storageFails = false } = {}) {
         completeInterview: (value) => ({ ...value, status: "completed" }),
       },
       "@/lib/interview/session-storage": {
-        readInterviewSession: () => ({ interactionMode: "live" }),
         saveInterviewSession(value) {
           if (storageFails) throw new Error("Storage denied");
           saved = value;
@@ -108,7 +107,7 @@ test("Finish opens confirmation without completing; confirmation saves completio
   assert.equal(h.saved.interview.status, "completed");
   assert.equal(h.saved.evaluationWorkspace, h.workspace);
   assert.equal(h.saved.evaluationContext.problem.id, "problem-1");
-  assert.equal(h.saved.interactionMode, "live");
+  assert.equal(Object.hasOwn(h.saved, "interactionMode"), false);
   assert.equal(h.render().props.open, false);
 });
 

@@ -65,7 +65,7 @@ try {
   await page.evaluate((interview) => {
     sessionStorage.setItem(
       `openmock:interview:${interview.id}`,
-      JSON.stringify({ interview, interactionMode: "chat" }),
+      JSON.stringify({ interview }),
     );
     localStorage.setItem(
       "openmock:ai-preferences",
@@ -78,6 +78,23 @@ try {
   }, interview);
   await page.goto(
     `http://localhost:3000/interview/conflict-with-teammate?session=${interview.id}`,
+  );
+  const header = page.locator("[data-interview-room] > header");
+  assert.ok(!/Interaction|\bChat\b|\bLive\b/.test(await header.innerText()));
+  const headerBounds = await header.boundingBox();
+  const timerBounds = await header
+    .getByRole("button", { name: "Resume interview timer" })
+    .locator("..")
+    .locator("..")
+    .boundingBox();
+  assert.ok(
+    Math.abs(
+      headerBounds.x +
+        headerBounds.width / 2 -
+        timerBounds.x -
+        timerBounds.width / 2,
+    ) < 2,
+    "timer group remains centered",
   );
   const input = page.getByRole("textbox", { name: "Your answer" });
   await input.fill("Typed context");
@@ -166,7 +183,7 @@ try {
     (interview) =>
       sessionStorage.setItem(
         `openmock:interview:${interview.id}`,
-        JSON.stringify({ interview, interactionMode: "chat" }),
+        JSON.stringify({ interview }),
       ),
     diagramInterview,
   );

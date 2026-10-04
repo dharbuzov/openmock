@@ -86,14 +86,8 @@ export function AIInterviewer() {
     providerIssueSnapshot,
     serverProviderIssueSnapshot,
   );
-  const {
-    mode,
-    setMode,
-    voiceEnabled,
-    setVoiceEnabled,
-    speechAvailable,
-    playbackAvailable,
-  } = useInterviewControls();
+  const { voiceEnabled, setVoiceEnabled, speechAvailable, playbackAvailable } =
+    useInterviewControls();
   const voice = useInterviewVoice({
     messages,
     busy: operation !== null,
@@ -249,7 +243,6 @@ export function AIInterviewer() {
     const settings = readSettings();
     if (aiSettingsIssue(settings)) {
       if (fromRecording) setAnswer(candidateAnswer);
-      if (mode === "live") setMode("chat");
       openSettings();
       return;
     }

@@ -45,7 +45,6 @@ function SessionRoom({
       interview={session.interview}
       problem={problem}
       definition={definition}
-      initialMode={session.interactionMode}
     />
   );
 }

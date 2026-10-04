@@ -97,7 +97,7 @@ not whether lazy models have already been loaded.
 
 For the full flow:
 
-1. Configure an AI provider and start an interview in Chat.
+1. Configure an AI provider and start an interview.
 2. Click the microphone, allow permission, speak, and click Stop.
 3. Wait for Transcribing; review/edit the resulting candidate draft.
 4. Click Send. This is exactly the typed-answer submission path.
@@ -165,7 +165,7 @@ publish the unauthenticated service to the internet.
 - Voice failure: use an available American English voice such as `af_heart` or
   `am_adam`. Arbitrary voice paths, other languages, and mixtures are rejected.
 
-Live conversation, VAD, automatic end-of-turn detection, streaming audio bytes, barge-in,
+Realtime conversation, VAD, automatic end-of-turn detection, streaming audio bytes, barge-in,
 WebRTC, and cloud speech providers are deferred. The next step is a real CPU
 smoke test and resource baseline across representative laptops before extending
 conversation behavior.

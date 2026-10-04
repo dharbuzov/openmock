@@ -228,7 +228,6 @@ test("Send retries reuse the captured workspace and Finish saves completion with
     "@/components/ui/spinner": { Spinner: "spinner" },
     "./interview-controls-context": {
       useInterviewControls: () => ({
-        mode: "chat",
         voiceEnabled: false,
         setVoiceEnabled: () => {},
         speechAvailable: false,

@@ -12,10 +12,7 @@ import { InterviewTimer } from "@/lib/interview/timer";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { readSettings } from "@/lib/settings/storage";
 
-import type { InteractionMode } from "./interaction-mode-control";
 type Controls = {
-  mode: InteractionMode;
-  setMode: (mode: InteractionMode) => void;
   voiceEnabled: boolean;
   setVoiceEnabled: (enabled: boolean) => void;
   speechAvailable: boolean;
@@ -29,16 +26,11 @@ const subscribeCapabilities = () => () => {};
 const noCapability = () => false;
 export function InterviewControlsProvider({
   children,
-  initialMode = "chat",
 }: {
   children: ReactNode;
-  initialMode?: InteractionMode;
 }) {
   const [timer] = useState(() => new InterviewTimer());
   const [paused, setPaused] = useState(true);
-  const [mode, setMode] = useState<InteractionMode>(
-    initialMode === "live" ? "chat" : initialMode,
-  );
   const [voiceEnabled, setVoiceEnabled] = useState(
     () => readSettings().interviewerVoiceEnabled,
   );
@@ -56,8 +48,6 @@ export function InterviewControlsProvider({
   );
   const value = useMemo(
     () => ({
-      mode,
-      setMode,
       voiceEnabled,
       setVoiceEnabled,
       speechAvailable,
@@ -70,7 +60,7 @@ export function InterviewControlsProvider({
         setPaused(!paused);
       },
     }),
-    [mode, voiceEnabled, speechAvailable, playbackAvailable, paused, timer],
+    [voiceEnabled, speechAvailable, playbackAvailable, paused, timer],
   );
   return (
     <TooltipProvider>

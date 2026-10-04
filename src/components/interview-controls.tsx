@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { Clock, Pause, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { InteractionModeControl } from "./interaction-mode-control";
-import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
@@ -16,8 +14,7 @@ import { useInterviewControls } from "./interview-controls-context";
 import { useInterviewSession } from "./interview-session-context";
 
 export function InterviewControls() {
-  const { mode, setMode, speechAvailable, paused, toggleTimer, elapsed } =
-    useInterviewControls();
+  const { paused, toggleTimer, elapsed } = useInterviewControls();
   const { definition } = useInterviewSession();
   const duration = definition.duration.defaultMinutes * 60_000;
   const [remaining, setRemaining] = useState(duration);
@@ -35,15 +32,6 @@ export function InterviewControls() {
     : "Pause interview timer";
   return (
     <div className="flex shrink-0 items-center gap-1 sm:gap-3">
-      <span className="hidden text-xs text-muted-foreground xl:inline">
-        Interaction
-      </span>
-      <InteractionModeControl
-        mode={mode}
-        setMode={setMode}
-        speechAvailable={speechAvailable}
-      />
-      <Separator orientation="vertical" className="h-5" />
       <div className="flex items-center gap-1">
         <Clock
           aria-hidden="true"
@@ -68,11 +56,6 @@ export function InterviewControls() {
                 variant="ghost"
                 size="icon-sm"
                 aria-label={timerLabel}
-                className={cn(
-                  paused
-                    ? "text-green-700 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
-                    : "text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300",
-                )}
                 onClick={toggleTimer}
               />
             }

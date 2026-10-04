@@ -59,9 +59,6 @@ const primitives = {
     ToggleGroupItem: "toggle-item",
   },
   "./settings-dialog": { AISettingsForm: "settings-form" },
-  "./interaction-mode-control": {
-    InteractionModeControl: "interaction-control",
-  },
 };
 function setupHarness(selectedDefinition = definition) {
   const hooks = hookHarness(),
@@ -72,7 +69,6 @@ function setupHarness(selectedDefinition = definition) {
     react: hooks.react,
     "./settings-provider": { useOpenSettings: () => () => settingsOpened++ },
     "next/navigation": { useRouter: () => ({ push: (url) => urls.push(url) }) },
-    "@/lib/voice/browser": { recognitionConstructor: () => class {} },
   };
   const { InterviewSetup } = loadComponent(
     "src/components/interview-setup.tsx",
@@ -198,19 +194,14 @@ test("Start validates saved settings, creates selected level and initial mode on
       tree,
       (node) => node.type === "toggle-group",
     ).props.onValueChange(["staff"]);
-    findElement(
-      tree,
-      (node) => node.type === "interaction-control",
-    ).props.setMode("live");
     tree = harness.render();
     assert.deepEqual(
       findElement(tree, (node) => node.type === "toggle-group").props.value,
       ["staff"],
     );
     assert.equal(
-      findElement(tree, (node) => node.type === "interaction-control").props
-        .mode,
-      "live",
+      findElement(tree, (node) => node.type === "interaction-control"),
+      null,
     );
     assert.equal(button(tree).props.disabled, false);
     button(tree).props.onClick();
@@ -220,7 +211,7 @@ test("Start validates saved settings, creates selected level and initial mode on
     assert.equal(url.pathname, "/interview/url-shortener");
     const saved = readInterviewSession(url.searchParams.get("session"));
     assert.equal(saved.interview.targetLevel, "staff");
-    assert.equal(saved.interactionMode, "live");
+    assert.equal(Object.hasOwn(saved, "interactionMode"), false);
     assert.equal(saved.interview.status, "in-progress");
     assert.equal(saved.interview.stage.current, definition.stages[0].id);
     assert.equal(saved.interview.elapsedMs, undefined);
@@ -319,20 +310,22 @@ test("AI readiness follows cloud keys and Ollama local configuration", () => {
   );
 });
 
-test("Room loads the created session and carries the initial interaction mode", () =>
+test("Room loads the created session without an interaction mode", () =>
   browser(() => {
     const harness = setupHarness();
     let tree = harness.render();
-    findElement(
-      tree,
-      (node) => node.type === "interaction-control",
-    ).props.setMode("live");
     tree = harness.render();
     button(tree).props.onClick();
     const sessionId = new URL(
       harness.urls[0],
       "http://localhost",
     ).searchParams.get("session");
+    // Sessions created before this cleanup may still contain obsolete fields.
+    const session = readInterviewSession(sessionId);
+    window.sessionStorage.setItem(
+      `openmock:interview:${sessionId}`,
+      JSON.stringify({ ...session, interactionMode: "legacy-choice" }),
+    );
     const hooks = hookHarness();
     const redirects = [];
     const { ConfiguredInterviewRoom } = loadComponent(
@@ -352,11 +345,11 @@ test("Room loads the created session and carries the initial interaction mode", 
     });
     const room = hooks.render(wrapper.type, wrapper.props);
     assert.equal(room.type, "room");
-    assert.equal(room.props.initialMode, "live");
+    assert.equal(Object.hasOwn(room.props, "initialMode"), false);
     assert.deepEqual(redirects, []);
   }));
 
-test("Room timer remains paused and saved Live mode falls back to Chat", () =>
+test("Room timer starts paused without interaction mode state", () =>
   browser(() => {
     const hooks = hookHarness();
     const { InterviewControlsProvider } = loadComponent(
@@ -367,16 +360,15 @@ test("Room timer remains paused and saved Live mode falls back to Chat", () =>
       },
     );
     let tree = hooks.render(InterviewControlsProvider, {
-      initialMode: "live",
       children: null,
     });
     let controls = tree.props.children.props.value;
-    assert.equal(controls.mode, "chat");
+    assert.equal(Object.hasOwn(controls, "mode"), false);
+    assert.equal(Object.hasOwn(controls, "setMode"), false);
     assert.equal(controls.paused, true);
     assert.equal(controls.elapsed(), 0);
     controls.toggleTimer();
     tree = hooks.render(InterviewControlsProvider, {
-      initialMode: "live",
       children: null,
     });
     controls = tree.props.children.props.value;
@@ -499,7 +491,7 @@ test("Setup reads default level and interview mode from the definition", () =>
     assert.equal(stored.interview.mode, "mock");
   }));
 
-test("Setup selects definition interview mode independently from Chat or Live interaction", () =>
+test("Setup selects the definition interview mode without another interaction choice", () =>
   browser(() => {
     saveSettings({
       provider: "ollama",
@@ -519,16 +511,11 @@ test("Setup selects definition interview mode independently from Chat or Live in
       definition.modes,
     );
     modeGroup(tree).props.onValueChange(["mock"]);
-    findElement(
-      tree,
-      (node) => node.type === "interaction-control",
-    ).props.setMode("live");
     tree = harness.render();
     assert.deepEqual(modeGroup(tree).props.value, ["mock"]);
     assert.equal(
-      findElement(tree, (node) => node.type === "interaction-control").props
-        .mode,
-      "live",
+      findElement(tree, (node) => node.type === "interaction-control"),
+      null,
     );
     modeGroup(tree).props.onValueChange([]);
     tree = harness.render();
@@ -536,7 +523,7 @@ test("Setup selects definition interview mode independently from Chat or Live in
     button(tree).props.onClick();
     const stored = readInterviewSession(harness.urls[0].split("session=")[1]);
     assert.equal(stored.interview.mode, "mock");
-    assert.equal(stored.interactionMode, "live");
+    assert.equal(Object.hasOwn(stored, "interactionMode"), false);
   }));
 
 test("Setup renders only definition-supported interview modes and ignores unsupported choices", () =>

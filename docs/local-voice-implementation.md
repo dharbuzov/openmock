@@ -30,12 +30,12 @@
 - `src/components/ai-interviewer.tsx`: transcription fills the editable draft;
   Send remains the single text execution path. Existing partial message snapshots
   feed speech during generation; final text and interview state are unchanged.
-- `src/components/interview-controls-context.tsx`, `interaction-mode-control.tsx`,
-  and `interview-setup.tsx`: recording/audio capability detection and unavailable
-  Live mode; older Live selections fall back to Chat.
+- `src/components/interview-controls-context.tsx`: recording/audio capability
+  detection and independent interviewer playback. Setup and room sessions have
+  one interaction model: type or record speech to compose a text answer.
 - `tests/all.test.mjs`, `tests/components/ai-interviewer.test.mjs`,
   `interview-controls.test.mjs`, and `interview-setup.test.mjs`: register new tests
-  and replace obsolete browser recognition/Live expectations.
+  and replace obsolete browser recognition expectations.
 - `next.config.ts`: standalone Docker output.
 - `.dependency-cruiser.cjs`: enforce engine independence from speech.
 - `.env.example`, `.gitignore`, and `README.md`: speech configuration and setup.
@@ -48,7 +48,7 @@ adapter at the interview UI boundary. Audio goes directly from the browser to
 Speech; text goes through the existing configured LLM provider. No Next.js audio
 proxy or inference code is introduced. Browser recognition and synthesis APIs
 are removed. Sentence-level TTS pipelining uses complete small WAV responses;
-Live, VAD, partial STT, and streaming bytes within a WAV remain deferred.
+Realtime conversation, VAD, partial STT, and streaming bytes within a WAV remain deferred.
 
 Validation: `npm run check` passes (171 tests, TypeScript, ESLint, and dependency
 boundaries). There is one pre-existing unused-variable lint warning in
@@ -90,4 +90,4 @@ errors.
 
 Recommended next step: run real Whisper and full browser interview smoke checks,
 and record memory after STT, TTS, and alternating turns on representative laptops
-before adding Live behavior.
+before adding realtime conversation.

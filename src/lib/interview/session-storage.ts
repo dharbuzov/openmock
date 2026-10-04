@@ -9,7 +9,6 @@ import type { Problem } from "../problems/types";
 
 export type InterviewRoomSession = {
   interview: Interview;
-  interactionMode: "chat" | "live";
   evaluationWorkspace?: WorkspaceSnapshot;
   evaluationContext?: { problem: Problem; definition: InterviewDefinition };
 };
@@ -23,11 +22,7 @@ export function readInterviewSession(id: string): InterviewRoomSession | null {
     const session = sessionStorage.get<InterviewRoomSession>(
       `openmock:interview:${id}`,
     );
-    if (
-      session?.interview.id !== id ||
-      !["chat", "live"].includes(session.interactionMode)
-    )
-      return null;
+    if (session?.interview.id !== id) return null;
     return session;
   } catch {
     logger.warn(

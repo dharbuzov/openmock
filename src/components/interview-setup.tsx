@@ -13,10 +13,6 @@ import {
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useOpenSettings } from "./settings-provider";
-import {
-  InteractionModeControl,
-  type InteractionMode,
-} from "./interaction-mode-control";
 import { ProblemMetadataBadges } from "./problem-metadata-badges";
 import { problemDescription } from "./problem-panel";
 import { readSettings, subscribeSettings } from "@/lib/settings/storage";
@@ -34,8 +30,6 @@ import type {
 } from "@/lib/interview/types";
 import type { Problem } from "@/lib/problems/types";
 
-const subscribeCapabilities = () => () => {};
-const noCapability = () => false;
 function aiSummarySnapshot(): string {
   const settings = readSettings();
   return JSON.stringify([
@@ -58,8 +52,6 @@ function SetupForm({
   const [interviewMode, setInterviewMode] = useState<InterviewMode>(
     definition.defaultMode,
   );
-  const [interactionMode, setInteractionMode] =
-    useState<InteractionMode>("chat");
   const openSettings = useOpenSettings();
   const snapshot = useSyncExternalStore(
     subscribeSettings,
@@ -74,13 +66,6 @@ function SetupForm({
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
   const startingRef = useRef(false);
-  const speechAvailable = useSyncExternalStore(
-    subscribeCapabilities,
-    () =>
-      typeof MediaRecorder !== "undefined" &&
-      Boolean(navigator.mediaDevices?.getUserMedia),
-    noCapability,
-  );
   const summary =
     problemDescription(problem.content)
       .split(/\n\s*\n/)
@@ -102,7 +87,7 @@ function SetupForm({
         targetLevel: level,
         mode: interviewMode,
       });
-      saveInterviewSession({ interview, interactionMode });
+      saveInterviewSession({ interview });
       router.push(`/interview/${problem.id}?session=${interview.id}`);
     } catch {
       startingRef.current = false;
@@ -214,19 +199,6 @@ function SetupForm({
           </Field>
 
           <Field>
-            <FieldLabel>Interaction</FieldLabel>
-            <InteractionModeControl
-              mode={interactionMode}
-              setMode={setInteractionMode}
-              speechAvailable={speechAvailable}
-            />
-            <FieldDescription>
-              {interactionMode === "chat"
-                ? "Turn-based conversation using text or microphone."
-                : "Continuous voice interaction with the AI interviewer."}
-            </FieldDescription>
-          </Field>
-          <Field>
             <FieldLabel>AI Interviewer</FieldLabel>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p
@@ -275,14 +247,17 @@ function SetupForm({
   );
 }
 
+const subscribeHydration = () => () => {};
+const serverHydrated = () => false;
+
 export function InterviewSetup(props: {
   problem: Problem;
   definition: InterviewDefinition;
 }) {
   const hydrated = useSyncExternalStore(
-    subscribeCapabilities,
+    subscribeHydration,
     () => true,
-    noCapability,
+    serverHydrated,
   );
   if (!hydrated)
     return (

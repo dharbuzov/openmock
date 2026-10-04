@@ -19,10 +19,7 @@ import {
   useInterviewSession,
   useCaptureWorkspace,
 } from "@/components/interview-session-context";
-import {
-  readInterviewSession,
-  saveInterviewSession,
-} from "@/lib/interview/session-storage";
+import { saveInterviewSession } from "@/lib/interview/session-storage";
 import {
   buildInterviewContext,
   completeInterview,
@@ -50,10 +47,8 @@ export function FinishInterviewButton() {
       const workspace = captureWorkspace();
       buildInterviewContext(request.interview, problem, definition, workspace);
       const completed = completeInterview(request.interview);
-      const session = readInterviewSession(completed.id);
       saveInterviewSession({
         interview: completed,
-        interactionMode: session?.interactionMode ?? "chat",
         evaluationWorkspace: workspace,
         evaluationContext: { problem, definition },
       });

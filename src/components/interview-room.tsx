@@ -1,4 +1,3 @@
-import type { InteractionMode } from "./interaction-mode-control";
 import Link from "next/link";
 import { OpenMockLogo } from "@/components/openmock-logo";
 import { Badge } from "@/components/ui/badge";
@@ -20,12 +19,10 @@ export function InterviewRoom({
   interview,
   problem,
   definition,
-  initialMode = "chat",
 }: {
   interview: Interview;
   problem: Problem;
   definition: InterviewDefinition;
-  initialMode?: InteractionMode;
 }) {
   const level = definition.levels.find(
     ({ id }) => id === interview.targetLevel,
@@ -38,7 +35,7 @@ export function InterviewRoom({
         problem={problem}
         definition={definition}
       >
-        <InterviewControlsProvider initialMode={initialMode}>
+        <InterviewControlsProvider>
           <InterviewDiagramProvider>
             <main
               data-interview-room

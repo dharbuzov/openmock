@@ -84,8 +84,6 @@ function conversation() {
     },
     "./interview-controls-context": {
       useInterviewControls: () => ({
-        mode: "chat",
-        setMode: () => {},
         voiceEnabled: true,
         setVoiceEnabled: () => {},
         speechAvailable: true,
