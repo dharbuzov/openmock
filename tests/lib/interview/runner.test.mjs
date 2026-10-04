@@ -152,3 +152,78 @@ test("engine has no AI settings, integrations or operational logging", () => {
   );
   assert.ok(!/"(?:senior|practice|system-design|dsa|behavioral)"/.test(source));
 });
+
+test("opening uses definition, mode, problem and first stage without candidate evidence or stage advancement", async () => {
+  const original = provider.generateInterviewResponse;
+  let calls = 0;
+  provider.generateInterviewResponse = async (
+    _settings,
+    context,
+    _signal,
+    onMessage,
+  ) => {
+    calls++;
+    assert.equal(context.interview.messages.length, 0);
+    assert.equal(
+      context.interview.stage.current,
+      context.definition.stages[0].id,
+    );
+    assert.equal(context.problem.interview, context.definition.id);
+    const message = `${context.definition.name} ${context.interview.mode} opening`;
+    onMessage?.(message);
+    return {
+      message,
+      stageComplete: true,
+      observations: [
+        {
+          id: "invented",
+          competencyId: "invalid",
+          observation: "No candidate evidence",
+        },
+      ],
+    };
+  };
+  try {
+    for (const id of ["dsa", "system-design", "behavioral"]) {
+      const def = loadDefinition(id),
+        task = { id: "example", interview: id };
+      for (const mode of def.modes) {
+        const initial = engine.startInterview(task, { definition: def, mode });
+        const chunks = [];
+        const result = await runner.processCandidateMessage(
+          {},
+          initial,
+          task,
+          def,
+          undefined,
+          undefined,
+          (text) => chunks.push(text),
+          true,
+        );
+        assert.equal(result.messages.length, 1);
+        assert.equal(result.messages[0].role, "interviewer");
+        assert.equal(result.messages[0].content, `${def.name} ${mode} opening`);
+        assert.equal(result.stage.current, initial.stage.current);
+        assert.deepEqual(result.stage.completed, []);
+        assert.deepEqual(result.observations, []);
+        assert.deepEqual(chunks, [result.messages[0].content]);
+        assert.equal(
+          await runner.processCandidateMessage(
+            {},
+            result,
+            task,
+            def,
+            undefined,
+            undefined,
+            undefined,
+            true,
+          ),
+          result,
+        );
+      }
+    }
+    assert.equal(calls, 6);
+  } finally {
+    provider.generateInterviewResponse = original;
+  }
+});

@@ -43,7 +43,12 @@
 
 ## Architecture and validation
 
-The engine, runner, and AI provider implementation are unchanged. Speech is an
+The engine and AI provider implementation are unchanged. The runner also accepts
+an opening turn with no candidate message, using the same provider and streaming
+path. The interviewer prompt owns the definition-aware opening; it cannot advance
+the stage or create candidate observations. The opening is saved in the session.
+The header and composer share one recording state in the controls context.
+Speech is an
 adapter at the interview UI boundary. Audio goes directly from the browser to
 Speech; text goes through the existing configured LLM provider. No Next.js audio
 proxy or inference code is introduced. Browser recognition and synthesis APIs

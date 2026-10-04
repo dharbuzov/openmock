@@ -86,3 +86,59 @@ test("AI time context uses active interview time rather than paused wall time", 
   );
   assert.deepEqual(data.time, { elapsedMinutes: 2, remainingMinutes: 43 });
 });
+
+test("header input hint reads the shared recording state and returns to idle after transcription", () => {
+  const providerHooks = hookHarness();
+  const { InterviewControlsProvider } = loadComponent(
+    "src/components/interview-controls-context.tsx",
+    {
+      react: providerHooks.react,
+      "@/components/ui/tooltip": { TooltipProvider: "div" },
+    },
+  );
+  const controls = () =>
+    findElement(
+      providerHooks.render(InterviewControlsProvider, { children: null }),
+      (node) => typeof node.props?.value?.recordingState === "string",
+    ).props.value;
+  let value = controls();
+  const headerHooks = hookHarness();
+  const { InterviewControls } = loadComponent(
+    "src/components/interview-controls.tsx",
+    {
+      react: headerHooks.react,
+      "./interview-controls-context": { useInterviewControls: () => value },
+      "./interview-session-context": {
+        useInterviewSession: () => ({
+          definition: { duration: { defaultMinutes: 60 } },
+        }),
+      },
+      "@/components/ui/button": { Button: "button" },
+      "@/components/ui/spinner": { Spinner: "spinner" },
+      "@/components/ui/tooltip": {
+        Tooltip: "div",
+        TooltipTrigger: "div",
+        TooltipContent: "div",
+      },
+    },
+  );
+  const hint = () =>
+    findElement(
+      headerHooks.render(InterviewControls, {}),
+      (node) => node.props.role === "status",
+    );
+  assert.match(hint().props.children[1], /Type or press/);
+  value.setRecordingState("recording");
+  value = controls();
+  assert.equal(hint().props.children[1], "Listening…");
+  for (const state of ["transcribing-for-edit", "transcribing-for-send"]) {
+    value.setRecordingState(state);
+    value = controls();
+    assert.equal(hint().props.children[1], "Transcribing…");
+  }
+  value.setRecordingState("idle");
+  value = controls();
+  assert.match(hint().props.children[1], /Type or press/);
+  providerHooks.dispose();
+  headerHooks.dispose();
+});

@@ -48,13 +48,43 @@ try {
       return stream;
     };
   });
+  let llmCalls = 0;
   let whisperCalls = 0,
     pending;
   await page.route("**/stt/transcribe", (route) => {
     whisperCalls++;
     pending = route;
   });
-  await page.route("**/api/chat", (route) => route.abort());
+  await page.route("**/api/chat", (route) => {
+    llmCalls++;
+    return route.fulfill({
+      contentType: "application/x-ndjson",
+      body:
+        JSON.stringify({
+          model: "smoke-test",
+          created_at: new Date().toISOString(),
+          message: {
+            role: "assistant",
+            content: JSON.stringify({
+              message: "What would you clarify first?",
+              stageComplete: false,
+              observations: [],
+            }),
+          },
+          done: false,
+        }) +
+        "\n" +
+        JSON.stringify({
+          model: "smoke-test",
+          done: true,
+          done_reason: "stop",
+          message: { role: "assistant", content: "" },
+          eval_count: 20,
+          prompt_eval_count: 20,
+        }) +
+        "\n",
+    });
+  });
   await page.goto("http://localhost:3000");
   const response = await page.request.post(
     "http://localhost:3000/api/interview",
@@ -79,24 +109,30 @@ try {
   await page.goto(
     `http://localhost:3000/interview/conflict-with-teammate?session=${interview.id}`,
   );
+  await page
+    .getByText("What would you clarify first?", { exact: true })
+    .waitFor();
+  assert.equal(llmCalls, 1);
+  await page.reload();
+  await page
+    .getByText("What would you clarify first?", { exact: true })
+    .waitFor();
+  assert.equal(llmCalls, 1, "saved opening is not regenerated on room reload");
   const header = page.locator("[data-interview-room] > header");
   assert.ok(!/Interaction|\bChat\b|\bLive\b/.test(await header.innerText()));
-  const headerBounds = await header.boundingBox();
-  const timerBounds = await header
+  const centerBounds = await header
     .getByRole("button", { name: "Resume interview timer" })
     .locator("..")
     .locator("..")
     .boundingBox();
   assert.ok(
-    Math.abs(
-      headerBounds.x +
-        headerBounds.width / 2 -
-        timerBounds.x -
-        timerBounds.width / 2,
-    ) < 2,
+    Math.abs(centerBounds.x + centerBounds.width / 2 - 720) < 2,
     "timer group remains centered",
   );
   const input = page.getByRole("textbox", { name: "Your answer" });
+  assert.ok(
+    (await header.innerText()).includes("Type or press Ctrl+M to talk"),
+  );
   await input.fill("Typed context");
   const form = page.locator("form").filter({ has: input });
   const height = (await form.boundingBox()).height;
@@ -117,6 +153,7 @@ try {
   );
   await page.getByRole("button", { name: "Cancel recording" }).waitFor();
   assert.equal(await input.count(), 0);
+  assert.ok((await header.innerText()).includes("Listening…"));
   await page.waitForFunction(
     () =>
       window.microphoneChecks.samples > 5 && window.microphoneChecks.peak > 1,
@@ -145,6 +182,7 @@ try {
     document.body.textContent.includes("Transcribing…"),
   );
   assert.equal(await input.count(), 0);
+  assert.ok((await header.innerText()).includes("Transcribing…"));
   await page.keyboard.press("Enter");
   await page.keyboard.press("Control+m");
   for (let count = 0; !pending && count < 250; count++)
@@ -191,6 +229,9 @@ try {
     `http://localhost:3000/interview/url-shortener?session=${diagramInterview.id}`,
   );
   await page.locator(".excalidraw canvas.interactive").first().waitFor();
+  await page
+    .getByText("What would you clarify first?", { exact: true })
+    .waitFor();
   const focusTargets = [
     "textarea",
     "diagram",

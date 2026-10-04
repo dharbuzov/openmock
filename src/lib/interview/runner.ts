@@ -22,10 +22,13 @@ export async function processCandidateMessage(
   snapshot?: WorkspaceSnapshot,
   signal?: AbortSignal,
   onMessage?: (message: string) => void,
+  opening = false,
 ): Promise<Interview> {
   if (
     interview.status !== "in-progress" ||
-    interview.messages.at(-1)?.role !== "candidate"
+    (opening
+      ? interview.messages.length !== 0
+      : interview.messages.at(-1)?.role !== "candidate")
   )
     return interview;
   if (interview.stage.current === null)
@@ -43,7 +46,10 @@ export async function processCandidateMessage(
     interviewId: interview.id,
     stageId: interview.stage.current,
   };
-  logger.debug(metadata, "User turn received");
+  logger.debug(
+    metadata,
+    opening ? "Interview opening requested" : "User turn received",
+  );
   // The provider's Output.object Zod schema validates raw output before returning.
   const turn = await generateInterviewResponse(
     settings,
@@ -52,7 +58,11 @@ export async function processCandidateMessage(
     onMessage,
   );
   logger.debug(metadata, "AI response received");
-  const updated = applyInterviewTurn(interview, definition, turn);
+  const updated = applyInterviewTurn(
+    interview,
+    definition,
+    opening ? { ...turn, stageComplete: false, observations: [] } : turn,
+  );
   logger.debug(metadata, "Interview turn applied");
   if (updated.stage.current !== interview.stage.current)
     logger.debug(

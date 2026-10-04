@@ -97,7 +97,9 @@ not whether lazy models have already been loaded.
 
 For the full flow:
 
-1. Configure an AI provider and start an interview.
+1. Configure an AI provider and start an interview. The interviewer generates
+   the first question from the definition, current stage, problem, and selected
+   Practice/Mock mode. Wait for the opening turn before answering.
 2. Click the microphone, allow permission, speak, and click Stop.
 3. Wait for Transcribing; review/edit the resulting candidate draft.
 4. Click Send. This is exactly the typed-answer submission path.
@@ -108,6 +110,8 @@ For the full flow:
    Enter during recording transcribes and sends; Escape cancels. Repeated Enter
    or microphone shortcuts during transcription are ignored. In the normal
    composer, Enter sends and Shift+Enter inserts a new line.
+   The header uses the same recording state: shortcut hint when idle,
+   Listening while recording, and Transcribing while Whisper runs.
    The microphone shortcut works across the room, including the diagram workspace,
    and matches the physical M key on non-Latin layouts. Starting recording stops
    any interviewer audio. Development logs named `Microphone shortcut detected`

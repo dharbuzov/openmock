@@ -12,13 +12,6 @@ import {
 import { Mic, ArrowDown, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Empty,
-  EmptyHeader,
-  EmptyTitle,
-  EmptyDescription,
-  EmptyContent,
-} from "@/components/ui/empty";
-import {
   MessageScrollerProvider,
   MessageScroller,
   MessageScrollerViewport,
@@ -27,6 +20,7 @@ import {
   MessageScrollerButton,
   useMessageScroller,
 } from "@/components/ui/message-scroller";
+import { saveInterviewSession } from "@/lib/interview/session-storage";
 import { acceptCandidateMessage } from "@/lib/interview/engine";
 import { Spinner } from "@/components/ui/spinner";
 import { RecordingControls } from "./recording-controls";
@@ -76,7 +70,8 @@ export function AIInterviewer() {
   const answerInput = useRef<HTMLTextAreaElement>(null);
   const composer = useRef<HTMLFormElement>(null);
   const [composerHeight, setComposerHeight] = useState(136);
-  const pending = operation === "send";
+  const opening = operation === "opening";
+  const pending = opening || operation === "send";
   const [error, setError] = useState("");
   const [streamedResponse, setStreamedResponse] = useState("");
   const lastWorkspaceSnapshot = useRef<WorkspaceSnapshot | null>(null);
@@ -112,7 +107,7 @@ export function AIInterviewer() {
     previousRecordingState.current = voice.recordingState;
   }, [voice.recordingState]);
   const state = pending
-    ? messages.at(-1)?.role !== "candidate"
+    ? !opening && messages.at(-1)?.role !== "candidate"
       ? "submitting"
       : streamedResponse
         ? "interviewer-streaming"
@@ -129,6 +124,7 @@ export function AIInterviewer() {
               ? "user-typing"
               : "idle";
   const inputBlocked =
+    messages.length === 0 ||
     operation !== null ||
     voice.transcribing ||
     interview.status !== "in-progress" ||
@@ -212,11 +208,25 @@ export function AIInterviewer() {
     message,
     key:
       message.role === "interviewer"
-        ? `response-${messages[index - 1]?.id ?? message.id}`
+        ? index === 0
+          ? `response-opening-${interview.id}`
+          : `response-${messages[index - 1]?.id ?? message.id}`
         : message.id,
     pending: false,
   }));
-  if (pending && lastCandidate)
+  if (opening)
+    transcriptMessages.push({
+      message: {
+        id: "opening",
+        role: "interviewer",
+        content: streamedResponse,
+        stage: interview.stage.current ?? "",
+        createdAt: interview.startedAt,
+      },
+      key: `response-opening-${interview.id}`,
+      pending: true,
+    });
+  if (!opening && pending && lastCandidate)
     transcriptMessages.push({
       message: {
         ...lastCandidate,
@@ -230,14 +240,15 @@ export function AIInterviewer() {
     retry = false,
     candidateAnswer = answer,
     fromRecording = false,
+    openingTurn = false,
   ) {
     if (
       operation ||
       (!fromRecording && (voice.transcribing || voice.listening)) ||
-      (error && !retry) ||
+      (error && !retry && !openingTurn) ||
       interview.status !== "in-progress" ||
       interview.stage.current === null ||
-      (!retry && !candidateAnswer.trim())
+      (!openingTurn && !retry && !candidateAnswer.trim())
     )
       return;
     const settings = readSettings();
@@ -246,19 +257,20 @@ export function AIInterviewer() {
       openSettings();
       return;
     }
-    const request = beginOperation("send");
+    const request = beginOperation(openingTurn ? "opening" : "send");
     if (!request) return;
     setError("");
     setStreamedResponse("");
     const speech = voice.beginResponse(request.controller.signal);
     try {
       if (!isCurrentOperation(request)) return;
-      const next = retry
-        ? request.interview
-        : acceptCandidateMessage(request.interview, candidateAnswer);
-      commitOperation(request, next);
+      const next =
+        retry || openingTurn
+          ? request.interview
+          : acceptCandidateMessage(request.interview, candidateAnswer);
+      if (!openingTurn) commitOperation(request, next);
       if (fromRecording) setAnswer("");
-      if (!retry || !lastWorkspaceSnapshot.current)
+      if (openingTurn || !retry || !lastWorkspaceSnapshot.current)
         lastWorkspaceSnapshot.current = captureWorkspace();
       const workspaceSnapshot = lastWorkspaceSnapshot.current ?? undefined;
       const { processCandidateMessage } =
@@ -277,11 +289,14 @@ export function AIInterviewer() {
             speech.push(content);
           }
         },
+        openingTurn,
       );
+      if (openingTurn && isCurrentOperation(request))
+        saveInterviewSession({ interview: result });
       if (commitOperation(request, result)) {
         const response = result.messages.at(-1);
         if (response?.role === "interviewer") speech.finish(response);
-        setAnswer("");
+        if (!openingTurn) setAnswer("");
         setStreamedResponse("");
       }
     } catch {
@@ -294,6 +309,28 @@ export function AIInterviewer() {
       endOperation(request);
     }
   }
+
+  const startOpening = useEffectEvent(() => {
+    void send(false, "", false, true);
+  });
+  useEffect(() => {
+    if (
+      !messages.length &&
+      !operation &&
+      !providerIssue &&
+      !error &&
+      interview.status === "in-progress" &&
+      interview.stage.current !== null
+    )
+      startOpening();
+  }, [
+    messages.length,
+    operation,
+    providerIssue,
+    error,
+    interview.status,
+    interview.stage,
+  ]);
 
   return (
     <section
@@ -352,30 +389,6 @@ export function AIInterviewer() {
               aria-relevant="additions"
               role="log"
             >
-              {messages.length === 0 && (
-                <MessageScrollerItem messageId="intro">
-                  {providerIssue ? (
-                    <Empty className="items-start justify-start gap-3 rounded-none p-0 text-left">
-                      <EmptyHeader className="items-start gap-1">
-                        <EmptyTitle>AI provider not configured</EmptyTitle>
-                        <EmptyDescription>
-                          Connect a provider to start the interview.
-                        </EmptyDescription>
-                      </EmptyHeader>
-                      <EmptyContent className="items-start">
-                        <Button size="sm" onClick={openSettings}>
-                          Configure provider
-                        </Button>
-                      </EmptyContent>
-                    </Empty>
-                  ) : (
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      Begin by walking me through your initial approach, or
-                      introduce yourself.
-                    </p>
-                  )}
-                </MessageScrollerItem>
-              )}
               {transcriptMessages.map(
                 ({ message, key, pending: isPending }) => (
                   <MessageScrollerItem
@@ -405,57 +418,6 @@ export function AIInterviewer() {
                   </MessageScrollerItem>
                 ),
               )}
-              {error && (
-                <MessageScrollerItem
-                  messageId="provider-error"
-                  className="flex flex-col gap-3"
-                >
-                  <p
-                    role="alert"
-                    className="text-xs leading-5 text-muted-foreground"
-                  >
-                    {error}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={
-                        operation !== null ||
-                        interview.status !== "in-progress" ||
-                        interview.stage.current === null
-                      }
-                      onClick={() => send(true)}
-                    >
-                      Retry
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={openSettings}>
-                      AI settings
-                    </Button>
-                  </div>
-                </MessageScrollerItem>
-              )}
-              {voice.error && (
-                <MessageScrollerItem
-                  messageId="voice-error"
-                  className="flex flex-col items-start gap-2"
-                >
-                  <p role="alert" className="text-xs text-muted-foreground">
-                    {voice.error}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={voice.retry}
-                    disabled={inputBlocked}
-                  >
-                    {voice.failedOperation === "playback"
-                      ? "Retry audio"
-                      : "Retry microphone"}
-                  </Button>
-                </MessageScrollerItem>
-              )}
             </MessageScrollerContent>
           </MessageScrollerViewport>
           <FollowSubmittedAnswer
@@ -474,6 +436,64 @@ export function AIInterviewer() {
           </MessageScrollerButton>
         </MessageScroller>
       </MessageScrollerProvider>
+      {providerIssue && (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-2 border-t px-4 py-3 text-xs text-muted-foreground"
+        >
+          <span>{providerIssue}</span>
+          <Button size="sm" onClick={openSettings}>
+            Configure provider
+          </Button>
+        </div>
+      )}
+      <div className="empty:hidden flex flex-col gap-3 px-4 pb-3">
+        {" "}
+        {error && (
+          <div className="flex flex-col gap-3">
+            <p role="alert" className="text-xs leading-5 text-muted-foreground">
+              {error}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={
+                  operation !== null ||
+                  interview.status !== "in-progress" ||
+                  interview.stage.current === null
+                }
+                onClick={() =>
+                  messages.length ? send(true) : send(false, "", false, true)
+                }
+              >
+                Retry
+              </Button>
+              <Button size="sm" variant="ghost" onClick={openSettings}>
+                AI settings
+              </Button>
+            </div>
+          </div>
+        )}
+        {voice.error && (
+          <div className="flex flex-col items-start gap-2">
+            <p role="alert" className="text-xs text-muted-foreground">
+              {voice.error}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={voice.retry}
+              disabled={inputBlocked}
+            >
+              {voice.failedOperation === "playback"
+                ? "Retry audio"
+                : "Retry microphone"}
+            </Button>
+          </div>
+        )}
+      </div>
       <form
         ref={composer}
         onKeyDownCapture={(event) => {

@@ -26,10 +26,20 @@ const scrollerParts = [
   "MessageScrollerButton",
 ];
 
-function conversation() {
+function conversation(fresh = false) {
   const hooks = hookHarness();
   let state = {
-    interview: startInterview(problem, { definition }),
+    interview: fresh
+      ? startInterview(problem, { definition })
+      : applyInterviewTurn(
+          startInterview(problem, { definition }),
+          definition,
+          {
+            message: "Opening question.",
+            stageComplete: false,
+            observations: [],
+          },
+        ),
     operation: null,
   };
   const operations = new SessionOperations(state.interview, (next) => {
@@ -170,7 +180,10 @@ function conversation() {
     stoppedPlayback: () => stoppedPlayback,
     speechChunks,
     shortcutLogs,
-    dispose: hooks.dispose,
+    dispose: () => {
+      hooks.dispose();
+      operations.cancel();
+    },
     speechFinished: () => speechFinished,
   };
 }
@@ -186,7 +199,8 @@ const responseSlot = (tree) =>
     tree,
     (node) =>
       node.type === "MessageScrollerItem" &&
-      node.props.messageId?.startsWith("response-"),
+      node.props.messageId?.startsWith("response-") &&
+      !node.props.messageId?.startsWith("response-opening-"),
   );
 function submit(harness, text) {
   textarea(harness.render()).props.onChange({ target: { value: text } });
@@ -203,7 +217,7 @@ test("typed answers reserve one stable Thinking/streaming/final slot and lock re
   const form = submit(h, "My approach");
   form.props.onSubmit({ preventDefault() {} });
   let tree = h.render();
-  assert.equal(h.state().interview.messages.length, 1);
+  assert.equal(h.state().interview.messages.length, 2);
   assert.equal(tree.props["data-conversation-state"], "interviewer-thinking");
   const key = responseSlot(tree).key;
   assert.equal(
@@ -232,7 +246,7 @@ test("typed answers reserve one stable Thinking/streaming/final slot and lock re
   assert.equal(responseSlot(tree).key, key);
   assert.equal(
     h.state().interview.messages.length,
-    1,
+    2,
     "partial response remains UI-only",
   );
   h.requests[0].resolve("What constraints matter?");
@@ -241,7 +255,7 @@ test("typed answers reserve one stable Thinking/streaming/final slot and lock re
   assert.equal(h.speechFinished(), 1);
   assert.equal(tree.props["data-conversation-state"], "idle");
   assert.equal(responseSlot(tree).key, key);
-  assert.equal(h.state().interview.messages.length, 2);
+  assert.equal(h.state().interview.messages.length, 3);
   assert.equal(textarea(tree).props.value, "");
   assert.equal(
     findElement(tree, (node) => node.type === "h2").props.children,
@@ -275,11 +289,11 @@ test("provider errors are system feedback and Retry preserves one candidate mess
   ).props.onClick();
   await flush();
   assert.equal(h.requests.length, 2);
-  assert.equal(h.state().interview.messages.length, 1);
+  assert.equal(h.state().interview.messages.length, 2);
   assert.equal(h.requests[1].snapshot, h.requests[0].snapshot);
   h.requests[1].resolve();
   await retry;
-  assert.equal(h.state().interview.messages.length, 2);
+  assert.equal(h.state().interview.messages.length, 3);
   assert.equal(h.render().props["data-conversation-state"], "idle");
 });
 
@@ -291,7 +305,7 @@ test("nonstreaming responses still replace Thinking in the same slot", async () 
   h.requests[0].resolve();
   await flush();
   assert.equal(responseSlot(h.render()).key, key);
-  assert.equal(h.state().interview.messages.length, 2);
+  assert.equal(h.state().interview.messages.length, 3);
 });
 
 test("composer shows recording time and transcription locks; dictated text uses typed Send", async () => {
@@ -334,7 +348,7 @@ test("composer shows recording time and transcription locks; dictated text uses 
   h.voiceProps().onDictation("Final utterance");
   assert.equal(
     h.state().interview.messages.length,
-    0,
+    1,
     "dictation only fills the draft",
   );
   const form = findElement(h.render(), (node) => node.type === "form");
@@ -342,10 +356,10 @@ test("composer shows recording time and transcription locks; dictated text uses 
   await flush();
   assert.equal(
     h.state().interview.messages.length,
-    1,
+    2,
     "dictated text uses the same submission path",
   );
-  assert.equal(h.state().interview.messages[0].content, "Final utterance");
+  assert.equal(h.state().interview.messages[1].content, "Final utterance");
   h.requests[0].resolve();
   await flush();
 });
@@ -360,9 +374,9 @@ test("recorded Send uses the existing candidate path without putting transcript 
   h.voice.recordingState = "idle";
   h.voice.transcribing = false;
   const tree = h.render();
-  assert.equal(h.state().interview.messages.length, 1);
+  assert.equal(h.state().interview.messages.length, 2);
   assert.equal(
-    h.state().interview.messages[0].content,
+    h.state().interview.messages[1].content,
     "Typed context Recorded answer",
   );
   assert.equal(textarea(tree).props.value, "");
@@ -371,7 +385,7 @@ test("recorded Send uses the existing candidate path without putting transcript 
   assert.equal(h.requests.length, 1);
   h.requests[0].resolve();
   await flush();
-  assert.equal(h.state().interview.messages.length, 2);
+  assert.equal(h.state().interview.messages.length, 3);
 });
 
 test("recording and transcription failure preserve the original typed draft", () => {
@@ -384,7 +398,7 @@ test("recording and transcription failure preserve the original typed draft", ()
   h.voice.recordingState = "idle";
   h.voice.error = "Could not transcribe";
   assert.equal(textarea(h.render()).props.value, "Keep my draft");
-  assert.equal(h.state().interview.messages.length, 0);
+  assert.equal(h.state().interview.messages.length, 1);
 });
 
 test("recording Enter captures before focused Cancel and uses the Send action", () => {
@@ -423,7 +437,7 @@ test("recording Enter captures before focused Cancel and uses the Send action", 
   pending.props.onKeyDownCapture(event);
   pending.props.onSubmit({ preventDefault() {} });
   assert.equal(sent, 1);
-  assert.equal(h.state().interview.messages.length, 0);
+  assert.equal(h.state().interview.messages.length, 1);
 });
 
 test("one room shortcut listener survives renders, matches physical M, and logs ignored reasons", () => {
@@ -527,4 +541,76 @@ test("one room shortcut listener survives renders, matches physical M, and logs 
       Object.defineProperty(globalThis, "document", originalDocument);
     else delete globalThis.document;
   }
+});
+
+test("fresh interview streams its opening into the first ordinary transcript slot without a candidate", async () => {
+  const h = conversation(true);
+  h.render();
+  const tree = h.render();
+  assert.equal(h.state().operation, "opening");
+  assert.equal(h.state().interview.messages.length, 0);
+  assert.equal(textarea(tree).props.disabled, true);
+  const slot = findElement(
+    tree,
+    (node) =>
+      node.type === "MessageScrollerItem" &&
+      node.props.messageId?.startsWith("response-opening-"),
+  );
+  assert.ok(slot);
+  h.render();
+  await flush();
+  assert.equal(h.requests.length, 1);
+  h.requests[0].onMessage("Tell me about");
+  assert.deepEqual(h.speechChunks, ["Tell me about"]);
+  h.requests[0].resolve("Tell me about a disagreement with a teammate.");
+  await flush();
+  const committed = h.render();
+  const finalSlot = findElement(
+    committed,
+    (node) => node.props.messageId === slot.props.messageId,
+  );
+  assert.equal(finalSlot.key, slot.key);
+  assert.equal(h.state().interview.messages.length, 1);
+  assert.equal(h.state().interview.messages[0].role, "interviewer");
+  assert.equal(h.state().interview.stage.current, definition.stages[0].id);
+  assert.equal(h.speechFinished(), 1);
+  assert.equal(textarea(committed).props.disabled, false);
+  h.render();
+  await flush();
+  assert.equal(h.requests.length, 1);
+});
+
+test("failed opening retries without inventing a candidate or duplicate opening", async () => {
+  const h = conversation(true);
+  h.render();
+  await flush();
+  h.requests[0].reject(Error("offline"));
+  await flush();
+  let tree = h.render();
+  assert.equal(h.state().interview.messages.length, 0);
+  assert.equal(h.requests.length, 1);
+  findElement(
+    tree,
+    (node) => node.type === "button" && node.props.children === "Retry",
+  ).props.onClick();
+  await flush();
+  assert.equal(h.requests.length, 2);
+  h.requests[1].resolve();
+  await flush();
+  h.render();
+  assert.equal(h.state().interview.messages.length, 1);
+  assert.equal(h.state().interview.messages[0].role, "interviewer");
+});
+
+test("unmounting during opening discards late output", async () => {
+  const h = conversation(true);
+  h.render();
+  await flush();
+  assert.equal(h.requests.length, 1);
+  h.dispose();
+  assert.equal(h.requests[0].signal.aborted, true);
+  h.requests[0].resolve("Late opening");
+  await flush();
+  assert.equal(h.state().interview.messages.length, 0);
+  assert.equal(h.speechFinished(), 0);
 });

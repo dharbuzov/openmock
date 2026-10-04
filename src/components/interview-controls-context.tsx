@@ -12,7 +12,12 @@ import { InterviewTimer } from "@/lib/interview/timer";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { readSettings } from "@/lib/settings/storage";
 
+export type RecordingState =
+  "idle" | "recording" | "transcribing-for-edit" | "transcribing-for-send";
+
 type Controls = {
+  recordingState: RecordingState;
+  setRecordingState: (state: RecordingState) => void;
   voiceEnabled: boolean;
   setVoiceEnabled: (enabled: boolean) => void;
   speechAvailable: boolean;
@@ -29,6 +34,7 @@ export function InterviewControlsProvider({
 }: {
   children: ReactNode;
 }) {
+  const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [timer] = useState(() => new InterviewTimer());
   const [paused, setPaused] = useState(true);
   const [voiceEnabled, setVoiceEnabled] = useState(
@@ -48,6 +54,8 @@ export function InterviewControlsProvider({
   );
   const value = useMemo(
     () => ({
+      recordingState,
+      setRecordingState,
       voiceEnabled,
       setVoiceEnabled,
       speechAvailable,
@@ -60,7 +68,14 @@ export function InterviewControlsProvider({
         setPaused(!paused);
       },
     }),
-    [voiceEnabled, speechAvailable, playbackAvailable, paused, timer],
+    [
+      recordingState,
+      voiceEnabled,
+      speechAvailable,
+      playbackAvailable,
+      paused,
+      timer,
+    ],
   );
   return (
     <TooltipProvider>

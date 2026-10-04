@@ -12,9 +12,6 @@ import { SpeechStream, SpeechLatency } from "@/lib/voice/speech-stream";
 import type { InterviewMessage } from "@/lib/interview/types";
 import { useInterviewControls } from "./interview-controls-context";
 
-export type RecordingState =
-  "idle" | "recording" | "transcribing-for-edit" | "transcribing-for-send";
-
 export function useInterviewVoice({
   messages,
   busy,
@@ -30,9 +27,13 @@ export function useInterviewVoice({
   onDictation: (text: string) => void;
   onRecordedAnswer?: (text: string) => void;
 }) {
-  const { voiceEnabled, speechAvailable, playbackAvailable } =
-    useInterviewControls();
-  const [recordingState, setRecordingState] = useState<RecordingState>("idle");
+  const {
+    recordingState,
+    setRecordingState,
+    voiceEnabled,
+    speechAvailable,
+    playbackAvailable,
+  } = useInterviewControls();
   const [microphoneStream, setMicrophoneStream] = useState<MediaStream | null>(
     null,
   );

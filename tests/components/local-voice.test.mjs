@@ -159,9 +159,12 @@ async function withBrowser(run) {
       return { duration: 1 };
     }
     createBufferSource() {
-      const source = {
-        connect() {},
-        disconnect() {},
+
+      return {
+        connect() {
+        },
+        disconnect() {
+        },
         start(time) {
           this.time = time;
           played.push(this);
@@ -170,7 +173,6 @@ async function withBrowser(run) {
           this.paused = true;
         },
       };
-      return source;
     }
   }
   Object.defineProperty(globalThis, "navigator", {
@@ -202,11 +204,18 @@ async function withBrowser(run) {
   }
 }
 
-const controls = () => ({
-  voiceEnabled: true,
-  speechAvailable: true,
-  playbackAvailable: true,
-});
+const controls = () => {
+  const state = {
+    recordingState: "idle",
+    setRecordingState(value) {
+      state.recordingState = value;
+    },
+    voiceEnabled: true,
+    speechAvailable: true,
+    playbackAvailable: true,
+  };
+  return state;
+};
 
 test("ending interview discards late transcription and permission grants release tracks", async () =>
   withBrowser(async ({ tracks }) => {
