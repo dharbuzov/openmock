@@ -2,10 +2,13 @@
 
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
-  finalTranscript,
-  recognitionConstructor,
-  type BrowserRecognition,
-} from "@/lib/voice/browser";
+  LocalWhisper,
+  LocalKokoro,
+  SpeechServiceBusyError,
+} from "@/lib/voice/local-speech";
+import { readSpeechSettings } from "@/lib/settings/storage";
+import { AudioQueue } from "@/lib/voice/audio-queue";
+import { SpeechStream, SpeechLatency } from "@/lib/voice/speech-stream";
 import type { InterviewMessage } from "@/lib/interview/types";
 import { useInterviewControls } from "./interview-controls-context";
 
@@ -14,102 +17,187 @@ export function useInterviewVoice({
   busy,
   active,
   onDictation,
-  onLiveAnswer,
+  finishing = false,
 }: {
   messages: InterviewMessage[];
   busy: boolean;
+  finishing?: boolean;
   active: boolean;
   onDictation: (text: string) => void;
-  onLiveAnswer: (text: string) => void;
 }) {
-  const { mode, setMode, voiceEnabled, speechAvailable, playbackAvailable } =
+  const { voiceEnabled, speechAvailable, playbackAvailable } =
     useInterviewControls();
-  const [dictating, setDictating] = useState(false);
   const [listening, setListening] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
-  const [partialTranscript, setPartialTranscript] = useState("");
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [speaking, setSpeaking] = useState(false);
   const [error, setError] = useState("");
-  const [playbackRetry, setPlaybackRetry] = useState(0);
-  const playbackAttempt = useRef(0);
   const [failedOperation, setFailedOperation] = useState<
     "microphone" | "playback" | null
   >(null);
-  const recognition = useRef<BrowserRecognition | null>(null);
-  const stopRecording = useRef<(() => void) | null>(null);
+  const recording = useRef<MediaRecorder | null>(null);
+  const stream = useRef<MediaStream | null>(null);
+  const recordingRequest = useRef<AbortController | null>(null);
+  const recordingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playback = useRef<{ stream: SpeechStream; detach: () => void } | null>(
+    null,
+  );
+  const audioContext = useRef<AudioContext | null>(null);
+  const audioQueue = useRef<AudioQueue | null>(null);
+  const latency = useRef<SpeechLatency | null>(null);
+  const playbackGeneration = useRef(0);
   const spoken = useRef(messages.at(-1)?.id);
-  const utterance = useRef<SpeechSynthesisUtterance | null>(null);
   const playbackMessage = useRef<InterviewMessage | null>(null);
-  const transcript = useEffectEvent((text: string, live: boolean) => {
-    if (!active || busy) return;
-    if (live) onLiveAnswer(text);
-    else onDictation(text);
-  });
-  const stopPlayback = () => {
-    if (utterance.current) {
-      utterance.current.onend = null;
-      utterance.current.onstart = null;
-      utterance.current.onerror = null;
-      utterance.current = null;
-    }
-    if (playbackAvailable) window.speechSynthesis.cancel();
-    setSpeaking(false);
+  const deliver = (text: string) => {
+    if (active && !busy && text.trim()) onDictation(text.trim());
   };
-  const play = useEffectEvent((message: InterviewMessage) => {
-    if (!voiceEnabled || !playbackAvailable || !active || busy) return;
-    stopPlayback();
-    playbackMessage.current = message;
-    setError("");
-    setFailedOperation(null);
-    recognition.current?.abort();
-    const audio = new SpeechSynthesisUtterance(message.content);
-    utterance.current = audio;
-    audio.onend = () => {
-      setSpeaking(false);
-      utterance.current = null;
-    };
-    audio.onerror = (event) => {
-      setSpeaking(false);
-      utterance.current = null;
-      if (event.error === "canceled" || event.error === "interrupted") return;
-      setFailedOperation("playback");
-      setError("Couldn't play the interviewer response aloud.");
-    };
-    audio.onstart = () => setSpeaking(true);
-    try {
-      window.speechSynthesis.speak(audio);
-    } catch {
-      setSpeaking(false);
-      setFailedOperation("playback");
-      setError("Couldn't play the interviewer response aloud.");
+
+  function releaseMicrophone() {
+    stream.current?.getTracks().forEach((track) => track.stop());
+    stream.current = null;
+    if (recordingTimer.current) clearTimeout(recordingTimer.current);
+    recordingTimer.current = null;
+  }
+  function cancelRecording() {
+    recordingRequest.current?.abort();
+    recordingRequest.current = null;
+    const recorder = recording.current;
+    recording.current = null;
+    if (recorder) {
+      recorder.onstop = null;
+      recorder.ondataavailable = null;
+      recorder.onerror = null;
+      if (recorder.state !== "inactive") recorder.stop();
     }
-  });
-  useEffect(() => {
-    const last =
-      playbackAttempt.current !== playbackRetry
-        ? playbackMessage.current
-        : messages.at(-1);
+    releaseMicrophone();
+    setListening(false);
+    setTranscribing(false);
+  }
+  function stopPlayback() {
+    playbackGeneration.current++;
+    playback.current?.stream.cancel();
+    playback.current?.detach();
+    playback.current = null;
+    audioQueue.current?.cancel();
+    setSpeaking(false);
+  }
+
+  function beginResponse(signal?: AbortSignal) {
+    stopPlayback();
+    const generation = playbackGeneration.current;
+    latency.current = new SpeechLatency();
+    let current: SpeechStream | null = null;
     if (
+      voiceEnabled &&
+      playbackAvailable &&
+      active &&
+      !recordingRequest.current
+    ) {
+      setError("");
+      setFailedOperation(null);
+      try {
+        if (!audioContext.current) {
+          audioContext.current = new AudioContext();
+          audioQueue.current = new AudioQueue(
+            audioContext.current,
+            setSpeaking,
+            () => latency.current?.mark("First audio playback"),
+          );
+        }
+        // Resume inside Send/Retry's user gesture, before awaiting LLM or HTTP work.
+        const ready = audioContext.current.resume();
+        void ready.catch(() => {});
+        const queue = audioQueue.current!;
+        const settings = readSpeechSettings();
+        const timing = latency.current;
+        current = new SpeechStream(
+          new LocalKokoro(settings.baseUrl),
+          settings.voice,
+          async (audio, chunkSignal) => {
+            if (!chunkSignal.aborted) await queue.enqueue(audio, chunkSignal);
+          },
+          (cause) => {
+            if (generation !== playbackGeneration.current) return;
+            setFailedOperation("playback");
+            setError(
+              cause instanceof SpeechServiceBusyError
+                ? cause.message + " Text remains available."
+                : "Couldn't play part of the interviewer audio. Text remains available.",
+            );
+          },
+          (event) => timing.mark(event),
+        );
+        const cancel = () => {
+          if (generation === playbackGeneration.current) stopPlayback();
+        };
+        signal?.addEventListener("abort", cancel, { once: true });
+        playback.current = {
+          stream: current,
+          detach: () => signal?.removeEventListener("abort", cancel),
+        };
+        if (signal?.aborted) cancel();
+      } catch {
+        setFailedOperation("playback");
+        setError(
+          "Browser audio playback is unavailable. Text remains available.",
+        );
+      }
+    }
+    return {
+      push: (snapshot: string) => current?.push(snapshot),
+      finish: (message: InterviewMessage) => {
+        spoken.current = message.id;
+        playbackMessage.current = message;
+        current?.push(message.content, true);
+      },
+      cancel: () => {
+        if (generation === playbackGeneration.current) stopPlayback();
+      },
+    };
+  }
+
+  const play = (message: InterviewMessage) => {
+    if (busy || !active) return;
+    beginResponse().finish(message);
+  };
+  const playCommitted = useEffectEvent(play);
+  const cancelRecordingOnCleanup = useEffectEvent(cancelRecording);
+  useEffect(() => {
+    const last = messages.at(-1);
+    if (
+      busy ||
       !last ||
-      (last.id === spoken.current &&
-        playbackAttempt.current === playbackRetry) ||
+      last.id === spoken.current ||
       last.role !== "interviewer"
     )
       return;
-    // Wait for the send operation to settle before speaking its validated response.
-    if (busy) return;
     spoken.current = last.id;
-    playbackAttempt.current = playbackRetry;
-    // Synchronize browser speech playback; state changes come from its lifecycle.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    play(last);
-  }, [messages, busy, playbackRetry]);
-  useEffect(() => {
-    return () => stopPlayback();
-    // stopPlayback only uses browser capability and refs; this is playback cleanup.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, voiceEnabled, playbackAvailable]);
+    // Fallback for responses generated without streaming. Streamed turns mark
+    // their final ID in finish(), so committing text cannot replay their audio.
+    void playCommitted(last);
+  }, [messages, busy]);
+  useEffect(
+    () => () => {
+      cancelRecordingOnCleanup();
+      // Lifecycle cleanup releases microphone tracks and pending requests.
+    },
+    [active, busy],
+  );
+  useEffect(
+    () => () => {
+      stopPlayback();
+      // Playback resources are owned by refs, independent of render closures.
+    },
+    [active, voiceEnabled, finishing],
+  );
+  useEffect(
+    () => () => {
+      void audioContext.current?.close().catch(() => {});
+      audioContext.current = null;
+      audioQueue.current = null;
+    },
+    [],
+  );
   useEffect(() => {
     if (!listening) return;
     const started = Date.now();
@@ -119,159 +207,115 @@ export function useInterviewVoice({
     );
     return () => clearInterval(interval);
   }, [listening]);
-  useEffect(() => {
+
+  async function startMicrophone() {
     if (
-      !active ||
       busy ||
-      speaking ||
+      !active ||
       !speechAvailable ||
-      (mode !== "live" && !dictating)
+      speaking ||
+      recordingRequest.current
     )
       return;
-    const Constructor = recognitionConstructor();
-    if (!Constructor) return;
-    const instance = new Constructor();
-    recognition.current = instance;
-    instance.continuous = mode === "live";
-    instance.interimResults = true;
-    instance.lang = document.documentElement.lang || "en";
-    const live = mode === "live";
-    let disposed = false;
-    let failed = false;
-    let stopping = false;
-    let delivered = false;
-    let manualStop = false;
-    let finalText = "";
-    let restart: ReturnType<typeof setTimeout> | undefined;
-    const deliver = (text: string) => {
-      if (delivered || disposed || failed || !text) return;
-      delivered = true;
-      setTranscribing(false);
-      setPartialTranscript("");
-      transcript(text, live);
-    };
-    const start = () => {
-      if (disposed || failed || stopping) return;
-      try {
-        instance.start();
-        setListening(true);
-        setRecordingSeconds(0);
-        setPartialTranscript("");
-      } catch {
-        failed = true;
-        setListening(false);
-        setDictating(false);
-        setMode("chat");
-        setFailedOperation("microphone");
-        setError("Could not start microphone. Check browser permissions.");
-      }
-    };
-    instance.onresult = (event) => {
-      if (disposed || failed || delivered) return;
-      const parts = Array.from(event.results);
-      setPartialTranscript(
-        parts
-          .map((result) => result[0].transcript)
-          .join(" ")
-          .trim(),
-      );
-      finalText = parts
-        .filter((result) => result.isFinal)
-        .map((result) => result[0].transcript)
-        .join(" ")
-        .trim();
-      const text = finalTranscript(event);
-      if (!text) return;
-      // Keep the existing Live behavior: a final utterance submits one answer.
-      // Chat dictation likewise finalizes into the draft, never a partial message.
-      deliver(finalText);
-      stopping = true;
-      instance.abort();
-      setListening(false);
-      setDictating(false);
-    };
-    instance.onerror = (event) => {
-      if (disposed || event.error === "aborted" || event.error === "no-speech")
-        return;
-      failed = true;
-      setListening(false);
-      setTranscribing(false);
-      setDictating(false);
-      setMode("chat");
-      setFailedOperation("microphone");
-      setError(
-        "Couldn't transcribe your answer. Check microphone permissions or try again.",
-      );
-    };
-    instance.onend = () => {
-      if (disposed) return;
-      setListening(false);
-      setTranscribing(false);
-      if (manualStop && live) setMode("chat");
-      if (finalText) deliver(finalText);
-      if (live && !failed && !stopping && !delivered)
-        restart = setTimeout(start, 300);
-      else setDictating(false);
-    };
-    stopRecording.current = () => {
-      if (stopping || disposed) return;
-      stopping = true;
-      manualStop = true;
-      setListening(false);
-      setTranscribing(true);
-      try {
-        instance.stop();
-      } catch {
-        setTranscribing(false);
-        setFailedOperation("microphone");
-        setError(
-          "Couldn't finish transcription. Please record your answer again.",
-        );
-        instance.abort();
-        setDictating(false);
-      }
-    };
-    start();
-    return () => {
-      disposed = true;
-      clearTimeout(restart);
-      instance.onresult = null;
-      instance.onerror = null;
-      instance.onend = null;
-      instance.abort();
-      recognition.current = null;
-      stopRecording.current = null;
-      setListening(false);
-      setTranscribing(false);
-      setPartialTranscript("");
-    };
-  }, [mode, dictating, speechAvailable, active, busy, speaking, setMode]);
-  const startMicrophone = () => {
-    if (busy || !active || !speechAvailable || transcribing) return;
+    const request = new AbortController();
+    stopPlayback();
+    recordingRequest.current = request;
     setError("");
     setFailedOperation(null);
-    stopPlayback();
-    setDictating(true);
-  };
+    try {
+      const settings = readSpeechSettings();
+      const media = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (request.signal.aborted) {
+        media.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      stream.current = media;
+      const mimeType = [
+        "audio/webm;codecs=opus",
+        "audio/mp4",
+        "audio/ogg;codecs=opus",
+      ].find((type) => MediaRecorder.isTypeSupported(type));
+      const recorder = new MediaRecorder(
+        media,
+        mimeType ? { mimeType } : undefined,
+      );
+      recording.current = recorder;
+      const chunks: Blob[] = [];
+      let bytes = 0;
+      recorder.ondataavailable = ({ data }) => {
+        bytes += data.size;
+        if (bytes > 10 * 1024 * 1024) {
+          cancelRecording();
+          setFailedOperation("microphone");
+          setError("Recording too large. Record a shorter answer or type it.");
+        } else if (data.size) chunks.push(data);
+      };
+      recorder.onerror = () => {
+        cancelRecording();
+        setFailedOperation("microphone");
+        setError("Microphone recording failed. You can still type.");
+      };
+      recorder.onstop = async () => {
+        recording.current = null;
+        releaseMicrophone();
+        setListening(false);
+        setTranscribing(true);
+        try {
+          const result = await new LocalWhisper(settings.baseUrl).transcribe(
+            new Blob(chunks, { type: recorder.mimeType }),
+            AbortSignal.any([request.signal, AbortSignal.timeout(180_000)]),
+          );
+          if (request.signal.aborted) return;
+          if (!result.text) throw new Error("No speech detected.");
+          deliver(result.text);
+        } catch {
+          if (!request.signal.aborted) {
+            setFailedOperation("microphone");
+            setError(
+              "Couldn't transcribe your answer. Check Local Speech or type your answer.",
+            );
+          }
+        } finally {
+          if (!request.signal.aborted) {
+            recordingRequest.current = null;
+            setTranscribing(false);
+          }
+        }
+      };
+      recorder.start(1000);
+      setRecordingSeconds(0);
+      setListening(true);
+      recordingTimer.current = setTimeout(() => {
+        if (recorder.state === "recording") recorder.stop();
+      }, 120_000);
+    } catch {
+      if (request.signal.aborted) return;
+      cancelRecording();
+      setFailedOperation("microphone");
+      setError(
+        "Could not start microphone. Check browser permissions; you can still type.",
+      );
+    }
+  }
   return {
     listening,
     transcribing,
-    partialTranscript,
+    partialTranscript: "",
     recordingSeconds,
     speaking,
     error,
     failedOperation,
     stopPlayback,
+    beginResponse,
     retry: () => {
-      setError("");
-      if (failedOperation === "playback") {
-        setPlaybackRetry((attempt) => attempt + 1);
-      } else startMicrophone();
-      setFailedOperation(null);
+      if (playback.current?.stream.isPending) return;
+      if (failedOperation === "playback" && playbackMessage.current)
+        void play(playbackMessage.current);
+      else void startMicrophone();
     },
     toggleMicrophone: () => {
-      if (listening) stopRecording.current?.();
-      else startMicrophone();
+      if (recording.current?.state === "recording") recording.current.stop();
+      else void startMicrophone();
     },
   };
 }

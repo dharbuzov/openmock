@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import { config } from "@/lib/config/config";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   serverExternalPackages: ["pino"],
   // AI defaults are public configuration, inlined for browser-side Settings.
   env: {

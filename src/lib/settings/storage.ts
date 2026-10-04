@@ -2,6 +2,10 @@ import { logger } from "../logging/logger";
 import { localStorage, sessionStorage } from "../storage/local-storage";
 import type { Storage } from "../storage/storage";
 import {
+  defaultSpeechSettings,
+  type SpeechSettings,
+} from "../voice/local-speech";
+import {
   aiProviders,
   anthropicModels,
   defaultOllamaSettings,
@@ -17,6 +21,7 @@ export const themeStorageKey = "openmock:theme";
 const preferencesKey = "openmock:ai-preferences";
 
 type StoredPreferences = {
+  speech?: SpeechSettings;
   interviewerVoiceEnabled?: boolean;
   provider?: AIProviderId;
   openai?: { model?: string; rememberApiKey?: boolean };
@@ -41,6 +46,31 @@ export class SettingsStorage {
 
   private readPreferences(): StoredPreferences {
     return this.preferencesStorage.get<StoredPreferences>(preferencesKey) ?? {};
+  }
+
+  readSpeechSettings(): SpeechSettings {
+    try {
+      const saved = this.readPreferences().speech;
+      return {
+        baseUrl:
+          typeof saved?.baseUrl === "string"
+            ? saved.baseUrl
+            : defaultSpeechSettings.baseUrl,
+        voice:
+          typeof saved?.voice === "string"
+            ? saved.voice
+            : defaultSpeechSettings.voice,
+      };
+    } catch {
+      return { ...defaultSpeechSettings };
+    }
+  }
+
+  saveSpeechSettings(speech: SpeechSettings): void {
+    this.preferencesStorage.set(preferencesKey, {
+      ...this.readPreferences(),
+      speech,
+    });
   }
 
   private readApiKey(
@@ -146,6 +176,11 @@ const settingsStorage = new SettingsStorage(
   sessionStorage,
 );
 export const readSettings = () => settingsStorage.readSettings();
+export const readSpeechSettings = () => settingsStorage.readSpeechSettings();
+export function saveSpeechSettings(speech: SpeechSettings): void {
+  settingsStorage.saveSpeechSettings(speech);
+  settingsListeners.forEach((listener) => listener());
+}
 export const readProviderSettings = (provider: AIProviderId) =>
   settingsStorage.readProviderSettings(provider);
 const settingsListeners = new Set<() => void>();

@@ -356,7 +356,7 @@ test("Room loads the created session and carries the initial interaction mode", 
     assert.deepEqual(redirects, []);
   }));
 
-test("Room timer remains paused at zero elapsed with selected Live mode", () =>
+test("Room timer remains paused and saved Live mode falls back to Chat", () =>
   browser(() => {
     const hooks = hookHarness();
     const { InterviewControlsProvider } = loadComponent(
@@ -371,7 +371,7 @@ test("Room timer remains paused at zero elapsed with selected Live mode", () =>
       children: null,
     });
     let controls = tree.props.children.props.value;
-    assert.equal(controls.mode, "live");
+    assert.equal(controls.mode, "chat");
     assert.equal(controls.paused, true);
     assert.equal(controls.elapsed(), 0);
     controls.toggleTimer();

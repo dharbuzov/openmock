@@ -1,4 +1,8 @@
-// Contract only; no speech provider is connected.
+export interface TranscriptionResult {
+  text: string;
+  language: string;
+}
+
 export interface SpeechToText {
-  transcribe(audio: Blob): Promise<string>;
+  transcribe(audio: Blob, signal?: AbortSignal): Promise<TranscriptionResult>;
 }

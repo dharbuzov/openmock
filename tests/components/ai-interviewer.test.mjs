@@ -38,6 +38,8 @@ function conversation() {
   const requests = [];
   let voiceProps;
   let stoppedPlayback = 0;
+  const speechChunks = [];
+  let speechFinished = 0;
   const voice = {
     listening: false,
     transcribing: false,
@@ -46,6 +48,14 @@ function conversation() {
     recordingSeconds: 0,
     error: "",
     stopPlayback: () => stoppedPlayback++,
+    beginResponse: () => {
+      stoppedPlayback++;
+      return {
+        push: (text) => speechChunks.push(text),
+        finish: () => speechFinished++,
+        cancel: () => stoppedPlayback++,
+      };
+    },
     toggleMicrophone: () => {},
     retry: () => {},
   };
@@ -146,6 +156,8 @@ function conversation() {
     state: () => state,
     voiceProps: () => voiceProps,
     stoppedPlayback: () => stoppedPlayback,
+    speechChunks,
+    speechFinished: () => speechFinished,
   };
 }
 const textarea = (tree) =>
@@ -195,6 +207,12 @@ test("typed answers reserve one stable Thinking/streaming/final slot and lock re
   await flush();
   assert.equal(h.requests.length, 1);
   h.requests[0].onMessage("What constraints");
+  assert.deepEqual(
+    h.speechChunks,
+    ["What constraints"],
+    "speech receives partial text while the LLM request is still pending",
+  );
+  assert.equal(h.speechFinished(), 0);
   tree = h.render();
   assert.equal(tree.props["data-conversation-state"], "interviewer-streaming");
   assert.equal(responseSlot(tree).key, key);
@@ -206,6 +224,7 @@ test("typed answers reserve one stable Thinking/streaming/final slot and lock re
   h.requests[0].resolve("What constraints matter?");
   await flush();
   tree = h.render();
+  assert.equal(h.speechFinished(), 1);
   assert.equal(tree.props["data-conversation-state"], "idle");
   assert.equal(responseSlot(tree).key, key);
   assert.equal(h.state().interview.messages.length, 2);
@@ -261,7 +280,7 @@ test("nonstreaming responses still replace Thinking in the same slot", async () 
   assert.equal(h.state().interview.messages.length, 2);
 });
 
-test("composer shows real interim text, listening time, transcribing locks and interruptible speaking", async () => {
+test("composer shows recording time and transcription locks; dictated text uses typed Send", async () => {
   const h = conversation();
   h.voice.listening = true;
   h.voice.partialTranscript = "I would clarify";
@@ -288,17 +307,24 @@ test("composer shows real interim text, listening time, transcribing locks and i
   assert.equal(
     findElement(tree, (node) => node.props["aria-label"] === "Dictate answer")
       .props.disabled,
-    false,
+    true,
   );
   assert.equal(textarea(tree).props.disabled, false);
-  h.voice.listening = true;
+  h.voice.speaking = false;
   h.render();
-  h.voiceProps().onLiveAnswer("Final utterance");
+  h.voiceProps().onDictation("Final utterance");
+  assert.equal(
+    h.state().interview.messages.length,
+    0,
+    "dictation only fills the draft",
+  );
+  const form = findElement(h.render(), (node) => node.type === "form");
+  form.props.onSubmit({ preventDefault() {} });
   await flush();
   assert.equal(
     h.state().interview.messages.length,
     1,
-    "final speech bypasses the stale listening render safely",
+    "dictated text uses the same submission path",
   );
   assert.equal(h.state().interview.messages[0].content, "Final utterance");
   h.requests[0].resolve();

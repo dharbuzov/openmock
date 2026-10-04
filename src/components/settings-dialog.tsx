@@ -30,7 +30,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { readProviderSettings, saveSettings } from "@/lib/settings/storage";
+import {
+  readProviderSettings,
+  saveSettings,
+  readSpeechSettings,
+  saveSpeechSettings,
+} from "@/lib/settings/storage";
+import { speechUrl } from "@/lib/voice/local-speech";
 import {
   aiProviders,
   anthropicModels,
@@ -64,6 +70,7 @@ export function AISettingsForm({
 }) {
   const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState(initialSettings);
+  const [speech, setSpeech] = useState(readSpeechSettings);
   const [keyInput, setKeyInput] = useState("");
   const [removeKey, setRemoveKey] = useState(false);
   const [ollamaModels, setOllamaModels] = useState<string[]>(
@@ -145,11 +152,16 @@ export function AISettingsForm({
 
   function save() {
     try {
+      speechUrl(speech.baseUrl, "/health");
+      saveSpeechSettings({
+        baseUrl: speech.baseUrl.trim(),
+        voice: speech.voice.trim(),
+      });
       saveSettings(resolvedSettings);
       onSaved();
     } catch {
       setFeedback(
-        "Could not save browser settings. Check browser storage permissions and try again.",
+        "Could not save settings. Check the local speech URL and browser storage permissions.",
       );
     }
   }
@@ -215,6 +227,50 @@ export function AISettingsForm({
             size="sm"
           />
         </Field>
+      </FieldSet>
+      <Separator />
+
+      <FieldSet>
+        <FieldLegend variant="label">Local Speech</FieldLegend>
+        <FieldGroup>
+          <FieldDescription>
+            Whisper converts speech to text. Kokoro reads interviewer responses.
+            Audio goes directly to the configured local service; your AI
+            provider stays independent.
+          </FieldDescription>
+          <Field>
+            <FieldLabel htmlFor="settings-speech-url">
+              Local Speech URL
+            </FieldLabel>
+            <Input
+              id="settings-speech-url"
+              value={speech.baseUrl}
+              inputMode="url"
+              spellCheck={false}
+              onChange={(event) =>
+                setSpeech({ ...speech, baseUrl: event.target.value })
+              }
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="settings-speech-voice">
+              Interviewer voice
+            </FieldLabel>
+            <Input
+              id="settings-speech-voice"
+              value={speech.voice}
+              placeholder="Service default (af_heart)"
+              spellCheck={false}
+              onChange={(event) =>
+                setSpeech({ ...speech, voice: event.target.value })
+              }
+            />
+            <FieldDescription>
+              English Kokoro voice, such as af_heart or am_adam. Whisper model
+              is configured on the service through WHISPER_MODEL.
+            </FieldDescription>
+          </Field>
+        </FieldGroup>
       </FieldSet>
       <Separator />
 

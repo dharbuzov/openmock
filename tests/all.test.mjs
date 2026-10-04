@@ -30,3 +30,6 @@ import "./components/interview-setup.test.mjs";
 import "./components/practice-problems.test.mjs";
 import "./lib/interview/evaluation-contract.test.mjs";
 import "./components/ai-interviewer.test.mjs";
+import "./components/local-voice.test.mjs";
+import "./lib/voice/local-speech.test.mjs";
+import "./lib/voice/speech-stream.test.mjs";

@@ -29,11 +29,11 @@ export function InteractionModeControl({
       <ToggleGroupItem
         value="live"
         aria-label="Live interaction"
-        disabled={!speechAvailable}
+        disabled
         title={
           speechAvailable
-            ? "Continuous voice interaction"
-            : "Speech recognition is unavailable in this browser"
+            ? "Live conversation is not available yet. Use the microphone in Chat."
+            : "Live conversation is not available yet."
         }
       >
         <Mic data-icon="inline-start" />

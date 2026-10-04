@@ -169,6 +169,13 @@ It excludes tests, generated files, dependencies, and build output. Files over
 an initialized interview with status `201`. Invalid JSON or missing/invalid
 `problemId` returns `400`; unknown problems return `404`.
 
+## Local Voice
+
+Run OpenMock and CPU-only Whisper/Kokoro with `docker compose up --build`.
+Audio is sent directly to the configured local Speech service; the LLM provider
+remains independent. See [Local Voice](docs/local-voice.md) for configuration,
+manual STT/TTS checks, privacy, resource measurement, and troubleshooting.
+
 ## License
 
 Copyright 2026 OpenMock contributors.

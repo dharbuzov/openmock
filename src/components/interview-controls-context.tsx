@@ -9,7 +9,6 @@ import {
   type ReactNode,
 } from "react";
 import { InterviewTimer } from "@/lib/interview/timer";
-import { recognitionConstructor } from "@/lib/voice/browser";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { readSettings } from "@/lib/settings/storage";
 
@@ -37,18 +36,22 @@ export function InterviewControlsProvider({
 }) {
   const [timer] = useState(() => new InterviewTimer());
   const [paused, setPaused] = useState(true);
-  const [mode, setMode] = useState<InteractionMode>(initialMode);
+  const [mode, setMode] = useState<InteractionMode>(
+    initialMode === "live" ? "chat" : initialMode,
+  );
   const [voiceEnabled, setVoiceEnabled] = useState(
     () => readSettings().interviewerVoiceEnabled,
   );
   const speechAvailable = useSyncExternalStore(
     subscribeCapabilities,
-    () => Boolean(recognitionConstructor()),
+    () =>
+      typeof MediaRecorder !== "undefined" &&
+      Boolean(navigator.mediaDevices?.getUserMedia),
     noCapability,
   );
   const playbackAvailable = useSyncExternalStore(
     subscribeCapabilities,
-    () => "speechSynthesis" in window,
+    () => typeof AudioContext !== "undefined",
     noCapability,
   );
   const value = useMemo(

@@ -86,17 +86,12 @@ export function AIInterviewer() {
   const voice = useInterviewVoice({
     messages,
     busy: operation !== null,
-    active:
-      interview.status === "in-progress" &&
-      interview.stage.current !== null &&
-      !error,
+    finishing: operation === "finish" || operation === "evaluate",
+    active: interview.status === "in-progress" && !error,
     onDictation: (text) =>
       setAnswer((previous) =>
         [previous.trim(), text].filter(Boolean).join(" "),
       ),
-    onLiveAnswer: (text) => {
-      void send(false, text, true);
-    },
   });
   const state = pending
     ? messages.at(-1)?.role !== "candidate"
@@ -145,14 +140,12 @@ export function AIInterviewer() {
       ? [answer.trim(), voice.partialTranscript].filter(Boolean).join(" ")
       : answer;
 
-  async function send(
-    retry = false,
-    candidateAnswer = answer,
-    fromVoice = false,
-  ) {
+  async function send(retry = false) {
+    const candidateAnswer = answer;
     if (
       operation ||
-      (!fromVoice && (voice.transcribing || voice.listening)) ||
+      voice.transcribing ||
+      voice.listening ||
       (error && !retry) ||
       interview.status !== "in-progress" ||
       interview.stage.current === null ||
@@ -169,8 +162,7 @@ export function AIInterviewer() {
     if (!request) return;
     setError("");
     setStreamedResponse("");
-    voice.stopPlayback();
-    if (fromVoice && !retry) setAnswer(candidateAnswer);
+    const speech = voice.beginResponse(request.controller.signal);
     try {
       if (!isCurrentOperation(request)) return;
       const next = retry
@@ -191,14 +183,20 @@ export function AIInterviewer() {
         workspaceSnapshot,
         request.controller.signal,
         (content) => {
-          if (isCurrentOperation(request)) setStreamedResponse(content);
+          if (isCurrentOperation(request)) {
+            setStreamedResponse(content);
+            speech.push(content);
+          }
         },
       );
       if (commitOperation(request, result)) {
+        const response = result.messages.at(-1);
+        if (response?.role === "interviewer") speech.finish(response);
         setAnswer("");
         setStreamedResponse("");
       }
     } catch {
+      speech.cancel();
       if (isCurrentOperation(request)) {
         setStreamedResponse("");
         setError("Couldn’t get a response from the AI provider.");
@@ -409,7 +407,7 @@ export function AIInterviewer() {
                 className="size-1.5 rounded-full bg-success"
               />
             )}
-            <span>{voice.transcribing ? "Transcribing…" : "Listening…"}</span>
+            <span>{voice.transcribing ? "Transcribing…" : "Recording…"}</span>
             {voice.listening && (
               <span className="ml-auto font-mono tabular-nums">
                 {String(Math.floor(voice.recordingSeconds / 60)).padStart(
@@ -453,7 +451,7 @@ export function AIInterviewer() {
             className="text-xs leading-5 text-muted-foreground"
           >
             {voice.speaking
-              ? "Interviewer speaking · You can interrupt"
+              ? "Interviewer speaking"
               : "Shift+Enter for a new line"}
           </p>
           <div className="flex items-center gap-1">
@@ -461,7 +459,7 @@ export function AIInterviewer() {
               type="button"
               variant="ghost"
               size={voice.listening ? "sm" : "icon-sm"}
-              disabled={!speechAvailable || inputBlocked}
+              disabled={!speechAvailable || inputBlocked || voice.speaking}
               aria-label={voice.listening ? "Stop recording" : "Dictate answer"}
               aria-pressed={voice.listening}
               title={
@@ -469,7 +467,7 @@ export function AIInterviewer() {
                   ? voice.listening
                     ? "Stop microphone"
                     : "Dictate answer"
-                  : "Speech recognition is unavailable in this browser"
+                  : "Microphone recording is unavailable in this browser"
               }
               onClick={voice.toggleMicrophone}
             >

@@ -1,0 +1,31 @@
+services:
+  openmock:
+    build: .
+    ports:
+      - "127.0.0.1:3000:3000"
+  speech:
+    build: ./services/speech
+    ports:
+      - "127.0.0.1:8001:8001"
+    environment:
+      WHISPER_MODEL: ${WHISPER_MODEL:-base.en}
+      WHISPER_DEVICE: cpu
+      KOKORO_VOICE: ${KOKORO_VOICE:-af_heart}
+      SPEECH_CPU_THREADS: ${SPEECH_CPU_THREADS:-4}
+      SPEECH_ALLOWED_ORIGINS: ${SPEECH_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+    volumes:
+      - speech-models:/models
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=5)",
+        ]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+volumes:
+  speech-models:

@@ -236,6 +236,7 @@ test("Send retries reuse the captured workspace and Finish saves completion with
         listening: false,
         error: "",
         stopPlayback: () => {},
+        beginResponse: () => ({ push() {}, finish() {}, cancel() {} }),
         toggleMicrophone: () => {},
       }),
     },

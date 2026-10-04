@@ -27,7 +27,6 @@ import {
 } from "@/lib/settings/types";
 import { startInterview } from "@/lib/interview/engine";
 import { saveInterviewSession } from "@/lib/interview/session-storage";
-import { recognitionConstructor } from "@/lib/voice/browser";
 import type {
   InterviewDefinition,
   InterviewLevelId,
@@ -77,7 +76,9 @@ function SetupForm({
   const startingRef = useRef(false);
   const speechAvailable = useSyncExternalStore(
     subscribeCapabilities,
-    () => Boolean(recognitionConstructor()),
+    () =>
+      typeof MediaRecorder !== "undefined" &&
+      Boolean(navigator.mediaDevices?.getUserMedia),
     noCapability,
   );
   const summary =

@@ -5,7 +5,7 @@ module.exports = {
       severity: "error",
       from: { path: "^src/lib/interview/engine\\.ts$" },
       to: {
-        path: "^src/lib/(ai|settings|logging)/|(^|/)node_modules/(ai|@ai-sdk)(/|$)",
+        path: "^src/lib/(ai|settings|logging|voice)/|(^|/)node_modules/(ai|@ai-sdk)(/|$)",
       },
     },
     {
