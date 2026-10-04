@@ -1,5 +1,6 @@
 "use client";
 
+import { resolveInterviewDuration } from "@/lib/interview/duration";
 import Link from "next/link";
 import { useState } from "react";
 import { ChevronRight, LayoutGrid } from "lucide-react";
@@ -282,6 +283,12 @@ export function PracticeProblems({
                   <ProblemMetadataBadges
                     problem={problem}
                     topicLimit={3}
+                    durationMinutes={resolveInterviewDuration(
+                      problem,
+                      interviewTypes.find(
+                        ({ id }) => id === problem.interview,
+                      )!,
+                    )}
                     typeLabel={
                       interviewTypes.find(({ id }) => id === problem.interview)
                         ?.name

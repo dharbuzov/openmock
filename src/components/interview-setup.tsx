@@ -21,6 +21,7 @@ import {
   aiProviders,
   type AIProviderId,
 } from "@/lib/settings/types";
+import { resolveInterviewDuration } from "@/lib/interview/duration";
 import { startInterview } from "@/lib/interview/engine";
 import { saveInterviewSession } from "@/lib/interview/session-storage";
 import type {
@@ -135,6 +136,7 @@ function SetupForm({
             topicLimit={3}
             showLabels
             typeLabel={definition.name}
+            durationMinutes={resolveInterviewDuration(problem, definition)}
             showCompanies
           />
         </section>
@@ -225,8 +227,7 @@ function SetupForm({
           </Field>
           <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-5">
             <p className="text-xs text-muted-foreground">
-              {definition.duration.defaultMinutes} min ·{" "}
-              {definition.stages.length} stages · {definition.name}
+              {definition.stages.length} stages
             </p>
             <Button
               size="sm"

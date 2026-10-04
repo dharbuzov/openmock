@@ -8,12 +8,13 @@ export default async function PracticePage() {
     getInterviewDefinitions(),
   ]);
   const interviewTypes = definitions.map(
-    ({ id, name, description, icon, order }) => ({
+    ({ id, name, description, icon, order, duration }) => ({
       id,
       name,
       description,
       icon,
       order,
+      duration,
     }),
   );
   return (

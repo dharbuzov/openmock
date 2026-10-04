@@ -22,6 +22,7 @@ const normalizedMetadataSchema = z.strictObject({
   title: nonEmptyString,
   interview: slugSchema,
   difficulty: z.enum(["easy", "medium", "hard"]),
+  duration: z.strictObject({ minutes: z.number().int().positive() }).optional(),
   categories: stringList,
   topics: stringList,
   companies: z

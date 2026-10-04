@@ -132,8 +132,12 @@ test("Practice controls filter rows and metadata stays display-only", () => {
   const props = {
     problems,
     interviewTypes: [
-      { id: "system-design", name: "System Design" },
-      { id: "dsa", name: "DSA" },
+      {
+        id: "system-design",
+        name: "System Design",
+        duration: { defaultMinutes: 60 },
+      },
+      { id: "dsa", name: "DSA", duration: { defaultMinutes: 45 } },
     ],
   };
   const render = () => hooks.render(PracticeProblems, props);
@@ -308,4 +312,67 @@ test("search resolves definition names and readable taxonomy labels", () => {
     }).length,
     1,
   );
+});
+
+test("Catalog metadata receives resolved duration for defaults and problem overrides", () => {
+  const hooks = hookHarness();
+  const { PracticeProblems } = loadComponent(
+    "src/components/practice-problems.tsx",
+    { ...overrides, react: hooks.react },
+  );
+  const tree = hooks.render(PracticeProblems, {
+    problems: [
+      problem("default"),
+      problem("override", { duration: { minutes: 17 } }),
+    ],
+    interviewTypes: [
+      {
+        id: "system-design",
+        name: "System Design",
+        duration: { defaultMinutes: 60 },
+      },
+    ],
+  });
+  assert.equal(
+    findElement(
+      tree,
+      (node) => node.type === "metadata" && node.props.problem.id === "default",
+    ).props.durationMinutes,
+    60,
+  );
+  assert.equal(
+    findElement(
+      tree,
+      (node) =>
+        node.type === "metadata" && node.props.problem.id === "override",
+    ).props.durationMinutes,
+    17,
+  );
+});
+
+test("duration badge shares the Catalog primary metadata row with type and difficulty", () => {
+  const { ProblemMetadataBadges } = loadComponent(
+    "src/components/problem-metadata-badges.tsx",
+    { "@/components/ui/badge": { Badge: "badge" } },
+  );
+  const tree = ProblemMetadataBadges({
+    problem: problem("example"),
+    typeLabel: "System Design",
+    durationMinutes: 17,
+  });
+  const primary = findElement(
+    tree,
+    (node) =>
+      node.type === "div" &&
+      Array.isArray(node.props.children) &&
+      node.props.children.filter(Boolean).length === 3 &&
+      node.props.children
+        .filter(Boolean)
+        .every((child) => child.type === "badge"),
+  );
+  assert.equal(primary.type, "div");
+  const badges = primary.props.children.filter(Boolean);
+  assert.equal(badges.length, 3);
+  assert.equal(badges[2].props.children[1], 17);
+  assert.equal(badges[2].props.children[2], " min");
 });

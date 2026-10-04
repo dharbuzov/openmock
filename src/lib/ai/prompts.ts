@@ -1,4 +1,5 @@
 import type { InterviewContext } from "../interview/types";
+import { resolveInterviewDuration } from "../interview/duration";
 import { loadPrompt } from "./prompt-loader";
 
 export async function interviewerSystemPrompt(
@@ -17,7 +18,11 @@ export function interviewContext(context: InterviewContext): string {
   );
   const remainingMinutes = Math.max(
     0,
-    context.definition.duration.defaultMinutes - elapsedMinutes,
+    resolveInterviewDuration(
+      context.problem,
+      context.definition,
+      context.interview.durationMinutes,
+    ) - elapsedMinutes,
   );
   return JSON.stringify({
     interviewDefinition: {

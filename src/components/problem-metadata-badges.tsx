@@ -1,3 +1,4 @@
+import { Clock } from "lucide-react";
 import type { Problem } from "@/lib/problems/types";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "cn";
@@ -14,12 +15,14 @@ export function ProblemMetadataBadges({
   topicLimit = 2,
   showLabels = false,
   typeLabel,
+  durationMinutes,
   showCompanies = false,
 }: {
   problem: Problem;
   topicLimit?: number;
   showLabels?: boolean;
   typeLabel?: string;
+  durationMinutes?: number;
   showCompanies?: boolean;
 }) {
   const topics = [...new Set(problem.topics)];
@@ -38,6 +41,12 @@ export function ProblemMetadataBadges({
       )}
     >
       <span className="truncate">{typeLabel}</span>
+    </Badge>
+  ) : null;
+  const durationBadge = durationMinutes ? (
+    <Badge variant="outline" className="text-muted-foreground">
+      <Clock aria-hidden="true" className="size-3" />
+      {durationMinutes} min
     </Badge>
   ) : null;
   return (
@@ -73,7 +82,16 @@ export function ProblemMetadataBadges({
             {metadataLabel(problem.difficulty)}
           </Badge>
         )}
+        {!showLabels && durationBadge}
       </div>
+      {showLabels && durationBadge && (
+        <>
+          <span className="text-xs leading-5 text-muted-foreground">
+            Duration
+          </span>
+          <div className="flex min-w-0 flex-wrap gap-1.5">{durationBadge}</div>
+        </>
+      )}
       {topics.length > 0 && (
         <>
           {showLabels && (

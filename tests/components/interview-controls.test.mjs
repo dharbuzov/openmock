@@ -22,6 +22,13 @@ test("new interviews use the saved voice default and speaker changes stay in the
         {
           react: hooks.react,
           "@/components/ui/tooltip": { TooltipProvider: "div" },
+          "./interview-session-context": {
+            useInterviewSession: () => ({
+              paused: false,
+              elapsed: () => 0,
+              toggleTimer() {},
+            }),
+          },
         },
       );
       return () =>
@@ -94,6 +101,13 @@ test("header input hint reads the shared recording state and returns to idle aft
     {
       react: providerHooks.react,
       "@/components/ui/tooltip": { TooltipProvider: "div" },
+      "./interview-session-context": {
+        useInterviewSession: () => ({
+          paused: false,
+          elapsed: () => 0,
+          toggleTimer() {},
+        }),
+      },
     },
   );
   const controls = () =>
@@ -110,7 +124,7 @@ test("header input hint reads the shared recording state and returns to idle aft
       "./interview-controls-context": { useInterviewControls: () => value },
       "./interview-session-context": {
         useInterviewSession: () => ({
-          definition: { duration: { defaultMinutes: 60 } },
+          interview: { durationMinutes: 60 },
         }),
       },
       "@/components/ui/button": { Button: "button" },
@@ -141,4 +155,55 @@ test("header input hint reads the shared recording state and returns to idle aft
   assert.match(hint().props.children[1], /Type or press/);
   providerHooks.dispose();
   headerHooks.dispose();
+});
+
+test("session provider keeps one clock through re-renders and normalizes legacy duration", () => {
+  const previousWindow = globalThis.window;
+  const previousNow = Date.now;
+  let now = 1000;
+  const events = new EventTarget();
+  globalThis.window = {
+    sessionStorage: storage(),
+    addEventListener: events.addEventListener.bind(events),
+    removeEventListener: events.removeEventListener.bind(events),
+  };
+  Date.now = () => now;
+  const hooks = hookHarness();
+  try {
+    const { InterviewSessionProvider } = loadComponent(
+      "src/components/interview-session-context.tsx",
+      { react: hooks.react },
+    );
+    const props = {
+      children: null,
+      initialInterview: {
+        id: "legacy",
+        startedAt: new Date(1000).toISOString(),
+        status: "in-progress",
+        stage: { current: "intro" },
+      },
+      problem: { duration: { minutes: 17 } },
+      definition: { duration: { defaultMinutes: 60 } },
+    };
+    const render = () =>
+      hooks.render(InterviewSessionProvider, props).props.value;
+    const first = render();
+    assert.equal(first.interview.durationMinutes, 17);
+    assert.equal(first.paused, false);
+    now += 2500;
+    props.problem = { duration: { minutes: 30 } };
+    const next = render();
+    assert.equal(next.elapsed, first.elapsed);
+    assert.equal(next.elapsed(), 2500);
+    assert.equal(next.interview.durationMinutes, 17);
+    next.toggleTimer();
+    assert.equal(render().paused, true);
+    now += 5000;
+    assert.equal(render().elapsed(), 2500);
+    hooks.dispose();
+  } finally {
+    Date.now = previousNow;
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
 });

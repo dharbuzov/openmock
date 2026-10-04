@@ -1,3 +1,5 @@
+import { resolveInterviewDuration } from "./duration";
+import { InterviewTimer } from "./timer";
 import type { Problem } from "../problems/types";
 import type {
   Interview,
@@ -7,7 +9,7 @@ import type {
   InterviewMode,
   InterviewTurn,
   WorkspaceSnapshot,
-  WorkspaceType
+  WorkspaceType,
 } from "./types";
 
 const newId = () => crypto.randomUUID();
@@ -93,6 +95,8 @@ export function startInterview(
     messages: [],
     observations: [],
     startedAt,
+    durationMinutes: resolveInterviewDuration(problem, definition),
+    timer: { elapsedMs: 0, runningSince: Date.parse(startedAt) },
   };
 }
 
@@ -207,8 +211,21 @@ export function completeInterview(interview: Interview): Interview {
     throw new InterviewStateError(
       "Only an in-progress interview can be completed.",
     );
+  const timer = new InterviewTimer(
+    Date.now,
+    interview.timer ?? {
+      elapsedMs: interview.elapsedMs ?? 0,
+      runningSince:
+        interview.elapsedMs === undefined
+          ? Date.parse(interview.startedAt)
+          : null,
+    },
+  );
+  timer.pause();
   return {
     ...interview,
+    timer: timer.snapshot(),
+    elapsedMs: timer.elapsed(),
     status: "completed",
     completedAt: now(),
     endReason: "candidate-finished",

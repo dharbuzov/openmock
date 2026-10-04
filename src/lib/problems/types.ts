@@ -11,6 +11,7 @@ export interface ProblemMetadata {
   title: string;
   interview: string;
   difficulty: ProblemDifficulty;
+  duration?: { minutes: number };
   categories: string[];
   topics: string[];
   companies: ProblemCompany[];

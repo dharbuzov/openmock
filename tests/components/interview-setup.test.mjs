@@ -60,7 +60,10 @@ const primitives = {
   },
   "./settings-dialog": { AISettingsForm: "settings-form" },
 };
-function setupHarness(selectedDefinition = definition) {
+function setupHarness(
+  selectedDefinition = definition,
+  selectedProblem = problem,
+) {
   const hooks = hookHarness(),
     urls = [];
   let settingsOpened = 0;
@@ -75,7 +78,7 @@ function setupHarness(selectedDefinition = definition) {
     overrides,
   );
   const form = hooks.render(InterviewSetup, {
-    problem,
+    problem: selectedProblem,
     definition: selectedDefinition,
   });
   return {
@@ -349,14 +352,24 @@ test("Room loads the created session without an interaction mode", () =>
     assert.deepEqual(redirects, []);
   }));
 
-test("Room timer starts paused without interaction mode state", () =>
+test("Room timer automatically runs without interaction mode state", () =>
   browser(() => {
     const hooks = hookHarness();
+    let paused = false;
     const { InterviewControlsProvider } = loadComponent(
       "src/components/interview-controls-context.tsx",
       {
         react: { ...hooks.react, createContext: () => "controls-context" },
         "@/components/ui/tooltip": { TooltipProvider: "tooltips" },
+        "./interview-session-context": {
+          useInterviewSession: () => ({
+            paused,
+            elapsed: () => 0,
+            toggleTimer: () => {
+              paused = !paused;
+            },
+          }),
+        },
       },
     );
     let tree = hooks.render(InterviewControlsProvider, {
@@ -365,14 +378,14 @@ test("Room timer starts paused without interaction mode state", () =>
     let controls = tree.props.children.props.value;
     assert.equal(Object.hasOwn(controls, "mode"), false);
     assert.equal(Object.hasOwn(controls, "setMode"), false);
-    assert.equal(controls.paused, true);
+    assert.equal(controls.paused, false);
     assert.equal(controls.elapsed(), 0);
     controls.toggleTimer();
     tree = hooks.render(InterviewControlsProvider, {
       children: null,
     });
     controls = tree.props.children.props.value;
-    assert.equal(controls.paused, false);
+    assert.equal(controls.paused, true);
   }));
 
 test("shared inline AI form preserves saved-key masking and Remember API key behavior", () =>
@@ -547,4 +560,31 @@ test("Setup renders only definition-supported interview modes and ignores unsupp
     modeGroup(tree).props.onValueChange(["mock"]);
     tree = harness.render();
     assert.deepEqual(modeGroup(tree).props.value, ["practice"]);
+  }));
+
+test("Setup shows resolved Duration after Difficulty once and captures it on Start", () =>
+  browser(() => {
+    saveSettings({
+      provider: "ollama",
+      model: "local",
+      baseUrl: "http://localhost:11434",
+    });
+    const harness = setupHarness(definition, {
+      ...problem,
+      duration: { minutes: 17 },
+    });
+    const tree = harness.render();
+    const html = renderToStaticMarkup(tree);
+    assert.ok(html.indexOf("Difficulty") < html.indexOf("Duration"));
+    assert.equal((html.match(/17 min/g) ?? []).length, 1);
+    assert.ok(html.includes(`${definition.stages.length} stages`));
+    button(tree).props.onClick();
+    const saved = readInterviewSession(
+      new URL(harness.urls[0], "http://localhost").searchParams.get("session"),
+    );
+    assert.equal(saved.interview.durationMinutes, 17);
+    assert.equal(
+      saved.interview.timer.runningSince,
+      Date.parse(saved.interview.startedAt),
+    );
   }));

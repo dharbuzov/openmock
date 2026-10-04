@@ -120,8 +120,40 @@ try {
   assert.equal(llmCalls, 1, "saved opening is not regenerated on room reload");
   const header = page.locator("[data-interview-room] > header");
   assert.ok(!/Interaction|\bChat\b|\bLive\b/.test(await header.innerText()));
-  const centerBounds = await header
+  const remaining = header.locator('[aria-label^="Remaining interview time"]');
+  const seconds = async () => {
+    const [minutes, seconds] = (await remaining.innerText())
+      .split(":")
+      .map(Number);
+    return minutes * 60 + seconds;
+  };
+  assert.equal(interview.durationMinutes, 45);
+  const before = await seconds();
+  await page.waitForTimeout(2100);
+  assert.ok(
+    (await seconds()) < before,
+    "new interview automatically counts down",
+  );
+  await header.getByRole("button", { name: "Pause interview timer" }).click();
+  const frozen = await seconds();
+  await page.reload();
+  await header
     .getByRole("button", { name: "Resume interview timer" })
+    .waitFor();
+  await page.waitForTimeout(1100);
+  assert.equal(await seconds(), frozen, "paused countdown survives reload");
+  await header.getByRole("button", { name: "Resume interview timer" }).click();
+  await page.waitForTimeout(2100);
+  const resumed = await seconds();
+  assert.ok(resumed < frozen, "resume continues the existing countdown");
+  await page.reload();
+  await header.getByRole("button", { name: "Pause interview timer" }).waitFor();
+  assert.ok(
+    (await seconds()) <= resumed,
+    "running reload does not reset duration",
+  );
+  const centerBounds = await header
+    .getByRole("button", { name: "Pause interview timer" })
     .locator("..")
     .locator("..")
     .boundingBox();

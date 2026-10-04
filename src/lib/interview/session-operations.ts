@@ -1,3 +1,4 @@
+import { InterviewTimer } from "./timer";
 import type { Interview } from "./types";
 
 export type SessionState = {
@@ -13,13 +14,44 @@ export type SessionRequest = {
 export class SessionOperations {
   private request: SessionRequest | null = null;
   private state: SessionState;
+  private timer: InterviewTimer;
 
   constructor(
     interview: Interview,
     private readonly onChange: (state: SessionState) => void,
+    now = Date.now,
   ) {
     this.state = { interview, operation: null };
+    this.timer = new InterviewTimer(
+      now,
+      interview.timer ?? {
+        elapsedMs: interview.elapsedMs ?? 0,
+        runningSince:
+          interview.status === "in-progress" &&
+          interview.elapsedMs === undefined
+            ? Date.parse(interview.startedAt)
+            : null,
+      },
+    );
   }
+
+  elapsed = (): number => this.timer.elapsed();
+  isPaused = (): boolean => this.timer.isPaused();
+  private snapshotInterview = (): Interview => ({
+    ...this.state.interview,
+    elapsedMs: this.timer.elapsed(),
+    timer: this.timer.snapshot(),
+  });
+  checkpoint = (): void => {
+    this.state = { ...this.state, interview: this.snapshotInterview() };
+    this.onChange(this.state);
+  };
+  toggleTimer = (): void => {
+    if (this.state.interview.status !== "in-progress") return;
+    if (this.timer.isPaused()) this.timer.resume();
+    else this.timer.pause();
+    this.checkpoint();
+  };
 
   begin = (
     operation: "opening" | "send" | "finish" | "evaluate",
@@ -35,9 +67,13 @@ export class SessionOperations {
       return null;
     this.request = {
       controller: new AbortController(),
-      interview: this.state.interview,
+      interview: this.snapshotInterview(),
     };
-    this.state = { ...this.state, operation };
+    this.state = {
+      ...this.state,
+      interview: this.request.interview,
+      operation,
+    };
     this.onChange(this.state);
     return this.request;
   };
@@ -47,8 +83,9 @@ export class SessionOperations {
 
   commit = (request: SessionRequest, interview: Interview): boolean => {
     if (!this.isCurrent(request)) return false;
+    if (interview.status === "completed") this.timer.pause();
     this.state = { ...this.state, interview };
-    this.onChange(this.state);
+    this.checkpoint();
     return true;
   };
 
@@ -56,7 +93,7 @@ export class SessionOperations {
     if (this.request !== request) return;
     this.request = null;
     this.state = { ...this.state, operation: null };
-    this.onChange(this.state);
+    this.checkpoint();
   };
 
   cancel = (): void => {

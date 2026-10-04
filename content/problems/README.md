@@ -37,6 +37,18 @@ defaults. Definition names supply the UI Type label. Companies accept names or o
 `relation`, and optional `source` provenance.
 The Markdown files are the only problem catalog; no TypeScript registration is needed.
 
+Problems may optionally override the interview definition's `duration.defaultMinutes`
+with a positive integer number of minutes:
+
+```yaml
+duration:
+  minutes: 45
+```
+
+The Catalog and Setup show this resolved duration. Starting an interview captures
+it for that session and starts the countdown automatically. Pause/resume and
+reload preserve the session's clock; later content edits do not change its duration.
+
 Problems used with a `code` workspace may optionally provide `language` and a
 `starterCode: |` YAML block. The current coding workspace uses that source as
 its initial buffer. Code execution is not implemented.

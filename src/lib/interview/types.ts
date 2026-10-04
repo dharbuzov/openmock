@@ -64,7 +64,7 @@ export type InterviewDefinition = {
 
 export type InterviewTypeSummary = Pick<
   InterviewDefinition,
-  "id" | "name" | "description" | "icon" | "order"
+  "id" | "name" | "description" | "icon" | "order" | "duration"
 >;
 
 export type InterviewStatus = "in-progress" | "completed";
@@ -105,6 +105,8 @@ export type Interview = {
   messages: InterviewMessage[];
   observations: InterviewObservation[];
   startedAt: string;
+  durationMinutes: number;
+  timer?: { elapsedMs: number; runningSince: number | null };
   completedAt?: string;
   elapsedMs?: number;
   endReason?: InterviewEndReason;

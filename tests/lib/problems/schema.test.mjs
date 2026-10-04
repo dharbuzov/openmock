@@ -6,6 +6,26 @@ const { parseProblemDocument, parseProblemMetadata } = load(
   "../src/lib/problems/schema.ts",
 );
 
+test("problem duration is optional and accepts only positive integer minutes", () => {
+  const metadata = {
+    id: "queue",
+    title: "Queue",
+    interview: "system-design",
+    difficulty: "medium",
+  };
+  assert.equal(parseProblemMetadata(metadata).duration, undefined);
+  assert.deepEqual(
+    parseProblemMetadata({ ...metadata, duration: { minutes: 45 } }).duration,
+    { minutes: 45 },
+  );
+  for (const minutes of [0, -1, 1.5, "45", null]) {
+    assert.throws(() =>
+      parseProblemMetadata({ ...metadata, duration: { minutes } }),
+    );
+  }
+  assert.throws(() => parseProblemMetadata({ ...metadata, duration: {} }));
+});
+
 test("optional problem metadata arrays default safely", () => {
   const metadata = parseProblemMetadata({
     id: "queue",

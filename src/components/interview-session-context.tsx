@@ -8,6 +8,11 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
+import { resolveInterviewDuration } from "@/lib/interview/duration";
+import {
+  readInterviewSession,
+  saveInterviewSession,
+} from "@/lib/interview/session-storage";
 import type { Interview } from "@/lib/interview/types";
 import type { InterviewDefinition } from "@/lib/interview/types";
 import type { Problem } from "@/lib/problems/types";
@@ -26,6 +31,9 @@ type InterviewSession = {
   problem: Problem;
   definition: InterviewDefinition;
   operation: SessionState["operation"];
+  paused: boolean;
+  elapsed: SessionOperations["elapsed"];
+  toggleTimer: SessionOperations["toggleTimer"];
   beginOperation: SessionOperations["begin"];
   commitOperation: SessionOperations["commit"];
   endOperation: SessionOperations["end"];
@@ -45,17 +53,41 @@ export function InterviewSessionProvider({
   problem: Problem;
   definition: InterviewDefinition;
 }) {
-  const [state, setState] = useState<SessionState>({
-    interview: initialInterview,
+  const [state, setState] = useState<SessionState>(() => ({
+    interview: {
+      ...initialInterview,
+      durationMinutes: resolveInterviewDuration(
+        problem,
+        definition,
+        initialInterview.durationMinutes,
+      ),
+    },
     operation: null,
-  });
+  }));
   const [operations] = useState(
-    () => new SessionOperations(initialInterview, setState),
+    () =>
+      new SessionOperations(state.interview, (next) => {
+        setState(next);
+        saveInterviewSession({
+          ...readInterviewSession(next.interview.id),
+          interview: next.interview,
+        });
+      }),
   );
-  useEffect(() => () => operations.cancel(), [operations]);
+  useEffect(() => {
+    const checkpoint = () => operations.checkpoint();
+    window.addEventListener("pagehide", checkpoint);
+    return () => {
+      window.removeEventListener("pagehide", checkpoint);
+      operations.cancel();
+    };
+  }, [operations]);
   const value = useMemo(
     () => ({
       ...state,
+      paused: operations.isPaused(),
+      elapsed: operations.elapsed,
+      toggleTimer: operations.toggleTimer,
       problem,
       definition,
       beginOperation: operations.begin,

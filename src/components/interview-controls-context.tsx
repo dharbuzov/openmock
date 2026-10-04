@@ -8,7 +8,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { InterviewTimer } from "@/lib/interview/timer";
+import { useInterviewSession } from "./interview-session-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { readSettings } from "@/lib/settings/storage";
 
@@ -35,8 +35,7 @@ export function InterviewControlsProvider({
   children: ReactNode;
 }) {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
-  const [timer] = useState(() => new InterviewTimer());
-  const [paused, setPaused] = useState(true);
+  const { paused, elapsed, toggleTimer } = useInterviewSession();
   const [voiceEnabled, setVoiceEnabled] = useState(
     () => readSettings().interviewerVoiceEnabled,
   );
@@ -61,12 +60,8 @@ export function InterviewControlsProvider({
       speechAvailable,
       playbackAvailable,
       paused,
-      elapsed: timer.elapsed,
-      toggleTimer: () => {
-        if (paused) timer.resume();
-        else timer.pause();
-        setPaused(!paused);
-      },
+      elapsed,
+      toggleTimer,
     }),
     [
       recordingState,
@@ -74,7 +69,8 @@ export function InterviewControlsProvider({
       speechAvailable,
       playbackAvailable,
       paused,
-      timer,
+      elapsed,
+      toggleTimer,
     ],
   );
   return (

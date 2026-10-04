@@ -27,8 +27,8 @@ export function InterviewControls() {
   );
   const { recordingState, paused, toggleTimer, elapsed } =
     useInterviewControls();
-  const { definition } = useInterviewSession();
-  const duration = definition.duration.defaultMinutes * 60_000;
+  const { interview } = useInterviewSession();
+  const duration = interview.durationMinutes * 60_000;
   const [remaining, setRemaining] = useState(duration);
   const time = formatRemaining(remaining);
   const overtime = remaining < 0;

@@ -1,7 +1,20 @@
+export type TimerSnapshot = { elapsedMs: number; runningSince: number | null };
+
 export class InterviewTimer {
   private accumulated = 0;
   private runningSince: number | null = null;
-  constructor(private readonly now = Date.now) {}
+  constructor(
+    private readonly now = Date.now,
+    snapshot?: TimerSnapshot,
+  ) {
+    this.accumulated = snapshot?.elapsedMs ?? 0;
+    this.runningSince = snapshot?.runningSince ?? null;
+  }
+  snapshot = (): TimerSnapshot => ({
+    elapsedMs: this.accumulated,
+    runningSince: this.runningSince,
+  });
+  isPaused = (): boolean => this.runningSince === null;
   elapsed = (): number =>
     this.accumulated +
     (this.runningSince === null

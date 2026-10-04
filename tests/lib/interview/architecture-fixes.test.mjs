@@ -44,7 +44,7 @@ test("Send and Finish share a synchronous lock and finishing reads the latest co
   session.commit(send, answered);
   session.end(send);
   const finish = session.begin("finish");
-  assert.equal(finish.interview, answered);
+  assert.deepEqual(finish.interview.messages, answered.messages);
   assert.equal(session.begin("send"), null);
   assert.equal(session.commit(send, candidate), false);
   session.end(send);
@@ -69,7 +69,7 @@ test("failed and cancelled operations release the lock while late results cannot
   session.commit(first, candidate);
   session.end(first);
   const retry = session.begin("send");
-  assert.equal(retry.interview, candidate);
+  assert.deepEqual(retry.interview.messages, candidate.messages);
   session.cancel();
   assert.equal(retry.controller.signal.aborted, true);
   const current = session.begin("finish");
@@ -499,4 +499,58 @@ test("domain result schema reads existing JSON and one storage supports writes a
   } finally {
     delete globalThis.window;
   }
+});
+
+const { resolveInterviewDuration } = load("../src/lib/interview/duration.ts");
+
+test("duration resolves override or definition default and active interviews retain their captured value", () => {
+  assert.equal(
+    resolveInterviewDuration(problem, definition),
+    definition.duration.defaultMinutes,
+  );
+  const overridden = { ...problem, duration: { minutes: 17 } };
+  const started = startInterview(overridden, { definition });
+  assert.equal(started.durationMinutes, 17);
+  assert.equal(started.timer.runningSince, Date.parse(started.startedAt));
+  assert.equal(
+    resolveInterviewDuration(
+      { ...overridden, duration: { minutes: 25 } },
+      definition,
+      started.durationMinutes,
+    ),
+    17,
+  );
+});
+
+test("one session timer survives checkpoints, running recovery, paused recovery, and completion", () => {
+  let now = 1000,
+    saved;
+  const started = { ...initial(), timer: { elapsedMs: 0, runningSince: now } };
+  const persist = (state) => {
+    saved = JSON.parse(JSON.stringify(state.interview));
+  };
+  const session = new SessionOperations(started, persist, () => now);
+  assert.equal(session.isPaused(), false);
+  now += 2000;
+  session.checkpoint();
+  session.checkpoint();
+  assert.equal(session.elapsed(), 2000);
+  now += 3000;
+  const recovered = new SessionOperations(saved, persist, () => now);
+  assert.equal(recovered.elapsed(), 5000);
+  recovered.toggleTimer();
+  assert.equal(recovered.isPaused(), true);
+  now += 90000;
+  const paused = new SessionOperations(saved, persist, () => now);
+  assert.equal(paused.isPaused(), true);
+  assert.equal(paused.elapsed(), 5000);
+  paused.toggleTimer();
+  now += 1000;
+  const request = paused.begin("finish");
+  assert.equal(request.interview.elapsedMs, 6000);
+  paused.commit(request, { ...request.interview, status: "completed" });
+  paused.end(request);
+  now += 10000;
+  assert.equal(paused.elapsed(), 6000);
+  assert.equal(saved.timer.runningSince, null);
 });
