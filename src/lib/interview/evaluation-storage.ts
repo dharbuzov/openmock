@@ -1,3 +1,4 @@
+import { evaluationFailureSchema } from "./evaluation-error";
 import { logger } from "../logging/logger";
 import { deserialize, sessionStorage } from "../storage/local-storage";
 import type { Storage } from "../storage/storage";
@@ -32,10 +33,7 @@ const resultsRecordSchema = z.object({
     z.object({ status: z.literal("completed"), result: interviewResultSchema }),
     z.object({
       status: z.literal("failed"),
-      error: z.object({
-        name: z.literal("EvaluationError"),
-        message: z.string(),
-      }),
+      error: evaluationFailureSchema,
     }),
     z.object({ status: z.literal("incomplete"), reason: z.string() }),
   ]),

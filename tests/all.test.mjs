@@ -35,3 +35,5 @@ import "./components/ai-interviewer.test.mjs";
 import "./components/local-voice.test.mjs";
 import "./lib/voice/local-speech.test.mjs";
 import "./lib/voice/speech-stream.test.mjs";
+
+import "./lib/interview/evaluation-error.test.mjs";

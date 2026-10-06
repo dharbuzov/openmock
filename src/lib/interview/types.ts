@@ -178,7 +178,7 @@ export type InterviewResult = {
 export type EvaluationOutcome =
   | { status: "completed"; result: InterviewResult }
   | { status: "incomplete"; reason: string }
-  | { status: "failed"; error: { name: "EvaluationError"; message: string } };
+  | { status: "failed"; error: import("./evaluation-error").EvaluationFailure };
 
 export type FinishedInterview = {
   interview: Interview;

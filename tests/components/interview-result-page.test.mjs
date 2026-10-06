@@ -44,16 +44,27 @@ test("result page replaces loading with failure and retries into the existing sc
   let tree = render();
   assert.equal(
     findElement(tree, (n) => n.props.role === "alert").props.children,
-    "We couldn't generate your evaluation.",
+    "Something went wrong while evaluating your interview.",
   );
   const retry = findElement(tree, (n) => n.type === "button");
   const first = retry.props.onClick();
   await retry.props.onClick();
   assert.equal(requests.length, 2);
   assert.equal(render().props.role, "status");
-  const record = { evaluation: { status: "completed", result: {} } };
-  requests[1].resolve(record);
+  requests[1].reject(
+    Object.assign(new Error("Rate limit"), { statusCode: 429 }),
+  );
   await first;
+  tree = render();
+  assert.equal(
+    findElement(tree, (n) => n.props.role === "alert").props.children,
+    "The AI provider rate limit was reached. Please try again shortly.",
+  );
+  const second = findElement(tree, (n) => n.type === "button").props.onClick();
+  assert.equal(render().props.role, "status");
+  const record = { evaluation: { status: "completed", result: {} } };
+  requests[2].resolve(record);
+  await second;
   tree = render();
   assert.equal(
     findElement(tree, (n) => n.type === "scorecard").props.record,
@@ -63,5 +74,5 @@ test("result page replaces loading with failure and retries into the existing sc
     findElement(tree, (n) => n.type === "scorecard").props.interviewId,
     "session",
   );
-  assert.equal(requests.length, 2);
+  assert.equal(requests.length, 3);
 });

@@ -1,3 +1,4 @@
+import { evaluationFailure } from "./evaluation-error";
 import { logger } from "../logging/logger";
 import { createTurnContext, type TurnContext } from "../logging/turn";
 import type { Problem } from "../problems/types";
@@ -195,11 +196,10 @@ export async function retryEvaluation(
       interview,
       evaluation: {
         status: "failed",
-        error: {
-          name: "EvaluationError",
-          message:
-            "Evaluation failed. Check your AI settings and retry evaluation.",
-        },
+        error: evaluationFailure(error, {
+          provider: settings.provider,
+          model: settings.model,
+        }),
       },
     };
   }

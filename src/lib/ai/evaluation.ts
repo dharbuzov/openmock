@@ -1,3 +1,7 @@
+import {
+  evaluationFailure,
+  type EvaluationFailure,
+} from "../interview/evaluation-error";
 import { loggedGenerateText } from "./logging";
 import {
   ownValue,
@@ -10,7 +14,7 @@ import { z } from "zod";
 import { Output, type LanguageModel } from "ai";
 import type { InterviewContext, InterviewResult } from "../interview/types";
 import type { AISettings } from "../settings/types";
-import { getLanguageModel, AIConfigurationError } from "./model";
+import { getLanguageModel } from "./model";
 import { loadPrompt } from "./prompt-loader";
 
 import {
@@ -27,6 +31,7 @@ const evaluatorOutputSchema = interviewResultSchema.omit({
 });
 
 export class EvaluationError extends Error {
+  failure?: EvaluationFailure;
   constructor(
     message = "Could not evaluate the interview. Check your AI settings and try again.",
     options?: ErrorOptions,
@@ -276,6 +281,11 @@ export async function evaluateInterviewWithModel(
       error instanceof EvaluationError
         ? error
         : new EvaluationError("Model evaluation failed", { cause: error });
+    failure.failure = evaluationFailure(failure, {
+      provider: metadata.provider,
+      model: metadata.model,
+      requestId: metadata.turnId,
+    });
     logger.error(
       {
         ...metadata,
@@ -324,14 +334,18 @@ export async function evaluateInterview(
         },
         "AI configuration failed",
       );
-    if (
-      error instanceof AIConfigurationError ||
+    const failure =
       error instanceof EvaluationError
-    )
-      throw error;
-    throw new EvaluationError("Evaluation configuration failed", {
-      cause: error,
+        ? error
+        : new EvaluationError("Evaluation configuration failed", {
+            cause: error,
+          });
+    failure.failure = evaluationFailure(failure, {
+      provider: settings.provider,
+      model: settings.model,
+      requestId: turnContext.turnId,
     });
+    throw failure;
   } finally {
     releaseCredentials();
   }
