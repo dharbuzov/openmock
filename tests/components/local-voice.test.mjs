@@ -159,12 +159,9 @@ async function withBrowser(run) {
       return { duration: 1 };
     }
     createBufferSource() {
-
       return {
-        connect() {
-        },
-        disconnect() {
-        },
+        connect() {},
+        disconnect() {},
         start(time) {
           this.time = time;
           played.push(this);
@@ -467,6 +464,10 @@ function voiceHarness(controls) {
             voice: "af_heart",
           }),
         };
+      if (name === "@/lib/logging/logger")
+        return load("../src/lib/logging/logger.ts");
+      if (name === "@/lib/logging/turn")
+        return load("../src/lib/logging/turn.ts");
       throw new Error(`Unexpected import ${name}`);
     },
     loadedModule,

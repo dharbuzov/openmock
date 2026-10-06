@@ -1,4 +1,5 @@
 import { logger } from "../logging/logger";
+import { createTurnContext, type TurnContext } from "../logging/turn";
 import type { Problem } from "../problems/types";
 import type { AISettings } from "../settings/types";
 import {
@@ -23,6 +24,7 @@ export async function processCandidateMessage(
   signal?: AbortSignal,
   onMessage?: (message: string) => void,
   opening = false,
+  turnContext?: TurnContext,
 ): Promise<Interview> {
   if (
     interview.status !== "in-progress" ||
@@ -31,45 +33,105 @@ export async function processCandidateMessage(
       : interview.messages.at(-1)?.role !== "candidate")
   )
     return interview;
-  if (interview.stage.current === null)
-    throw new InterviewStateError("No active interview stage.");
-  const context = buildInterviewContext(
-    interview,
-    problem,
-    definition,
-    snapshot,
-  );
-  if (!definition.stages.some(({ id }) => id === interview.stage.current))
-    throw new InterviewStateError("Unknown current interview stage.");
-  const { generateInterviewResponse } = await import("../ai/provider");
   const metadata = {
+    ...(turnContext ?? createTurnContext(interview.id)),
+    component: "interview-engine",
+    operation: "candidate-turn",
     interviewId: interview.id,
     stageId: interview.stage.current,
   };
+  const started = performance.now();
+  if (logger.isLevelEnabled("trace"))
+    logger.trace(
+      {
+        ...metadata,
+        interview,
+        problem,
+        definition,
+        workspace: snapshot,
+        opening,
+      },
+      "INTERVIEW_STATE_BEFORE",
+    );
   logger.debug(
     metadata,
     opening ? "Interview opening requested" : "User turn received",
   );
   // The provider's Output.object Zod schema validates raw output before returning.
-  const turn = await generateInterviewResponse(
-    settings,
-    context,
-    signal,
-    onMessage,
-  );
-  logger.debug(metadata, "AI response received");
-  const updated = applyInterviewTurn(
-    interview,
-    definition,
-    opening ? { ...turn, stageComplete: false, observations: [] } : turn,
-  );
-  logger.debug(metadata, "Interview turn applied");
-  if (updated.stage.current !== interview.stage.current)
-    logger.debug(
-      { ...metadata, nextStage: updated.stage.current },
-      "Stage transitioned",
+  try {
+    if (interview.stage.current === null)
+      throw new InterviewStateError("No active interview stage.");
+    const context = buildInterviewContext(
+      interview,
+      problem,
+      definition,
+      snapshot,
     );
-  return updated;
+    if (!definition.stages.some(({ id }) => id === interview.stage.current))
+      throw new InterviewStateError("Unknown current interview stage.");
+    const { generateInterviewResponse } = await import("../ai/provider");
+    const turn = await generateInterviewResponse(
+      settings,
+      context,
+      signal,
+      onMessage,
+      metadata,
+    );
+    logger.debug(metadata, "AI response received");
+    if (logger.isLevelEnabled("trace"))
+      logger.trace(
+        {
+          ...metadata,
+          decision: turn,
+          appliedDecision: opening
+            ? { ...turn, stageComplete: false, observations: [] }
+            : turn,
+        },
+        "INTERVIEW_DECISION",
+      );
+    const updated = applyInterviewTurn(
+      interview,
+      definition,
+      opening ? { ...turn, stageComplete: false, observations: [] } : turn,
+    );
+    logger.debug(metadata, "Interview turn applied");
+    if (updated.stage.current !== interview.stage.current) {
+      const transition = {
+        ...metadata,
+        previousStage: interview.stage.current,
+        nextStage: updated.stage.current,
+      };
+      logger.debug(transition, "STAGE_TRANSITION");
+      logger.info(transition, "Stage transitioned");
+    }
+    if (logger.isLevelEnabled("trace"))
+      logger.trace(
+        {
+          ...metadata,
+          previousStage: interview.stage.current,
+          currentStage: updated.stage.current,
+          interview: updated,
+        },
+        "INTERVIEW_STATE_AFTER",
+      );
+    logger.debug(
+      { ...metadata, durationMs: Math.round(performance.now() - started) },
+      "ENGINE_COMPLETED",
+    );
+    return updated;
+  } catch (error) {
+    logger.error(
+      {
+        ...metadata,
+        provider: settings.provider,
+        model: settings.model,
+        err: error,
+        durationMs: Math.round(performance.now() - started),
+      },
+      "ENGINE_FAILED",
+    );
+    throw error;
+  }
 }
 
 export async function finishInterview(

@@ -190,7 +190,7 @@ Next.js routes and content loaders run on Node; the interview engine is shared.
 There is no NestJS service.
 
 Levels: trace, debug, info, warn, error, fatal. Defaults are debug in development
-and info in production; invalid levels fall back to info. Set `LOG_LEVEL=debug`
+and info in production; invalid levels fall back to info. Set `LOG_LEVEL=trace`
 before starting Next.js. The same level is inlined into browser builds; rebuild
 production assets to change browser verbosity. `NEXT_PUBLIC_LOG_LEVEL` is an
 alternative browser setting when LOG_LEVEL is unset.
@@ -209,14 +209,17 @@ and provider credentials) and recognizable/configured secret values in strings.
 Normal prompts, messages, definitions, workspace data and model output remain
 intact without truncation. Getters and circular references are not serialized.
 
-At DEBUG/TRACE verbosity, every interviewer turn, evaluation and connection test
-logs a full AI request and response with a shared requestId and durationMs.
-Interview calls also include interviewId, stageId, targetLevel and workspace.
-For V3 providers, logs include the SDK provider parameters and raw provider result
-before parsing/schema validation, including available wire request/response bodies.
-Failures include the same request/available response at debug verbosity.
-Production INFO logs keep metadata, errors and evaluation diagnostics; payload
-logs require explicitly enabling DEBUG/TRACE.
+INFO records interview lifecycle, stage transitions and connection tests. DEBUG
+records request lifecycle, endpoints/statuses, IDs, sizes, usage and timings.
+TRACE adds complete prompts, model/wire requests and raw responses, parsed output,
+STT results, TTS input, and interview state before/after decisions. Payloads are
+never truncated; credentials remain redacted and binary audio is never logged.
+Each candidate interaction carries one interviewId/turnId through STT, the engine,
+LLM and TTS; requestId distinguishes individual calls and retries. Configuration
+and evaluation calls have their own request/operation context.
+
+See [TRACE observability](docs/trace-observability.md) for timing semantics,
+verification and a complete captured example from a mock interview turn.
 
 Error serialization preserves sanitized messages, names, codes/statuses and bounded
 causes without arbitrary SDK config/request objects. Sanitized stack frames appear
@@ -227,8 +230,8 @@ parse/validation outcomes and sanitized issue paths/messages.
 
 `lib/interview/engine.ts` owns state transitions and validates definition identity,
 workspace capability and active stages. It has no AI/settings/logging dependencies.
-`runner.ts` coordinates AI turns and evaluation with metadata-only operational logs;
-AI boundary DEBUG payload logging remains separate.
+`runner.ts` coordinates AI turns and evaluation with operational metadata and
+TRACE state/decision snapshots. The engine itself remains independent of logging.
 
 Definitions explicitly declare `defaultLevel` and `defaultMode`, validated against
 their available arrays during loading. The final stage clears `stage.current` to

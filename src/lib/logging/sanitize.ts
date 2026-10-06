@@ -74,17 +74,21 @@ export function sanitizeString(value: string): string {
 }
 
 export function ownValue(value: unknown, key: string): unknown {
-  if (!value || typeof value !== "object") return undefined;
-  let current: object | null = value;
-  for (let depth = 0; current && depth < (key === "name" ? 5 : 1); depth++) {
-    const descriptor = Object.getOwnPropertyDescriptor(current, key);
-    if (descriptor) return descriptor.value;
-    current = Object.getPrototypeOf(current);
+  try {
+    if (!value || typeof value !== "object") return undefined;
+    let current: object | null = value;
+    for (let depth = 0; current && depth < (key === "name" ? 5 : 1); depth++) {
+      const descriptor = Object.getOwnPropertyDescriptor(current, key);
+      if (descriptor) return descriptor.value;
+      current = Object.getPrototypeOf(current);
+    }
+    return undefined;
+  } catch {
+    return undefined;
   }
-  return undefined;
 }
 
-export type ErrorOptions = { includeStack?: boolean };
+export type ErrorOptions = { includeStack?: boolean; fullContent?: boolean };
 export function safeError(
   error: unknown,
   options: ErrorOptions = {},
@@ -117,7 +121,7 @@ export function safeError(
     else if (typeof value === "string") {
       // AI SDK wrapper messages embed complete response text/value. Preserve the
       // explanation and use the cause for parsing/schema details instead.
-      if (key === "message")
+      if (key === "message" && !options.fullContent)
         value = value
           .replace(
             /(JSON parsing failed:) Text:[\s\S]*/,
@@ -127,7 +131,11 @@ export function safeError(
             /(Type validation failed[^:]*:) Value:[\s\S]*/,
             "$1 [response omitted]",
           );
-      if (key === "message" && ownValue(error, "name") === "SyntaxError")
+      if (
+        key === "message" &&
+        !options.fullContent &&
+        ownValue(error, "name") === "SyntaxError"
+      )
         value = (value as string).replace(
           /"[^"]*"/g,
           "[response excerpt omitted]",
@@ -147,6 +155,13 @@ export function safeError(
   const cause = ownValue(error, "cause");
   if (cause !== undefined)
     result.cause = safeError(cause, options, seen, depth + 1);
+  if (options.fullContent) {
+    for (const key of ["text", "responseBody", "data", "value", "issues"]) {
+      const value = ownValue(error, key);
+      if (value !== undefined)
+        result[key] = redactSecrets(value, seen, options);
+    }
+  }
   if (options.includeStack ?? process.env.NODE_ENV !== "production") {
     const stack = ownValue(error, "stack");
     // Keep frames only; the header may contain raw response text from SDK errors.
@@ -170,6 +185,10 @@ export function redactSecrets(
   if (typeof value === "string") return sanitizeString(value);
   if (value instanceof Error) return safeError(value, options);
   if (!value || typeof value !== "object") return value;
+  if (value instanceof ArrayBuffer || ArrayBuffer.isView(value))
+    return { binaryBytes: value.byteLength };
+  if (typeof Blob !== "undefined" && value instanceof Blob)
+    return { binaryBytes: value.size, contentType: value.type };
   if (value instanceof Date) return value.toISOString();
   if (ancestors.has(value)) return "[OMITTED]";
   ancestors.add(value);

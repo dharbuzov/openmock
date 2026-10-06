@@ -8,7 +8,10 @@ export function isPromptName(value: string): value is PromptName {
 
 const prompts = new Map<PromptName, Promise<string>>();
 
-export function loadPrompt(name: PromptName): Promise<string> {
+export function loadPrompt(
+  name: PromptName,
+  context: Record<string, unknown> = {},
+): Promise<string> {
   const existing = prompts.get(name);
   if (existing) return existing;
   const pending = fetch(`/api/prompts/${name}`)
@@ -23,7 +26,13 @@ export function loadPrompt(name: PromptName): Promise<string> {
     })
     .catch((error: unknown) => {
       logger.error(
-        { operation: "load-prompt", name, err: error },
+        {
+          ...context,
+          component: "prompts",
+          operation: "load-prompt",
+          name,
+          err: error,
+        },
         "Prompt loading failed",
       );
       prompts.delete(name);

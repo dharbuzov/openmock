@@ -1,6 +1,7 @@
 import type { TextToSpeech } from "./tts";
 import { SentenceBuffer } from "./sentence-buffer";
 import { logger } from "../logging/logger";
+import type { TurnContext } from "../logging/turn";
 
 export type SpeechTimingEvent =
   | "LLM first token"
@@ -12,17 +13,17 @@ export class SpeechLatency {
   private readonly started = performance.now();
   private readonly seen = new Set<SpeechTimingEvent>();
   private firstToken?: number;
-  private readonly turnId = crypto.randomUUID();
+  constructor(private readonly context?: TurnContext) {}
 
   mark(event: SpeechTimingEvent): void {
     if (this.seen.has(event)) return;
     this.seen.add(event);
     const now = performance.now();
     if (event === "LLM first token") this.firstToken = now;
-    if (process.env.NODE_ENV === "development") {
+    if (logger.isLevelEnabled("debug")) {
       logger.debug(
         {
-          turnId: this.turnId,
+          ...this.context,
           event,
           elapsedMs: Math.round(now - this.started),
           sinceFirstTokenMs:
@@ -41,6 +42,8 @@ export class SpeechStream {
   private readonly controller = new AbortController();
   private readonly pending: string[] = [];
   private processing = false;
+  private final = false;
+  private completed = false;
 
   constructor(
     private readonly provider: TextToSpeech,
@@ -51,6 +54,7 @@ export class SpeechStream {
     ) => Promise<void>,
     private readonly onError: (error: unknown) => void,
     private readonly timing: (event: SpeechTimingEvent) => void,
+    private readonly onComplete?: () => void,
   ) {}
 
   get isPending(): boolean {
@@ -59,6 +63,7 @@ export class SpeechStream {
 
   push(snapshot: string, final = false): void {
     if (this.controller.signal.aborted) return;
+    this.final ||= final;
     try {
       if (snapshot) this.timing("LLM first token");
       this.pending.push(...this.buffer.push(snapshot, final));
@@ -92,6 +97,10 @@ export class SpeechStream {
       }
     } finally {
       this.processing = false;
+      if (this.final && !this.completed && !this.controller.signal.aborted) {
+        this.completed = true;
+        this.onComplete?.();
+      }
     }
   }
 

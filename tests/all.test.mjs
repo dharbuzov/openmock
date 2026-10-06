@@ -1,5 +1,6 @@
 import "./lib/problems/schema.test.mjs";
 import "./lib/logging/logging.test.mjs";
+import "./lib/logging/trace-pipeline.test.mjs";
 import "./lib/problems/loader.test.mjs";
 import "./lib/diagram/normalize-excalidraw.test.mjs";
 import "./lib/interview/engine.test.mjs";

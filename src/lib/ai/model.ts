@@ -8,6 +8,7 @@ import {
 } from "ai";
 import type { AISettings } from "../settings/types";
 import { normalizeOllamaBaseUrl } from "./ollama";
+import { loggedProviderFetch } from "./logging";
 
 export class AIConfigurationError extends Error {
   constructor(message: string) {
@@ -16,7 +17,14 @@ export class AIConfigurationError extends Error {
   }
 }
 
-export function getLanguageModel(settings: AISettings): LanguageModel {
+export function getLanguageModel(
+  settings: AISettings,
+  context: Record<string, unknown> = {},
+): LanguageModel {
+  const fetch = loggedProviderFetch(
+    { provider: settings.provider, model: settings.model, ...context },
+    "apiKey" in settings ? [settings.apiKey] : [],
+  );
   if (!settings.model.trim())
     throw new AIConfigurationError("Select an AI model before continuing.");
 
@@ -27,7 +35,9 @@ export function getLanguageModel(settings: AISettings): LanguageModel {
           "Enter an OpenAI API key before continuing.",
         );
       return wrapLanguageModel({
-        model: createOpenAI({ apiKey: settings.apiKey.trim() })(settings.model),
+        model: createOpenAI({ apiKey: settings.apiKey.trim(), fetch })(
+          settings.model,
+        ),
         middleware: defaultSettingsMiddleware({
           settings: { providerOptions: { openai: { store: false } } },
         }),
@@ -40,12 +50,15 @@ export function getLanguageModel(settings: AISettings): LanguageModel {
         );
       return createAnthropic({
         apiKey: settings.apiKey.trim(),
+        fetch,
         headers: { "anthropic-dangerous-direct-browser-access": "true" },
       })(settings.model);
     }
     case "ollama": {
       const baseURL = `${normalizeOllamaBaseUrl(settings.baseUrl)}/api`;
-      return createOllama({ baseURL, compatibility: "strict" })(settings.model);
+      return createOllama({ baseURL, compatibility: "strict", fetch })(
+        settings.model,
+      );
     }
   }
 }

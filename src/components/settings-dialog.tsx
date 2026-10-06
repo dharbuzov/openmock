@@ -45,6 +45,7 @@ import {
   saveSpeechSettings,
 } from "@/lib/settings/storage";
 import { LocalKokoro, speechUrl } from "@/lib/voice/local-speech";
+import { logger } from "@/lib/logging/logger";
 import {
   aiProviders,
   anthropicModels,
@@ -238,6 +239,13 @@ export function AISettingsForm({
   async function testSpeechConnection() {
     if (speechController.current) return;
     const request = new AbortController();
+    const started = performance.now();
+    const metadata = {
+      component: "speech",
+      operation: "connection-test",
+      requestId: crypto.randomUUID(),
+      endpoint: `${speech.baseUrl}/health`,
+    };
     speechController.current = request;
     setSpeechConnectionState("testing");
     setSpeechConnectionError("");
@@ -249,6 +257,16 @@ export function AISettingsForm({
       });
       if (!response.ok) throw new Error("Speech service unavailable");
       const health = await response.json();
+      logger.debug(
+        {
+          ...metadata,
+          status: response.status,
+          durationMs: Math.round(performance.now() - started),
+        },
+        "Speech health received",
+      );
+      if (logger.isLevelEnabled("trace"))
+        logger.trace({ ...metadata, health }, "SPEECH_HEALTH_RESPONSE");
       if (request.signal.aborted) return;
       // Models load on first use; not-loaded and working are healthy states.
       const capabilities = [health?.stt, health?.tts];
@@ -259,6 +277,15 @@ export function AISettingsForm({
             !["ready", "not-loaded", "working"].includes(capability.status),
         )
       ) {
+        logger.error(
+          {
+            ...metadata,
+            sttStatus: health?.stt?.status,
+            ttsStatus: health?.tts?.status,
+            durationMs: Math.round(performance.now() - started),
+          },
+          "Speech capabilities unavailable",
+        );
         setSpeechConnectionState("error");
         setSpeechConnectionError(
           "Speech recognition or voice playback is unavailable. Check the speech service and retry.",
@@ -266,7 +293,16 @@ export function AISettingsForm({
         return;
       }
       setSpeechConnectionState("connected");
-    } catch {
+      logger.info(metadata, "Speech connection tested");
+    } catch (error) {
+      logger.error(
+        {
+          ...metadata,
+          err: error,
+          durationMs: Math.round(performance.now() - started),
+        },
+        "Speech connection test failed",
+      );
       if (!request.signal.aborted) {
         setSpeechConnectionState("error");
         setSpeechConnectionError(
@@ -281,6 +317,7 @@ export function AISettingsForm({
   function selectProvider(provider: AIProviderId) {
     if (provider === settings.provider) return;
     resetAIConnection();
+    logger.info({ component: "settings", provider }, "AI provider selected");
     setSettings({
       ...readProviderSettings(provider),
       interviewerVoiceEnabled: settings.interviewerVoiceEnabled,

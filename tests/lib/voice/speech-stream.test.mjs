@@ -218,14 +218,21 @@ test("queue cancellation stops scheduled nodes and rejects late decoder output",
   assert.equal(ctx.sources[0].stopped, true);
 });
 
-test("voice timings are development-only, metadata-only, and logged once per milestone", () => {
+test("voice timings follow DEBUG level, preserve turn correlation, and log once per milestone", () => {
   const { installLogger } = load("../src/lib/logging/logger.ts");
   const original = process.env.NODE_ENV;
   const events = [];
-  installLogger({ debug: (context) => events.push(context) });
+  installLogger({
+    debug: (context) => events.push(context),
+    isLevelEnabled: () => true,
+  });
   try {
     process.env.NODE_ENV = "development";
-    const timing = new SpeechLatency();
+    const timing = new SpeechLatency({
+      interviewId: "interview",
+      turnId: "turn",
+      startedAt: performance.now(),
+    });
     for (const event of [
       "LLM first token",
       "TTS first chunk submitted",
@@ -237,12 +244,20 @@ test("voice timings are development-only, metadata-only, and logged once per mil
     }
     assert.equal(events.length, 4);
     assert.equal(events[0].sinceFirstTokenMs, 0);
+    assert.equal(events[0].turnId, "turn");
+    assert.equal(events[0].interviewId, "interview");
     assert.ok(
       events.every((event) => !("text" in event) && event.elapsedMs >= 0),
     );
     process.env.NODE_ENV = "production";
     new SpeechLatency().mark("LLM first token");
-    assert.equal(events.length, 4);
+    assert.equal(events.length, 5);
+    installLogger({
+      debug: (context) => events.push(context),
+      isLevelEnabled: () => false,
+    });
+    new SpeechLatency().mark("LLM first token");
+    assert.equal(events.length, 5);
   } finally {
     if (original === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = original;

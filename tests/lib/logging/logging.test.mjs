@@ -246,6 +246,41 @@ test("cause chains are bounded and circular causes do not recurse", () => {
   assert.equal(safeError(error).cause.message, "Cause chain omitted");
 });
 
+test("TRACE preserves diagnostic error content while redacting secrets and omitting binary bytes", () => {
+  const logs = [];
+  const log = wrapLogger(
+    pino({ level: "trace" }, { write: (line) => logs.push(JSON.parse(line)) }),
+  );
+  const error = Object.assign(
+    new SyntaxError('Invalid JSON "candidate content" ' + secret),
+    {
+      text: "complete model output " + secret,
+      responseBody: "complete provider error body " + secret,
+      data: { apiKey: secret, details: "useful diagnostic content" },
+    },
+  );
+  log.trace(
+    {
+      err: error,
+      audio: new Uint8Array([1, 2, 3]),
+      blob: new Blob(["audio"]),
+      array: new ArrayBuffer(7),
+    },
+    "PARSE_FAILED",
+  );
+  assert.ok(logs[0].err.message.includes('"candidate content"'));
+  assert.equal(logs[0].err.text, "complete model output [REDACTED]");
+  assert.equal(
+    logs[0].err.responseBody,
+    "complete provider error body [REDACTED]",
+  );
+  assert.equal(logs[0].err.data.details, "useful diagnostic content");
+  assert.deepEqual(logs[0].audio, { binaryBytes: 3 });
+  assert.equal(logs[0].blob.binaryBytes, 5);
+  assert.equal(logs[0].array.binaryBytes, 7);
+  assert.ok(!JSON.stringify(logs).includes(secret));
+});
+
 test("secret redaction preserves complete application payloads without truncation", () => {
   const { redactSecrets } = load("../src/lib/logging/sanitize.ts");
   const prompt = "Explain the cache design. ".repeat(1000);

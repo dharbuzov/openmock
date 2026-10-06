@@ -11,6 +11,8 @@ import { AudioQueue } from "@/lib/voice/audio-queue";
 import { SpeechStream, SpeechLatency } from "@/lib/voice/speech-stream";
 import type { InterviewMessage } from "@/lib/interview/types";
 import { useInterviewControls } from "./interview-controls-context";
+import { logger } from "@/lib/logging/logger";
+import { createTurnContext, type TurnContext } from "@/lib/logging/turn";
 
 export function useInterviewVoice({
   messages,
@@ -19,13 +21,17 @@ export function useInterviewVoice({
   onDictation,
   onRecordedAnswer,
   finishing = false,
+  interviewId = "unassigned",
+  getTurnContext,
 }: {
   messages: InterviewMessage[];
   busy: boolean;
   finishing?: boolean;
   active: boolean;
-  onDictation: (text: string) => void;
-  onRecordedAnswer?: (text: string) => void;
+  interviewId?: string;
+  getTurnContext?: () => TurnContext;
+  onDictation: (text: string, context?: TurnContext) => void;
+  onRecordedAnswer?: (text: string, context?: TurnContext) => void;
 }) {
   const {
     recordingState,
@@ -59,10 +65,15 @@ export function useInterviewVoice({
   const playbackGeneration = useRef(0);
   const spoken = useRef(messages.at(-1)?.id);
   const playbackMessage = useRef<InterviewMessage | null>(null);
-  const deliver = (text: string, intent: "edit" | "send") => {
+  const playbackTurnContext = useRef<TurnContext | undefined>(undefined);
+  const deliver = (
+    text: string,
+    intent: "edit" | "send",
+    context?: TurnContext,
+  ) => {
     if (active && !busy && text.trim()) {
-      if (intent === "send") onRecordedAnswer?.(text.trim());
-      else onDictation(text.trim());
+      if (intent === "send") onRecordedAnswer?.(text.trim(), context);
+      else onDictation(text.trim(), context);
     }
   };
   const deliverLatest = useRef(deliver);
@@ -108,10 +119,22 @@ export function useInterviewVoice({
     setSpeaking(false);
   }
 
-  function beginResponse(signal?: AbortSignal) {
+  function beginResponse(signal?: AbortSignal, context?: TurnContext) {
     stopPlayback();
     const generation = playbackGeneration.current;
-    latency.current = new SpeechLatency();
+    latency.current = new SpeechLatency(context);
+    playbackTurnContext.current = context;
+    const complete = () => {
+      if (context)
+        logger.info(
+          {
+            ...context,
+            component: "interview-turn",
+            durationMs: Math.round(performance.now() - context.startedAt),
+          },
+          "TURN_COMPLETED",
+        );
+    };
     let current: SpeechStream | null = null;
     if (
       voiceEnabled &&
@@ -137,7 +160,7 @@ export function useInterviewVoice({
         const settings = readSpeechSettings();
         const timing = latency.current;
         current = new SpeechStream(
-          new LocalKokoro(settings.baseUrl),
+          new LocalKokoro(settings.baseUrl, context),
           settings.voice,
           async (audio, chunkSignal) => {
             if (!chunkSignal.aborted) await queue.enqueue(audio, chunkSignal);
@@ -152,6 +175,7 @@ export function useInterviewVoice({
             );
           },
           (event) => timing.mark(event),
+          complete,
         );
         const cancel = () => {
           if (generation === playbackGeneration.current) stopPlayback();
@@ -175,6 +199,7 @@ export function useInterviewVoice({
         spoken.current = message.id;
         playbackMessage.current = message;
         current?.push(message.content, true);
+        if (!current) complete();
       },
       cancel: () => {
         if (generation === playbackGeneration.current) stopPlayback();
@@ -184,7 +209,12 @@ export function useInterviewVoice({
 
   const play = (message: InterviewMessage) => {
     if (busy || !active) return;
-    beginResponse().finish(message);
+    beginResponse(
+      undefined,
+      playbackMessage.current?.id === message.id
+        ? playbackTurnContext.current
+        : createTurnContext(interviewId),
+    ).finish(message);
   };
   const playCommitted = useEffectEvent(play);
   const cancelRecordingOnCleanup = useEffectEvent(cancelRecording);
@@ -277,6 +307,17 @@ export function useInterviewVoice({
         setError("Microphone recording failed. You can still type.");
       };
       recorder.onstop = async () => {
+        const context = getTurnContext?.() ?? createTurnContext(interviewId);
+        logger.debug(
+          {
+            ...context,
+            component: "candidate-input",
+            operation: "recorded-answer",
+            audioBytes: bytes,
+            contentType: recorder.mimeType,
+          },
+          "CANDIDATE_AUDIO_INPUT",
+        );
         recording.current = null;
         releaseMicrophone();
         const intent = recordingIntent.current;
@@ -284,7 +325,10 @@ export function useInterviewVoice({
           intent === "send" ? "transcribing-for-send" : "transcribing-for-edit",
         );
         try {
-          const result = await new LocalWhisper(settings.baseUrl).transcribe(
+          const result = await new LocalWhisper(
+            settings.baseUrl,
+            context,
+          ).transcribe(
             new Blob(chunks, { type: recorder.mimeType }),
             AbortSignal.any([request.signal, AbortSignal.timeout(180_000)]),
           );
@@ -292,7 +336,7 @@ export function useInterviewVoice({
           if (!result.text.trim()) throw new Error("No speech detected.");
           recordingRequest.current = null;
           setRecordingState("idle");
-          deliverLatest.current(result.text, intent);
+          deliverLatest.current(result.text, intent, context);
         } catch {
           if (!request.signal.aborted) {
             setFailedOperation("microphone");

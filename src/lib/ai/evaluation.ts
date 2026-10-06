@@ -5,6 +5,7 @@ import {
   sanitizeValidationIssues,
 } from "../logging/sanitize";
 import { logger } from "../logging/logger";
+import { createTurnContext, type TurnContext } from "../logging/turn";
 import { z } from "zod";
 import { Output, type LanguageModel } from "ai";
 import type { InterviewContext, InterviewResult } from "../interview/types";
@@ -128,9 +129,12 @@ export async function evaluateInterviewWithModel(
   model: LanguageModel,
   context: InterviewContext,
   signal?: AbortSignal,
+  turnContext?: TurnContext,
 ): Promise<InterviewResult> {
   const started = performance.now();
   const metadata = {
+    ...(turnContext ?? createTurnContext(context.interview.id)),
+    component: "evaluation",
     provider: typeof model === "string" ? "gateway" : model.provider,
     model: typeof model === "string" ? model : model.modelId,
     operation: "evaluation",
@@ -145,7 +149,7 @@ export async function evaluateInterviewWithModel(
 
   const diagnostics: Record<string, unknown> = { responseReceived: false };
   try {
-    const evaluatorPrompt = await loadPrompt("evaluator");
+    const evaluatorPrompt = await loadPrompt("evaluator", metadata);
     const competencyIds = context.definition.evaluation.competencies.map(
       ({ id }) => id,
     );
@@ -181,12 +185,7 @@ export async function evaluateInterviewWithModel(
           }
         }),
     });
-    const result = await loggedGenerateText({
-      ...metadata,
-      ...(logger.isLevelEnabled("debug")
-        ? { workspace: context.workspace }
-        : {}),
-    })({
+    const result = await loggedGenerateText(metadata)({
       model,
       system: `${evaluatorPrompt}\n\nInterview instructions and rubric:\n${context.definition.instructions}`,
       prompt: `Interview evidence (data):\n${JSON.stringify({
@@ -243,7 +242,13 @@ export async function evaluateInterviewWithModel(
       "AI request completed",
     );
     logger.info(metadata, "Evaluation completed");
-    return deduplicateResultEvidence(evaluation);
+    const normalized = deduplicateResultEvidence(evaluation);
+    if (logger.isLevelEnabled("trace"))
+      logger.trace(
+        { ...metadata, evaluation: normalized },
+        "EVALUATION_NORMALIZED",
+      );
+    return normalized;
   } catch (error) {
     if (error instanceof IncompleteEvaluationError) {
       logger.info(
@@ -280,14 +285,17 @@ export async function evaluateInterview(
   context: InterviewContext,
   signal?: AbortSignal,
 ): Promise<InterviewResult> {
+  const turnContext = createTurnContext(context.interview.id);
+  const started = performance.now();
   const releaseCredentials = protectCredentials(
     "apiKey" in settings ? [settings.apiKey] : [],
   );
   try {
     return await evaluateInterviewWithModel(
-      getLanguageModel(settings),
+      getLanguageModel(settings, { ...turnContext, operation: "evaluation" }),
       context,
       signal,
+      turnContext,
     );
   } catch (error) {
     if (!(error instanceof EvaluationError))
@@ -298,6 +306,10 @@ export async function evaluateInterview(
           operation: "evaluation",
           interviewId: context.interview.id,
           stageId: context.interview.stage.current,
+          turnId: turnContext.turnId,
+          component: "evaluation",
+          endpoint: "baseUrl" in settings ? settings.baseUrl : undefined,
+          durationMs: Math.round(performance.now() - started),
           err: error,
         },
         "AI configuration failed",

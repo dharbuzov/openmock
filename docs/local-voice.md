@@ -143,8 +143,9 @@ python tests/services/speech/test_api.py
 Recorded audio travels directly from the browser to the configured local Speech
 URL, never through the OpenMock backend. The service does not persist recordings,
 log raw audio or transcripts, or send audio to an LLM. The resulting text follows
-the existing interview provider and logging policies, including existing debug
-payload logs. Use `LOG_LEVEL=info` to avoid those AI debug logs. Local Speech does
+the existing interview provider and logging policies. `LOG_LEVEL=trace` exposes
+full transcripts and TTS text in the browser's diagnostic logs; DEBUG records only
+speech lifecycle metadata. No logging level dumps binary audio. Local Speech does
 not make a cloud-configured LLM local.
 
 Ports bind to loopback only. CORS allows localhost:3000 and 127.0.0.1:3000 by
@@ -176,12 +177,13 @@ conversation behavior.
 
 ## Latency measurement
 
-In development (`npm run dev`), the existing browser logger emits metadata-only
+At DEBUG or TRACE (including production), the existing browser logger emits metadata-only
 `Voice latency` events once per turn for LLM first token, TTS first chunk submitted,
 TTS first audio received, and first audio playback. `elapsedMs` is relative to Send;
 `sinceFirstTokenMs` uses the first nonempty message snapshot from the existing SDK
 partial-output stream. It excludes JSON envelope tokens. No speech text is logged.
-Production builds emit no voice timing events.
+INFO-level builds emit no voice timing events. Each event carries the same
+`interviewId` and `turnId` as the engine, STT and TTS calls.
 
 The optional `tests/voice-browser-smoke.mjs` requires Playwright and Chrome outside
 application dependencies. With OpenMock and Speech running, invoke

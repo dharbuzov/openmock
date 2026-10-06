@@ -81,7 +81,16 @@ function conversation(fresh = false) {
   const overrides = {
     react: hooks.react,
     "@/lib/logging/logger": {
-      logger: { debug: (metadata) => shortcutLogs.push(metadata) },
+      logger: {
+        debug: (metadata, event) => {
+          if (event === "Microphone shortcut detected")
+            shortcutLogs.push(metadata);
+        },
+        info() {},
+        error() {},
+        trace() {},
+        isLevelEnabled: () => false,
+      },
     },
     "./recording-controls": { RecordingControls: "recording-controls" },
     "@/components/ui/spinner": { Spinner: "spinner" },

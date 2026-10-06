@@ -383,7 +383,7 @@ test("evaluation parse and schema failures preserve causes and safe diagnostics"
   installLogger(
     wrapLogger(
       pino(
-        { level: "debug" },
+        { level: "trace" },
         { write: (line) => logs.push(JSON.parse(line)) },
       ),
     ),
@@ -425,8 +425,8 @@ test("evaluation parse and schema failures preserve causes and safe diagnostics"
       assert.ok(!serialized.includes("sk-THIS_MUST_NEVER_APPEAR"));
       if (text.startsWith("{"))
         assert.ok(serialized.includes("private model response"));
-      const request = logs.find((entry) => entry.msg === "AI request");
-      const response = logs.find((entry) => entry.msg === "AI response");
+      const request = logs.find((entry) => entry.msg === "LLM_REQUEST");
+      const response = logs.find((entry) => entry.msg === "LLM_RAW_RESPONSE");
       assert.equal(request.requestId, response.requestId);
       assert.ok(request.request.system);
       assert.ok(request.request.providerRequest.prompt.length > 0);
@@ -451,7 +451,7 @@ test("shared AI boundary logs full successful payloads and correlates provider f
   installLogger(
     wrapLogger(
       pino(
-        { level: "debug" },
+        { level: "trace" },
         { write: (line) => logs.push(JSON.parse(line)) },
       ),
     ),
@@ -472,8 +472,8 @@ test("shared AI boundary logs full successful payloads and correlates provider f
       messages: [{ role: "user", content }],
       maxRetries: 0,
     });
-    const request = logs.find((entry) => entry.msg === "AI request");
-    const response = logs.find((entry) => entry.msg === "AI response");
+    const request = logs.find((entry) => entry.msg === "LLM_REQUEST");
+    const response = logs.find((entry) => entry.msg === "LLM_RAW_RESPONSE");
     assert.equal(request.request.system, system);
     assert.equal(
       request.request.messages[0].content,
@@ -493,7 +493,7 @@ test("shared AI boundary logs full successful payloads and correlates provider f
     );
     assert.ok(!JSON.stringify(logs).includes(credential));
 
-    for (const level of ["debug", "info"]) {
+    for (const level of ["trace", "debug", "info"]) {
       logs.length = 0;
       installLogger(
         wrapLogger(
@@ -519,10 +519,10 @@ test("shared AI boundary logs full successful payloads and correlates provider f
       );
       const failure = logs.find((entry) => entry.msg === "AI request failed");
       assert.equal(failure.err.message, "Provider unavailable");
-      assert.equal("request" in failure, level === "debug");
-      if (level === "debug")
+      assert.equal("request" in failure, false);
+      if (level === "trace")
         assert.equal(
-          logs.find((entry) => entry.msg === "AI request").requestId,
+          logs.find((entry) => entry.msg === "LLM_REQUEST").requestId,
           failure.requestId,
         );
     }

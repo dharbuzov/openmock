@@ -1,6 +1,7 @@
 import { startInterview, InterviewOptionsError } from "@/lib/interview/engine";
 import { getProblem } from "@/lib/problems/loader";
 import { requireInterviewDefinition } from "@/lib/interview/definitions";
+import { logger } from "@/lib/logging/logger";
 import {
   interviewLevelIds,
   interviewModes,
@@ -56,14 +57,20 @@ export async function POST(request: Request) {
     return Response.json({ error: "Problem not found." }, { status: 404 });
   const definition = await requireInterviewDefinition(problem.interview);
   try {
-    return Response.json(
-      startInterview(problem, {
-        definition,
-        targetLevel: input.targetLevel as InterviewLevelId | undefined,
-        mode: input.mode as InterviewMode | undefined,
-      }),
-      { status: 201 },
+    const interview = startInterview(problem, {
+      definition,
+      targetLevel: input.targetLevel as InterviewLevelId | undefined,
+      mode: input.mode as InterviewMode | undefined,
+    });
+    logger.info(
+      {
+        interviewId: interview.id,
+        problemId: problem.id,
+        definitionId: definition.id,
+      },
+      "Interview started",
     );
+    return Response.json(interview, { status: 201 });
   } catch (error) {
     if (error instanceof InterviewOptionsError)
       return Response.json({ error: error.message }, { status: 400 });

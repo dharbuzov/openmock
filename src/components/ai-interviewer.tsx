@@ -41,6 +41,7 @@ import {
 import { useInterviewControls } from "./interview-controls-context";
 import { useInterviewVoice } from "./use-interview-voice";
 import { logger } from "@/lib/logging/logger";
+import { createTurnContext, type TurnContext } from "@/lib/logging/turn";
 
 const providerIssueSnapshot = () => aiSettingsIssue(readSettings());
 const serverProviderIssueSnapshot = () => "";
@@ -75,6 +76,8 @@ export function AIInterviewer() {
   const [error, setError] = useState("");
   const [streamedResponse, setStreamedResponse] = useState("");
   const lastWorkspaceSnapshot = useRef<WorkspaceSnapshot | null>(null);
+  const dictationContext = useRef<TurnContext | undefined>(undefined);
+  const lastTurnContext = useRef<TurnContext | undefined>(undefined);
   const openSettings = useOpenSettings();
   const providerIssue = useSyncExternalStore(
     subscribeSettings,
@@ -84,16 +87,27 @@ export function AIInterviewer() {
   const { voiceEnabled, setVoiceEnabled, speechAvailable, playbackAvailable } =
     useInterviewControls();
   const voice = useInterviewVoice({
+    interviewId: interview.id,
+    getTurnContext: () =>
+      (dictationContext.current ??= createTurnContext(interview.id)),
     messages,
     busy: operation !== null,
     finishing: operation === "finish" || operation === "evaluate",
     active: interview.status === "in-progress" && !error,
-    onDictation: (text) =>
+    onDictation: (text, context) => {
+      dictationContext.current = context;
       setAnswer((previous) =>
         [previous.trim(), text].filter(Boolean).join(" "),
-      ),
-    onRecordedAnswer: (text) => {
-      void send(false, [answer.trim(), text].filter(Boolean).join(" "), true);
+      );
+    },
+    onRecordedAnswer: (text, context) => {
+      void send(
+        false,
+        [answer.trim(), text].filter(Boolean).join(" "),
+        true,
+        false,
+        context,
+      );
     },
   });
   const previousRecordingState = useRef(voice.recordingState);
@@ -241,6 +255,7 @@ export function AIInterviewer() {
     candidateAnswer = answer,
     fromRecording = false,
     openingTurn = false,
+    recordedContext?: TurnContext,
   ) {
     if (
       operation ||
@@ -259,9 +274,35 @@ export function AIInterviewer() {
     }
     const request = beginOperation(openingTurn ? "opening" : "send");
     if (!request) return;
+    const context =
+      (retry
+        ? lastTurnContext.current
+        : (recordedContext ?? dictationContext.current)) ??
+      createTurnContext(interview.id);
+    dictationContext.current = undefined;
+    lastTurnContext.current = context;
+    const inputText = retry
+      ? (request.interview.messages.at(-1)?.content ?? candidateAnswer)
+      : candidateAnswer;
+    logger.debug(
+      {
+        ...context,
+        component: "candidate-input",
+        operation: openingTurn ? "opening" : retry ? "retry" : "send",
+        provider: settings.provider,
+        model: settings.model,
+        inputLength: inputText.length,
+      },
+      "TURN_STARTED",
+    );
+    if (logger.isLevelEnabled("trace"))
+      logger.trace(
+        { ...context, text: inputText, opening: openingTurn, retry },
+        "CANDIDATE_INPUT",
+      );
     setError("");
     setStreamedResponse("");
-    const speech = voice.beginResponse(request.controller.signal);
+    const speech = voice.beginResponse(request.controller.signal, context);
     try {
       if (!isCurrentOperation(request)) return;
       const next =
@@ -290,16 +331,34 @@ export function AIInterviewer() {
           }
         },
         openingTurn,
+        context,
       );
       if (openingTurn && isCurrentOperation(request))
         saveInterviewSession({ interview: result });
       if (commitOperation(request, result)) {
+        if (logger.isLevelEnabled("trace"))
+          logger.trace(
+            { ...context, interview: result, response: result.messages.at(-1) },
+            "FRONTEND_RESPONSE",
+          );
         const response = result.messages.at(-1);
         if (response?.role === "interviewer") speech.finish(response);
         if (!openingTurn) setAnswer("");
         setStreamedResponse("");
       }
-    } catch {
+    } catch (error) {
+      logger.error(
+        {
+          ...context,
+          component: "interview-turn",
+          operation: "send",
+          provider: settings.provider,
+          model: settings.model,
+          err: error,
+          durationMs: Math.round(performance.now() - context.startedAt),
+        },
+        "TURN_FAILED",
+      );
       speech.cancel();
       if (isCurrentOperation(request)) {
         setStreamedResponse("");

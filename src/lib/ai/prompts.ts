@@ -4,8 +4,9 @@ import { loadPrompt } from "./prompt-loader";
 
 export async function interviewerSystemPrompt(
   context: InterviewContext,
+  logContext: Record<string, unknown> = {},
 ): Promise<string> {
-  return `${await loadPrompt("interviewer")}\n\n${context.definition.instructions}`;
+  return `${await loadPrompt("interviewer", logContext)}\n\n${context.definition.instructions}`;
 }
 
 export function interviewContext(context: InterviewContext): string {

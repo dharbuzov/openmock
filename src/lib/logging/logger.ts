@@ -31,21 +31,37 @@ export function wrapLogger(sink: PinoLogger): Logger {
     levels.map((level) => [
       level,
       (context: Record<string, unknown>, event: string) => {
-        if (!sink.isLevelEnabled(level)) return;
-        // Event labels are static application strings; reject credentials even here.
-        const message = /^[a-zA-Z ]{1,100}$/.test(event) ? event : "Log event";
-        sink[level](
-          redactSecrets(context, new WeakSet(), {
-            includeStack:
-              process.env.NODE_ENV !== "production" ||
-              sink.isLevelEnabled("debug"),
-          }) as object,
-          message,
-        );
+        try {
+          if (!sink.isLevelEnabled(level)) return;
+          // Event labels are static application strings; reject credentials even here.
+          const message = /^[a-zA-Z_ ]{1,100}$/.test(event)
+            ? event
+            : "Log event";
+          sink[level](
+            redactSecrets(context, new WeakSet(), {
+              fullContent: level === "trace",
+              includeStack:
+                process.env.NODE_ENV !== "production" ||
+                sink.isLevelEnabled("debug"),
+            }) as object,
+            message,
+          );
+        } catch {
+          // Diagnostics must never interrupt application work or retry a request.
+        }
       },
     ]),
   ) as Omit<Logger, "isLevelEnabled">;
-  return { ...methods, isLevelEnabled: (level) => sink.isLevelEnabled(level) };
+  return {
+    ...methods,
+    isLevelEnabled: (level) => {
+      try {
+        return sink.isLevelEnabled(level);
+      } catch {
+        return false;
+      }
+    },
+  };
 }
 
 // Next instrumentation and route bundles can have separate module instances.
@@ -68,12 +84,20 @@ export function installLogger(logger: Logger): void {
 const methods = Object.fromEntries(
   levels.map((level) => [
     level,
-    (context: Record<string, unknown>, event: string) =>
-      (registry[loggerKey] ?? fallback)[level](context, event),
+    (context: Record<string, unknown>, event: string) => {
+      try {
+        (registry[loggerKey] ?? fallback)[level](context, event);
+      } catch {}
+    },
   ]),
 ) as Omit<Logger, "isLevelEnabled">;
 export const logger: Logger = {
   ...methods,
-  isLevelEnabled: (level) =>
-    (registry[loggerKey] ?? fallback).isLevelEnabled(level),
+  isLevelEnabled: (level) => {
+    try {
+      return (registry[loggerKey] ?? fallback).isLevelEnabled(level);
+    } catch {
+      return false;
+    }
+  },
 };
