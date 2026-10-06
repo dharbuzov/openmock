@@ -20,6 +20,7 @@ const competencySchema = z.object({
   competencyId: z.string().trim().min(1),
   rating: z.enum(competencyRatings),
   summary: z.string().trim().min(1).max(600),
+  expectation: z.string().trim().min(1).max(600).optional(),
   evidence: z.array(evidenceSchema).max(8),
 });
 

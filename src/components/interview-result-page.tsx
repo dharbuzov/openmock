@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { ResultsScorecard } from "./interview-results";
 import {
@@ -91,19 +90,11 @@ export function InterviewResultPage({ interviewId }: { interviewId: string }) {
     );
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-12">
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
       <h1 className="text-3xl font-semibold tracking-tight">
         Interview results
       </h1>
       <ResultsScorecard record={state.record} interviewId={interviewId} />
-      <div className="flex flex-wrap gap-3">
-        <Link
-          href="/practice"
-          className={buttonVariants({ variant: "outline" })}
-        >
-          Choose another problem
-        </Link>
-      </div>
     </main>
   );
 }

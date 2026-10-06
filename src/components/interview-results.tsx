@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowRight, Check } from "lucide-react";
 import { useMemo, useSyncExternalStore } from "react";
 import type {
   CompetencyRating,
@@ -67,7 +68,12 @@ function EvidenceList({ evidence }: { evidence: EvaluationEvidence[] }) {
   return (
     <ul className="flex list-disc flex-col gap-2 pl-5 text-xs leading-5 text-muted-foreground">
       {evidence.map((item, index) => (
-        <li key={index}>{item.observation}</li>
+        <li key={index}>
+          <p>{item.observation}</p>
+          {item.stage ? (
+            <p className="text-xs text-muted-foreground">{item.stage}</p>
+          ) : null}
+        </li>
       ))}
     </ul>
   );
@@ -92,16 +98,18 @@ export function ResultsScorecard({
         ? `${minutes} min`
         : `${Math.floor(minutes / 60)} hr${minutes % 60 ? ` ${minutes % 60} min` : ""}`;
   const result = evaluation.status === "completed" ? evaluation.result : null;
-  const demonstrated =
-    result?.competencies.filter(
-      ({ rating }) => rating === "positive" || rating === "strong-positive",
-    ).length ?? 0;
   return (
     <div className="flex min-w-0 flex-col gap-6">
       <header className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">
-          {context.problemTitle}
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold tracking-tight">
+            {context.problemTitle}
+          </h2>
+          <Link href="/practice" className={buttonVariants({ size: "sm" })}>
+            Try another problem
+            <ArrowRight data-icon="inline-end" aria-hidden="true" />
+          </Link>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Badge variant="outline">{context.definitionName}</Badge>
           <Badge variant="outline">{context.levelName}</Badge>
@@ -155,31 +163,45 @@ export function ResultsScorecard({
               {result.finalAssessment}
             </p>
           </section>
-          <Separator />
-          <section
-            aria-labelledby="evaluation-summary"
-            className="flex flex-col gap-3"
-          >
-            <h2 id="evaluation-summary" className="text-lg font-medium">
-              Summary
-            </h2>
-            <p className="max-w-prose text-sm leading-6 text-muted-foreground">
-              {result.summary}
-            </p>
-          </section>
+          <div className="grid gap-6 sm:grid-cols-2">
+            {[
+              { title: "What went well", items: result.strengths, Icon: Check },
+              {
+                title: "What to improve",
+                items: result.concerns,
+                Icon: ArrowRight,
+              },
+            ].map(({ title, items, Icon }) => (
+              <section key={title} className="flex flex-col gap-3">
+                <h2 className="text-sm font-medium">{title}</h2>
+                {items.length ? (
+                  <ul className="flex flex-col gap-2 text-sm leading-5 text-muted-foreground">
+                    {items.map((item, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <Icon
+                          aria-hidden="true"
+                          className="mt-0.5 size-4 shrink-0"
+                        />
+                        <span>{item.observation}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    None recorded.
+                  </p>
+                )}
+              </section>
+            ))}
+          </div>
           <Separator />
           <section
             aria-labelledby="competencies"
             className="flex min-w-0 flex-col gap-3"
           >
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 id="competencies" className="text-lg font-medium">
-                Competencies
-              </h2>
-              <span className="text-xs text-muted-foreground">
-                {demonstrated} of {result.competencies.length} demonstrated
-              </span>
-            </div>
+            <h2 id="competencies" className="text-lg font-medium">
+              Competencies
+            </h2>
             <Accordion defaultValue={[]} multiple>
               {context.competencies.map(({ id, name }) => {
                 const competency = result.competencies.find(
@@ -203,6 +225,16 @@ export function ResultsScorecard({
                         <p className="text-sm leading-6 text-muted-foreground">
                           {competency.summary}
                         </p>
+                        {competency.expectation ? (
+                          <div className="flex flex-col gap-1.5">
+                            <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              {result.targetLevel} expectation
+                            </h3>
+                            <p className="text-sm leading-5 text-muted-foreground">
+                              {competency.expectation}
+                            </p>
+                          </div>
+                        ) : null}
                         {competency.evidence.length ? (
                           <>
                             <h3 className="text-xs font-medium text-muted-foreground">
@@ -218,34 +250,6 @@ export function ResultsScorecard({
               })}
             </Accordion>
           </section>
-          {result.strengths.length || result.concerns.length ? (
-            <>
-              <Separator />
-              <div className="grid gap-6 sm:grid-cols-2">
-                {result.strengths.length ? (
-                  <section className="flex flex-col gap-3">
-                    <h2 className="text-lg font-medium">Strengths</h2>
-                    <EvidenceList evidence={result.strengths} />
-                  </section>
-                ) : null}
-                {result.concerns.length ? (
-                  <section className="flex flex-col gap-3">
-                    <h2 className="text-lg font-medium">Concerns</h2>
-                    <EvidenceList evidence={result.concerns} />
-                  </section>
-                ) : null}
-              </div>
-            </>
-          ) : null}
-          {result.keyMoments.length ? (
-            <>
-              <Separator />
-              <section className="flex flex-col gap-3">
-                <h2 className="text-lg font-medium">Key moments</h2>
-                <EvidenceList evidence={result.keyMoments} />
-              </section>
-            </>
-          ) : null}
         </>
       ) : (
         <section className="flex flex-col items-start gap-3">

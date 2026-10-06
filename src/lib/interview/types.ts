@@ -157,6 +157,7 @@ export type CompetencyResult = {
   competencyId: string;
   rating: CompetencyRating;
   summary: string;
+  expectation?: string;
   evidence: EvaluationEvidence[];
 };
 export type InterviewResult = {

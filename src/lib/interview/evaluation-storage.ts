@@ -89,12 +89,7 @@ export function parseResultsRecord(value: string | null): ResultsRecord | null {
   try {
     const parsed = resultsRecordSchema.safeParse(deserialize<unknown>(value));
     if (!parsed.success) return null;
-    const record = parsed.data;
-    if (record.evaluation.status === "completed")
-      record.evaluation.result = deduplicateResultEvidence(
-        record.evaluation.result,
-      );
-    return record;
+    return parsed.data;
   } catch {
     return null;
   }

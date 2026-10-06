@@ -262,7 +262,7 @@ test("original non-participation regression passes SDK validation, storage, and 
     );
     assert.match(html, /Requirements &amp; Scope/);
     assert.match(html, /12 min/);
-    assert.match(html, /0 of 8 demonstrated/);
+    assert.doesNotMatch(html, /\d+ of \d+ demonstrated/);
     assert.doesNotMatch(html, /demonstrated positively/);
     const prompt = JSON.stringify(model.doGenerateCalls[0].prompt);
     assert.match(prompt, /candidate-finished/);
@@ -484,7 +484,7 @@ test("scorecard promotes canonical recommendation and rationale and omits empty 
     html,
     /The candidate did not demonstrate sufficient evidence for the target level/,
   );
-  assert.match(html, /0 of 8 demonstrated/);
+  assert.doesNotMatch(html, /\d+ of \d+ demonstrated/);
   assert.doesNotMatch(
     html,
     /demonstrated positively|>Strengths<|>Concerns<|>Key moments<|>Evidence<|No evidence recorded/,
@@ -632,4 +632,95 @@ test("expanded competency panels show secondary evidence only when it exists", (
   assert.match(html, /Candidate identified core functionality/);
   assert.equal((html.match(/>Evidence</g) ?? []).length, 1);
   assert.doesNotMatch(html, /No evidence recorded/);
+});
+
+test("expectations are optional, persist with gap ratings, and reject non-gap ratings", () => {
+  const { context, result } = fixture();
+  const { interviewResultSchema } = load(
+    "../src/lib/interview/result-schema.ts",
+  );
+  assert.ok(interviewResultSchema.safeParse(result).success);
+  result.competencies[0].expectation =
+    "Justify the choices required by the selected rubric.";
+  const parsed = interviewResultSchema.parse(result);
+  assert.equal(
+    parsed.competencies[0].expectation,
+    result.competencies[0].expectation,
+  );
+  assert.doesNotThrow(() => evaluator.validateResult(parsed, context));
+  for (const rating of ["positive", "strong-positive", "not-assessed"]) {
+    assert.throws(
+      () =>
+        evaluator.validateResult(
+          {
+            ...parsed,
+            competencies: parsed.competencies.map((item, i) =>
+              i === 0 ? { ...item, rating } : item,
+            ),
+          },
+          context,
+        ),
+      /Expectations must only/,
+    );
+  }
+});
+
+test("results prioritize feedback and show dynamic expectations only inside competency content", () => {
+  const { context, result } = fixture();
+  result.strengths = [{ observation: "Identified a useful structure." }];
+  result.concerns = [{ observation: "Explain the implementation." }];
+  result.competencies[0].expectation = "Justify the technical choices.";
+  const record = {
+    context: {
+      problemTitle: problem.title,
+      definitionName: definition.name,
+      levelName: "Staff",
+      startedAt: context.interview.startedAt,
+      completedAt: context.interview.completedAt,
+      endReason: "candidate-finished",
+      competencies: definition.evaluation.competencies,
+    },
+    evaluation: { status: "completed", result },
+  };
+  const html = renderToStaticMarkup(
+    createElement(ResultsScorecard, { record, interviewId: "session" }),
+  );
+  assert.equal((html.match(/Try another problem/g) ?? []).length, 1);
+  assert.ok(html.indexOf("Recommendation") < html.indexOf("What went well"));
+  assert.ok(
+    html.indexOf("What to improve") < html.indexOf('id="competencies"'),
+  );
+  assert.match(html, /Identified a useful structure/);
+  assert.match(html, /Explain the implementation/);
+  assert.doesNotMatch(
+    html,
+    />Summary<|>Strengths<|>Concerns<|>Key moments<|Justify the technical choices/,
+  );
+  const { ResultsScorecard: ExpandedScorecard } = loadComponent(
+    "src/components/interview-results.tsx",
+    {
+      "@/components/ui/accordion": {
+        Accordion: "div",
+        AccordionItem: "div",
+        AccordionTrigger: "button",
+        AccordionContent: "div",
+      },
+    },
+  );
+  for (const level of ["junior", "middle", "senior", "staff", "principal"]) {
+    const expanded = renderToStaticMarkup(
+      createElement(ExpandedScorecard, {
+        record: {
+          ...record,
+          evaluation: {
+            status: "completed",
+            result: { ...result, targetLevel: level },
+          },
+        },
+        interviewId: "session",
+      }),
+    );
+    assert.match(expanded, new RegExp(`${level} expectation`));
+    assert.match(expanded, /Justify the technical choices/);
+  }
 });

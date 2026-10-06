@@ -87,6 +87,16 @@ export function validateResult(
     throw new EvaluationError(
       "Hiring cannot be recommended when no required competency was demonstrated",
     );
+  if (
+    result.competencies.some(
+      ({ rating, expectation }) =>
+        expectation !== undefined &&
+        ["strong-positive", "positive", "not-assessed"].includes(rating),
+    )
+  )
+    throw new EvaluationError(
+      "Expectations must only describe competency gaps",
+    );
   const messageIds = new Set(context.interview.messages.map(({ id }) => id));
   const evidence = [
     ...result.strengths,
