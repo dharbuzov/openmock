@@ -15,6 +15,7 @@ const { parseProblemDocument } = load("../src/lib/problems/schema.ts");
 const { saveSettings, readSettings, subscribeSettings } = load(
   "../src/lib/settings/storage.ts",
 );
+const { readSpeechSettings } = load("../src/lib/settings/storage.ts");
 const { readInterviewSession } = load(
   "../src/lib/interview/session-storage.ts",
 );
@@ -433,6 +434,13 @@ test("shared inline AI form preserves saved-key masking and Remember API key beh
     let tree = hooks.render(AISettingsForm, props);
     findElement(
       tree,
+      (node) =>
+        node.type === "select" &&
+        node.props.items?.some((item) => item.value === "af_bella"),
+    ).props.onValueChange("af_bella");
+    tree = hooks.render(AISettingsForm, props);
+    findElement(
+      tree,
       (node) => node.props.id === "settings-interviewer-voice",
     ).props.onCheckedChange(false);
     tree = hooks.render(AISettingsForm, props);
@@ -468,6 +476,7 @@ test("shared inline AI form preserves saved-key masking and Remember API key beh
       (node) => node.type === "button" && node.props.children === "Save",
     ).props.onClick();
     assert.equal(saved, 1);
+    assert.equal(readSpeechSettings().voice, "af_bella");
     assert.equal(readSettings().apiKey, "replacement-key");
     assert.equal(readSettings().rememberApiKey, true);
     assert.equal(readSettings().interviewerVoiceEnabled, false);

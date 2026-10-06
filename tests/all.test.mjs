@@ -27,6 +27,7 @@ import "./components/problem-panel.test.mjs";
 import "./lib/interview/timer.test.mjs";
 import "./components/current-stage-badge.test.mjs";
 import "./components/interview-setup.test.mjs";
+import "./components/settings-dialog.test.mjs";
 import "./components/practice-problems.test.mjs";
 import "./lib/interview/evaluation-contract.test.mjs";
 import "./components/ai-interviewer.test.mjs";
