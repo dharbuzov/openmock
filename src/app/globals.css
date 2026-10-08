@@ -6,6 +6,7 @@
 
 @theme inline {
   --color-background: var(--background);
+  --color-workspace: var(--workspace);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -53,6 +54,7 @@
 }
 
 :root {
+  --workspace: #ffffff;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -92,40 +94,41 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --workspace: #171717;
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --card: #111111;
+  --card-foreground: var(--foreground);
+  --popover: #1f1f1f;
+  --popover-foreground: var(--foreground);
+  --primary: var(--foreground);
+  --primary-foreground: var(--background);
+  --secondary: #1f1f1f;
+  --secondary-foreground: var(--foreground);
+  --muted: #1f1f1f;
+  --muted-foreground: #a1a1aa;
+  --accent: #262626;
+  --accent-foreground: var(--foreground);
   --destructive: oklch(0.704 0.191 22.216);
   --success: oklch(0.78 0.14 155);
   --warning: oklch(0.82 0.14 80);
   --interview-level: oklch(0.78 0.07 285);
   --interview-stage: oklch(0.78 0.08 260);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --border: #303030;
+  --input: var(--border);
   --ring: oklch(0.556 0 0);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
   --sidebar-ring: oklch(0.556 0 0);
 }
 
@@ -267,4 +270,49 @@ body:has([data-interview-room]) > header {
 .problem-scroll:hover::-webkit-scrollbar-thumb,
 .problem-scroll:focus-within::-webkit-scrollbar-thumb {
   background: var(--muted-foreground);
+}
+
+/* Scope integration overrides to dark mode to preserve the light palette. */
+.dark [data-interview-room] [data-panel] {
+  background-color: var(--card);
+}
+.dark [data-interview-room] [data-panel][id="workspace"] {
+  background-color: var(--workspace);
+}
+.dark [data-interview-room] section > .border-b {
+  background-color: var(--card);
+}
+.dark .excalidraw-canvas,
+.dark .excalidraw-canvas .excalidraw {
+  background-color: var(--workspace);
+}
+.dark .excalidraw-canvas .excalidraw.theme--dark {
+  --island-bg-color: var(--popover);
+  --popup-bg-color: var(--popover);
+  --popup-secondary-bg-color: var(--muted);
+  --default-bg-color: var(--workspace);
+  --default-border-color: var(--border);
+  --input-border-color: var(--border);
+  --input-bg-color: var(--card);
+  --input-hover-bg-color: var(--accent);
+  --input-label-color: var(--muted-foreground);
+  --text-primary-color: var(--foreground);
+  --popup-text-color: var(--foreground);
+  --color-on-surface: var(--foreground);
+  --color-surface-high: var(--accent);
+  --color-surface-mid: var(--popover);
+  --color-surface-low: var(--muted);
+  --color-surface-lowest: var(--card);
+  --color-border-outline: var(--border);
+  --color-border-outline-variant: var(--border);
+  --button-hover-bg: var(--accent);
+  --button-active-bg: var(--accent);
+}
+
+.dark [data-interview-room] > header,
+.dark [data-interview-room] [aria-label="Interview context"],
+.dark [data-interview-room] section > .border-b,
+.dark [data-interview-room] form.border-t,
+.dark [data-interview-room] [aria-label="Interview panes"] {
+  border-color: var(--border);
 }

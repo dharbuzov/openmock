@@ -40,7 +40,7 @@ export function ExcalidrawWorkspace() {
         theme={resolvedTheme === "dark" ? "dark" : "light"}
         autoFocus={false}
         handleKeyboardGlobally={false}
-        initialData={{ appState: { viewBackgroundColor: "#ffffff" } }}
+        initialData={{ appState: { viewBackgroundColor: "transparent" } }}
         UIOptions={{
           canvasActions: {
             export: false,

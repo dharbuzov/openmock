@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { Monaco } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
 import { useInterviewCode } from "@/components/interview-code-context";
@@ -35,9 +36,32 @@ const Editor = dynamic(
   },
 );
 
+// Inherit syntax, cursor, selection and diagnostics from Monaco's native theme.
+function applyDarkTheme(monaco: Monaco) {
+  const background = getComputedStyle(document.documentElement)
+    .getPropertyValue("--workspace")
+    .trim();
+  monaco.editor.defineTheme("openmock-dark", {
+    base: "vs-dark",
+    inherit: true,
+    rules: [],
+    colors: {
+      "editor.background": background,
+      "editorGutter.background": background,
+    },
+  });
+  monaco.editor.setTheme("openmock-dark");
+}
+
 export function CodeWorkspace({ starterCode }: { starterCode: string }) {
   const { resolvedTheme } = useTheme();
   const codeRef = useInterviewCode();
+  const monacoRef = useRef<Monaco | null>(null);
+  useEffect(() => {
+    if (resolvedTheme === "dark" && monacoRef.current) {
+      applyDarkTheme(monacoRef.current);
+    }
+  }, [resolvedTheme]);
   const [language, setLanguage] =
     useState<(typeof codeLanguages)[number]>(defaultCodeLanguage);
   const [buffers, setBuffers] = useState<
@@ -98,6 +122,10 @@ export function CodeWorkspace({ starterCode }: { starterCode: string }) {
               [language.id]: value ?? "",
             }))
           }
+          onMount={(_, monaco) => {
+            monacoRef.current = monaco;
+            if (resolvedTheme === "dark") applyDarkTheme(monaco);
+          }}
           theme={resolvedTheme === "dark" ? "vs-dark" : "vs"}
           loading={
             <p role="status" className="p-4 text-sm text-muted-foreground">
