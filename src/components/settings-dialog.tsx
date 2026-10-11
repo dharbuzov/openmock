@@ -277,7 +277,7 @@ export function AISettingsForm({
             !["ready", "not-loaded", "working"].includes(capability.status),
         )
       ) {
-        logger.error(
+        logger.warn(
           {
             ...metadata,
             sttStatus: health?.stt?.status,
@@ -295,7 +295,8 @@ export function AISettingsForm({
       setSpeechConnectionState("connected");
       logger.info(metadata, "Speech connection tested");
     } catch (error) {
-      logger.error(
+      if (request.signal.aborted) return;
+      logger.warn(
         {
           ...metadata,
           err: error,
@@ -303,12 +304,10 @@ export function AISettingsForm({
         },
         "Speech connection test failed",
       );
-      if (!request.signal.aborted) {
-        setSpeechConnectionState("error");
-        setSpeechConnectionError(
-          "Could not reach the configured speech service. Check the Local Speech URL and that the service is running.",
-        );
-      }
+      setSpeechConnectionState("error");
+      setSpeechConnectionError(
+        "Could not reach the configured speech service. Check the Local Speech URL and that the service is running.",
+      );
     } finally {
       if (speechController.current === request) speechController.current = null;
     }

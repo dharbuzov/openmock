@@ -8,8 +8,20 @@ import {
 
 function harness(listModels = async () => ["qwen3:8b"]) {
   const hooks = hookHarness();
+  const logs = [];
   const overrides = {
     react: hooks.react,
+    "@/lib/logging/logger": {
+      logger: {
+        isLevelEnabled: () => false,
+        ...Object.fromEntries(
+          ["trace", "debug", "info", "warn", "error"].map((level) => [
+            level,
+            (context, event) => logs.push({ level, context, event }),
+          ]),
+        ),
+      },
+    },
     "next-themes": { useTheme: () => ({ theme: "light", setTheme() {} }) },
     "@/lib/settings/storage": {
       readSpeechSettings: () => ({
@@ -89,8 +101,43 @@ function harness(listModels = async () => ["qwen3:8b"]) {
       section(tree, name),
       (node) => typeof node.props.onTest === "function",
     );
-  return { render, section, connection, dispose: hooks.dispose };
+  return { render, section, connection, logs, dispose: hooks.dispose };
 }
+
+test("unreachable Speech stays inline and cancelled tests do not log failures", async () => {
+  const h = harness();
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => {
+      throw new TypeError("Failed to fetch");
+    };
+    await h.connection(h.render(), "speech").props.onTest();
+    const connection = h.connection(h.render(), "speech");
+    assert.equal(connection.props.state, "error");
+    assert.match(connection.props.error, /Could not reach/);
+    assert.equal(h.logs.length, 1);
+    assert.equal(h.logs[0].level, "warn");
+    assert.equal(h.logs[0].context.err.message, "Failed to fetch");
+
+    globalThis.fetch = (_url, { signal }) =>
+      new Promise((_resolve, reject) => {
+        signal.addEventListener("abort", () => reject(signal.reason), {
+          once: true,
+        });
+      });
+    const pending = connection.props.onTest();
+    findElement(
+      h.render(),
+      (node) => node.props.id === "settings-speech-url",
+    ).props.onChange({ target: { value: "http://localhost:8002" } });
+    await pending;
+    assert.equal(h.connection(h.render(), "speech").props.state, "idle");
+    assert.equal(h.logs.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    h.dispose();
+  }
+});
 
 test("connection controls and helper state stay inside their section; Save stays outside", () => {
   const h = harness();

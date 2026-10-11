@@ -8,10 +8,10 @@ speech providers and the configured LLM provider are independent.
 ## Start
 
 ```sh
-docker compose up --build
+docker compose up -d --build
 ```
 
-Open http://localhost:3000. Later starts can use `docker compose up`.
+Open http://localhost:3000. Later starts can use `docker compose up -d`.
 OpenMock and Speech run in separate containers; CUDA and NVIDIA Container Toolkit
 are not required. To use a development Next.js server instead, run
 `docker compose up --build speech` and `npm run dev`.
@@ -21,9 +21,10 @@ by the browser, so use localhost rather than the Compose hostname `speech`.
 The URL and voice override are saved in browser preferences independently of
 the AI provider. Leave voice blank to use the service's `KOKORO_VOICE`.
 
-Configure Ollama, OpenAI, or Anthropic as usual. Compose does not install or
-configure an LLM. A locally installed Ollama remains reachable directly from the
-browser at its configured URL, and must allow the OpenMock origin through CORS.
+Configure Ollama, OpenAI, or Anthropic as usual. Add `--profile local-ai` to also
+start Compose Ollama and initialize Qwen; see the [startup matrix](../README.md#local-docker-stack).
+A separately installed Ollama remains reachable directly from the browser at
+its configured URL, and must allow the OpenMock origin through CORS.
 
 ## Models and resources
 

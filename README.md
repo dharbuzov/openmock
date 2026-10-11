@@ -171,10 +171,137 @@ an initialized interview with status `201`. Invalid JSON or missing/invalid
 
 ## Local Voice
 
-Run OpenMock and CPU-only Whisper/Kokoro with `docker compose up --build`.
+Run OpenMock and CPU-only Whisper/Kokoro with
+`docker compose up -d --build`.
 Audio is sent directly to the configured local Speech service; the LLM provider
 remains independent. See [Local Voice](docs/local-voice.md) for configuration,
 manual STT/TTS checks, privacy, resource measurement, and troubleshooting.
+
+## Local Docker stack
+
+OpenMock and Speech always start. The `local-ai` profile adds containerized Ollama:
+
+| Mode                 | Command                                           | Services                                    |
+| -------------------- | ------------------------------------------------- | ------------------------------------------- |
+| BYOK or host Ollama  | `docker compose up -d --build`                    | OpenMock, Speech                            |
+| Containerized Ollama | `docker compose --profile local-ai up -d --build` | OpenMock, Speech, Ollama, model initializer |
+
+Open [localhost:3000](http://localhost:3000). Profile selection does not change
+saved provider, API key, model, or Speech preferences. For BYOK select OpenAI or
+Anthropic in Settings and enter your key. Local Speech works with any provider;
+when unavailable, connection testing reports an error and text interviews remain usable.
+
+Compose reads `.env` (not `.env.local`); optionally copy `.env.example` to `.env`
+to configure the local services. `OLLAMA_MODEL` defaults to `qwen3:8b` and
+`OLLAMA_PORT` to `11434`. These control infrastructure, not saved browser settings
+or the application's build-time AI defaults.
+
+### Model initialization and connection
+
+The initializer waits for Ollama's health check, downloads the selected model on
+first startup, and exits successfully. Subsequent starts check the installed model
+and skip the download. Downloads happen at runtime and require internet access;
+they can take several minutes. OpenMock starts independently while this happens.
+The `ollama-models` named volume stores models across container restarts and
+recreation; `speech-models` keeps existing Speech caches.
+
+```sh
+docker compose --profile local-ai ps -a
+docker compose --profile local-ai logs ollama-init
+docker compose --profile local-ai exec ollama ollama list
+curl http://localhost:11434/api/tags
+```
+
+Expect `ollama-init` to exit with code 0 and `qwen3:8b` to appear in the model
+list. A failed download exits nonzero with an error in the initializer logs;
+retry with `docker compose --profile local-ai up -d ollama-init`.
+After changing `OLLAMA_MODEL`, run the local-ai startup command again.
+
+In Settings select **Ollama**, use **Server URL** `http://localhost:11434`, click
+**Test connection**, select **qwen3:8b** from the installed models, then **Save**.
+The connection test lists models; send a text answer in an interview to test inference.
+If changing `OLLAMA_PORT`, update the browser Server URL to that host port.
+Browser AI requests go directly to localhost; container clients, including the
+initializer, use `http://ollama:11434`. The Next.js server currently makes no AI
+provider requests, so it needs no endpoint override or Ollama dependency.
+
+For **host Ollama**, leave `local-ai` disabled and configure the existing Ollama
+Server URL (Base URL) in Settings. Browser requests normally use
+`http://localhost:11434`. Container clients can use
+`http://host.docker.internal:11434`; Compose maps that hostname to the host gateway.
+The Base URL accepts either address, but it must resolve from the client making
+the request: `host.docker.internal` is a container hostname and may not resolve
+in your browser. Host Ollama must listen on an interface reachable from containers
+when using that address and allow the OpenMock browser origin through CORS.
+Host models are managed by your host Ollama installation, independently of Compose.
+
+Ollama's host port binds only to `127.0.0.1`. `OLLAMA_ORIGINS` explicitly allows
+the local OpenMock origins `http://localhost:3000` and `http://127.0.0.1:3000`,
+without adding wildcard origins. See [Ollama CORS configuration](https://docs.ollama.com/faq#how-can-i-allow-additional-web-origins-to-access-ollama).
+Stop any separately installed Ollama using the same port, or change `OLLAMA_PORT`.
+
+### NVIDIA GPU and CPU fallback
+
+The local-ai profile requests one NVIDIA GPU through Compose device reservations,
+intended for the RTX 4080. On Windows, use Docker Desktop **Linux containers**
+with the **WSL2 backend**, a current NVIDIA Windows driver supporting WSL2 GPU
+compute, and an updated WSL kernel (`wsl --update`). See
+[Docker Desktop GPU prerequisites and validation](https://docs.docker.com/desktop/features/gpu/).
+Native Linux Docker requires the
+[NVIDIA Container Toolkit](https://docs.ollama.com/docker).
+Validate GPU passthrough before startup using Docker's documented GPU test.
+
+Missing GPU reservations cause startup failure; an inaccessible NVIDIA device
+also fails Ollama's health check, preventing initialization. After an interview
+request, run `docker compose --profile local-ai exec ollama ollama ps` and check
+the **PROCESSOR** column for GPU use. Ollama can offload to CPU when GPU memory
+is insufficient; if GPU use was requested, treat CPU-only output as a failure
+and inspect `docker compose --profile local-ai logs ollama` before continuing.
+See [Ollama GPU verification](https://docs.ollama.com/faq#how-can-i-tell-if-my-model-was-loaded-onto-the-gpu).
+
+To explicitly run on CPU, use the override (Docker Compose **v2.24.4+**):
+
+```sh
+docker compose -f compose.yaml -f compose.cpu.yaml --profile local-ai up --build -d
+```
+
+The override removes the GPU reservation and NVIDIA health check requirement;
+models, ports, and initialization stay the same. CPU inference is slower. Keep
+both `-f` arguments on later CPU-mode Compose commands.
+
+### Stop, switch, and verify
+
+Changing profiles does not stop containers that are already running. To switch
+modes, first stop the full stack, then run the desired startup command:
+
+```sh
+docker compose --profile local-ai down
+# Named volumes are retained. Do not add -v unless deleting cached models is intended.
+docker compose up --build -d
+```
+
+Use `docker compose --profile local-ai stop ollama ollama-init` or
+`docker compose stop speech` to stop Speech temporarily.
+Use the CPU override arguments with `down` when switching from CPU mode.
+`restart` reuses installed models; `up` also runs the initializer to check them.
+
+Validate both configurations without starting containers:
+
+```sh
+docker compose config
+docker compose --profile local-ai config
+node --test tests/compose.test.mjs
+```
+
+The Compose tests cover profile isolation, the CPU override, and mocked model
+initialization (download once, skip installed models, fail on download errors).
+They need Docker Compose and a POSIX shell (Git Bash on Windows); unavailable
+tools are reported as skipped tests. They do not start containers or download models.
+
+Use `config --services` to inspect enabled services. For a runtime persistence
+check, note the model from `ollama list`, run `down` without `-v`, and start
+local-ai again: the same model should remain and initializer logs should say
+it is already installed. Check `ps -a` for health and initializer exit status.
 
 ## License
 

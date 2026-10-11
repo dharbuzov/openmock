@@ -1,6 +1,8 @@
 services:
   openmock:
     build: .
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:3000:3000"
   speech:
@@ -27,5 +29,53 @@ services:
       timeout: 10s
       start_period: 30s
       retries: 3
+  ollama:
+    image: ollama/ollama:latest
+    profiles: [local-ai]
+    ports:
+      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      OLLAMA_DEBUG: "1"
+      OLLAMA_VULKAN: "false"
+
+    volumes:
+      - ollama-models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      # Fail visibly if the requested NVIDIA device is unavailable.
+      test:
+        ["CMD-SHELL", "nvidia-smi >/dev/null 2>&1 && ollama list >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 12
+  ollama-init:
+    image: ollama/ollama:latest
+    profiles: [local-ai]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        if ollama show "$$OLLAMA_MODEL" >/dev/null 2>&1; then
+          echo "Model $$OLLAMA_MODEL is already installed; skipping download."
+        else
+          ollama pull "$$OLLAMA_MODEL"
+        fi
+        ollama show "$$OLLAMA_MODEL" >/dev/null
+        echo "Model $$OLLAMA_MODEL is ready."
 volumes:
   speech-models:
+  ollama-models:

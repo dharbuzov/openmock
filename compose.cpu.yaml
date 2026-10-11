@@ -1,0 +1,6 @@
+# Explicit CPU fallback; use together with compose.yaml (Compose v2.24.4+).
+services:
+  ollama:
+    deploy: !reset {}
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
