@@ -362,7 +362,8 @@ export function AIInterviewer() {
       speech.cancel();
       if (isCurrentOperation(request)) {
         setStreamedResponse("");
-        setError("Couldn’t get a response from the AI provider.");
+        const { interviewErrorMessage } = await import("@/lib/ai/error");
+        if (isCurrentOperation(request)) setError(interviewErrorMessage(error));
       }
     } finally {
       endOperation(request);

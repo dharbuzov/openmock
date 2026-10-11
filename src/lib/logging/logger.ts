@@ -75,7 +75,15 @@ const fallback = wrapLogger(
       process.env.NEXT_PUBLIC_LOG_LEVEL,
       process.env.NODE_ENV === "production",
     ),
-    browser: { asObject: true },
+    browser: {
+      asObject: true,
+      write: (entry) => {
+        const record = entry as Record<string, unknown>;
+        const level = Number(record.level);
+        const method = level >= 50 ? "error" : level >= 40 ? "warn" : "log";
+        console[method](String(record.msg ?? "Log event"), entry);
+      },
+    },
   }),
 );
 export function installLogger(logger: Logger): void {

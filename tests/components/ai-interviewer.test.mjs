@@ -288,7 +288,7 @@ test("provider errors are system feedback and Retry preserves one candidate mess
   assert.equal(responseSlot(tree), null);
   assert.match(
     findElement(tree, (node) => node.props.role === "alert").props.children,
-    /AI provider/,
+    /AI provider request failed: network failed/,
   );
   assert.equal(textarea(tree).props.value, "Preserve this answer");
   assert.equal(textarea(tree).props.disabled, false);

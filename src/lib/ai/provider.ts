@@ -12,6 +12,7 @@ import type { InterviewContext, InterviewTurn } from "../interview/types";
 import type { AISettings } from "../settings/types";
 import { getLanguageModel, AIConfigurationError } from "./model";
 import { interviewerSystemPrompt, interviewContext } from "./prompts";
+import { interviewErrorMessage } from "./error";
 
 export const interviewTurnSchema = z.object({
   message: z.string().trim().min(1).max(1_200),
@@ -19,20 +20,37 @@ export const interviewTurnSchema = z.object({
   observations: z
     .array(
       z.object({
-        id: z.string().default(""),
-        competencyId: z.string().trim().min(1).optional(),
+        id: z.string(),
+        competencyId: z.string().trim().min(1).nullable(),
         observation: z.string().trim().min(1).max(300),
-        messageId: z.string().trim().min(1).optional(),
+        messageId: z.string().trim().min(1).nullable(),
       }),
     )
     .max(8),
 });
 
+// Strict provider schemas require every key; null represents an absent reference.
+function normalizeInterviewTurn(
+  turn: z.infer<typeof interviewTurnSchema>,
+): InterviewTurn {
+  return {
+    ...turn,
+    observations: turn.observations.map(
+      ({ competencyId, messageId, ...observation }) => ({
+        ...observation,
+        ...(competencyId === null ? {} : { competencyId }),
+        ...(messageId === null ? {} : { messageId }),
+      }),
+    ),
+  };
+}
+
 export class AIProviderError extends Error {
   constructor(
     message = "Could not reach the interviewer. Check your AI settings and try again.",
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
     this.name = "AIProviderError";
   }
 }
@@ -45,6 +63,7 @@ export async function generateInterviewResponseWithModel(
   turnContext?: TurnContext,
 ): Promise<InterviewTurn> {
   const started = performance.now();
+  let streamError: unknown;
   const metadata = {
     provider: typeof model === "string" ? "gateway" : model.provider,
     model: typeof model === "string" ? model : model.modelId,
@@ -111,8 +130,10 @@ export async function generateInterviewResponseWithModel(
           logContext,
         ),
         output: loggedOutput(options.output, logContext),
-        onError: ({ error }) =>
-          logger.error({ ...logContext, err: error }, "AI request failed"),
+        onError: ({ error }) => {
+          streamError = error;
+          logger.error({ ...logContext, err: error }, "AI request failed");
+        },
         onFinish: ({ text, usage, finishReason }) =>
           logger.debug(
             {
@@ -134,11 +155,13 @@ export async function generateInterviewResponseWithModel(
         )
           onMessage(partial.message);
       }
-      return await result.output;
+      if (streamError !== undefined) throw streamError;
+      return normalizeInterviewTurn(await result.output);
     }
     const result = await loggedGenerateText(metadata)(options);
-    return result.output;
+    return normalizeInterviewTurn(result.output);
   } catch (error) {
+    error = streamError ?? error;
     logger.error(
       {
         ...metadata,
@@ -148,7 +171,7 @@ export async function generateInterviewResponseWithModel(
       "Interviewer generation failed",
     );
     if (error instanceof AIProviderError) throw error;
-    throw new AIProviderError();
+    throw new AIProviderError(interviewErrorMessage(error), { cause: error });
   }
 }
 
@@ -198,7 +221,7 @@ export async function generateInterviewResponse(
       error instanceof AIProviderError
     )
       throw error;
-    throw new AIProviderError();
+    throw new AIProviderError(interviewErrorMessage(error), { cause: error });
   } finally {
     releaseCredentials();
   }

@@ -191,6 +191,22 @@ test("valid evidence-based Hire and No Hire evaluations remain valid", () => {
   );
 });
 
+function providerOutput(output) {
+  const evidence = (items) =>
+    items.map((item) => ({ messageId: null, stage: null, ...item }));
+  return JSON.stringify({
+    ...output,
+    strengths: evidence(output.strengths),
+    concerns: evidence(output.concerns),
+    keyMoments: evidence(output.keyMoments),
+    competencies: output.competencies.map((item) => ({
+      expectation: null,
+      ...item,
+      evidence: evidence(item.evidence),
+    })),
+  });
+}
+
 test("original non-participation regression passes SDK validation, storage, and collapsed scorecard rendering", async () => {
   const { context, result } = fixture();
   const { interviewId } = result;
@@ -208,7 +224,7 @@ test("original non-participation regression passes SDK validation, storage, and 
   );
   const model = new MockLanguageModelV3({
     doGenerate: {
-      content: [{ type: "text", text: JSON.stringify(output) }],
+      content: [{ type: "text", text: providerOutput(output) }],
       finishReason: { unified: "stop", raw: "stop" },
       usage: {
         inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
@@ -273,7 +289,7 @@ test("original non-participation regression passes SDK validation, storage, and 
           content: [
             {
               type: "text",
-              text: JSON.stringify({ ...output, recommendation }),
+              text: providerOutput({ ...output, recommendation }),
             },
           ],
           finishReason: { unified: "stop", raw: "stop" },
@@ -414,7 +430,7 @@ test("incomplete model evaluation logs an informational outcome without an error
   };
   const model = new MockLanguageModelV3({
     doGenerate: {
-      content: [{ type: "text", text: JSON.stringify(output) }],
+      content: [{ type: "text", text: providerOutput(output) }],
       finishReason: { unified: "stop", raw: "stop" },
       usage: { inputTokens: { total: 1 }, outputTokens: { total: 1 } },
     },

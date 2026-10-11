@@ -170,9 +170,10 @@ export async function evaluateInterviewWithModel(
     );
     const messageIds = context.interview.messages.map(({ id }) => id);
     const evidenceSchema = evaluatorOutputSchema.shape.strengths.element;
-    const referencedEvidenceSchema = messageIds.length
-      ? evidenceSchema.extend({ messageId: z.enum(messageIds).optional() })
-      : evidenceSchema.omit({ messageId: true });
+    const referencedEvidenceSchema = evidenceSchema.extend({
+      messageId: messageIds.length ? z.enum(messageIds).nullable() : z.null(),
+      stage: evidenceSchema.shape.stage.unwrap().nullable(),
+    });
     const evidence = z.array(referencedEvidenceSchema);
     const schema = evaluatorOutputSchema.extend({
       recommendation: z.enum(context.definition.evaluation.recommendations),
@@ -183,6 +184,10 @@ export async function evaluateInterviewWithModel(
         .array(
           evaluatorOutputSchema.shape.competencies.element.extend({
             competencyId: z.enum(competencyIds),
+            expectation:
+              evaluatorOutputSchema.shape.competencies.element.shape.expectation
+                .unwrap()
+                .nullable(),
             evidence: evidence.max(8),
           }),
         )
@@ -232,7 +237,28 @@ export async function evaluateInterviewWithModel(
       responseReceived: true,
       responseLength: result.text.length,
     });
-    const output = result.output;
+    const rawOutput = result.output;
+    const normalizeEvidence = (
+      items: z.infer<typeof referencedEvidenceSchema>[],
+    ) =>
+      items.map(({ messageId, stage, ...item }) => ({
+        ...item,
+        ...(messageId === null ? {} : { messageId }),
+        ...(stage === null ? {} : { stage }),
+      }));
+    const output = {
+      ...rawOutput,
+      strengths: normalizeEvidence(rawOutput.strengths),
+      concerns: normalizeEvidence(rawOutput.concerns),
+      keyMoments: normalizeEvidence(rawOutput.keyMoments),
+      competencies: rawOutput.competencies.map(
+        ({ expectation, evidence, ...item }) => ({
+          ...item,
+          ...(expectation === null ? {} : { expectation }),
+          evidence: normalizeEvidence(evidence),
+        }),
+      ),
+    };
     Object.assign(diagnostics, {
       parseSucceeded: true,
       validationSucceeded: false,

@@ -17,8 +17,30 @@ const { normalizeExcalidrawScene } = load(
 );
 const { captureWorkspaceSnapshot } = load("../src/lib/interview/workspace.ts");
 
+function strictEvaluationFixture(text) {
+  try {
+    const output = JSON.parse(text);
+    if (!Array.isArray(output.competencies)) return text;
+    const evidence = (items) =>
+      items?.map((item) => ({ messageId: null, stage: null, ...item }));
+    return JSON.stringify({
+      ...output,
+      strengths: evidence(output.strengths),
+      concerns: evidence(output.concerns),
+      keyMoments: evidence(output.keyMoments),
+      competencies: output.competencies.map((item) => ({
+        expectation: null,
+        ...item,
+        evidence: evidence(item.evidence),
+      })),
+    });
+  } catch {
+    return text;
+  }
+}
+
 const mockResult = (text) => ({
-  content: [{ type: "text", text }],
+  content: [{ type: "text", text: strictEvaluationFixture(text) }],
   finishReason: { unified: "stop", raw: "stop" },
   usage: {
     inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
@@ -101,6 +123,41 @@ test("provider returns the shared structured InterviewTurn model", async () => {
   assert.match(prompt, /Probe duplicate values/);
   assert.match(prompt, /Solution\.java/);
   assert.match(prompt, /hash map/);
+  const schema = model.doGenerateCalls[0].responseFormat.schema;
+  const observationSchema = schema.properties.observations.items;
+  assert.deepEqual(
+    [...observationSchema.required].sort(),
+    Object.keys(observationSchema.properties).sort(),
+  );
+});
+
+test("provider normalizes required nullable observation references", async () => {
+  const interview = startInterview(problem, { definition });
+  const model = new MockLanguageModelV3({
+    doGenerate: mockResult(
+      JSON.stringify({
+        message: "Tell me your approach.",
+        stageComplete: false,
+        observations: [
+          {
+            id: "",
+            competencyId: null,
+            messageId: null,
+            observation: "Candidate is starting.",
+          },
+        ],
+      }),
+    ),
+  });
+  const turn = await generateInterviewResponseWithModel(model, {
+    interview,
+    problem,
+    definition,
+    workspace: { type: "none" },
+  });
+  assert.deepEqual(turn.observations, [
+    { id: "", observation: "Candidate is starting." },
+  ]);
 });
 
 test("system design context includes the normalized diagram through the generic workspace", async () => {
@@ -220,7 +277,7 @@ test("provider failures remain safe", async () => {
   );
   const model = new MockLanguageModelV3({
     doGenerate: async () => {
-      throw new Error("secret");
+      throw new Error("Provider rejected apiKey=secret");
     },
   });
   await assert.rejects(
@@ -238,6 +295,33 @@ test("provider failures remain safe", async () => {
     (error) =>
       error instanceof AIProviderError && !error.message.includes("secret"),
   );
+});
+
+test("interviewer errors explain provider failures and sanitize nested causes", () => {
+  const { interviewErrorMessage } = load("../src/lib/ai/error.ts");
+  for (const [statusCode, expected] of [
+    [401, /authentication/],
+    [429, /quota/],
+    [404, /model or endpoint/],
+  ]) {
+    assert.match(
+      interviewErrorMessage(
+        new Error("Wrapper", {
+          cause: Object.assign(new Error("Provider failure"), { statusCode }),
+        }),
+      ),
+      expected,
+    );
+  }
+  assert.match(
+    interviewErrorMessage(new Error("Failed to fetch")),
+    /allows browser requests/,
+  );
+  const message = interviewErrorMessage(
+    new Error("Provider rejected apiKey=secret"),
+  );
+  assert.match(message, /Provider rejected/);
+  assert.doesNotMatch(message, /secret/);
 });
 
 test("evaluation is qualitative, holistic, and preserves not-assessed", async () => {
@@ -648,11 +732,20 @@ test("evaluation constrains every evidence message reference to the supplied tra
     ]) {
       if (hasMessages)
         assert.deepEqual(
-          schema.properties.messageId.enum,
+          schema.properties.messageId.anyOf.find((item) => item.enum).enum,
           interview.messages.map(({ id }) => id),
         );
-      else assert.equal(schema.properties.messageId, undefined);
+      else assert.deepEqual(schema.properties.messageId, { type: "null" });
+      assert.deepEqual(
+        [...schema.required].sort(),
+        Object.keys(schema.properties).sort(),
+      );
     }
+    const competencySchema = properties.competencies.items;
+    assert.deepEqual(
+      [...competencySchema.required].sort(),
+      Object.keys(competencySchema.properties).sort(),
+    );
     if (hasMessages) {
       for (const field of [
         "strengths",
