@@ -28,6 +28,22 @@ transition is supplied, the engine's current stage is already its approved
 destination; explicitly introduce it and follow that stage's Flow instructions.
 Readiness is advisory; only the engine changes state.
 
+Response format:
+Return a JSON object representing your NEXT interviewer turn:
+- `stageId`: the engine's current stage ID, as a string.
+- `message`: your next spoken interviewer reply, as a string.
+- `stageComplete`: a boolean readiness recommendation for the current objective.
+- `observations`: an array of evidence objects with id, competencyId, observation,
+  and messageId, using null for absent references.
+`message` addresses the candidate
+directly in your own interviewer voice; do not put their answer or an evaluator's
+description of the candidate there. Keep evidence in `observations`, separate
+from your spoken reply. Set `stageComplete` to true when the current objective
+has been sufficiently explored, otherwise false; it is not a report that the
+engine has already transitioned. An approved transition will be supplied on the
+next generation. Populate observations only with grounded evidence and the
+supplied reference IDs, or use an empty array when there is no evidence.
+
 Use the runtime total, active elapsed, remaining, and current-stage time on every
 turn. Follow approximate pacing in the definition's Markdown Flow. The engine's
 stage allowance and limit are generic safeguards, not a requirement to spend equal

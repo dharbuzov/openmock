@@ -49,12 +49,18 @@ test("interviewer prompt composes the global resource before interview instructi
     const definition = loadDefinition("behavioral");
     const composed = await interviewerSystemPrompt({
       definition,
-      interview: { startedAt: new Date().toISOString() },
+      interview: {
+        startedAt: new Date().toISOString(),
+        stage: { current: "introduction" },
+      },
     });
     const globalIndex = composed.indexOf("OpenMock's interviewer");
     const definitionIndex = composed.indexOf("# Behavioral Interview");
     assert.ok(globalIndex >= 0);
     assert.ok(definitionIndex > globalIndex);
+    assert.ok(composed.indexOf("Next turn task:") > definitionIndex);
+    assert.match(composed, /active stage "introduction"/);
+    assert.match(composed, /approved transition is null/);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -63,4 +69,30 @@ test("interviewer prompt composes the global resource before interview instructi
 test("production prompt composition no longer exports the hardcoded constant", () => {
   const prompts = load("node:fs").readFileSync("src/lib/ai/prompts.ts", "utf8");
   assert.ok(!prompts.includes("BASE_INTERVIEWER_SYSTEM_PROMPT"));
+});
+
+test("next-turn instructions follow the engine's approved destination without changing the definition", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(await readPromptResource("interviewer"));
+  try {
+    const definition = loadDefinition("system-design");
+    const transition = {
+      from: "requirements",
+      to: "high-level-design",
+      reason: "ready",
+    };
+    const before = structuredClone(definition);
+    const composed = await interviewerSystemPrompt({
+      definition,
+      interview: { stage: { current: transition.to } },
+      transition,
+    });
+    assert.match(composed, /active stage "high-level-design"/);
+    assert.ok(composed.includes(JSON.stringify(transition)));
+    assert.ok(composed.includes(definition.instructions));
+    assert.deepEqual(definition, before);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

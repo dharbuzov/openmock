@@ -24,7 +24,7 @@ const problem = {
   companies: [],
   content: "Return the indices of two distinct elements whose sum is target.",
 };
-const candidate = `Sure. I'd start with a straightforward brute-force approach.
+const bruteForce = `Sure. I'd start with a straightforward brute-force approach.
 
 We could iterate through the array using two nested loops, checking each pair of distinct elements to see whether their sum equals the target.
 
@@ -38,140 +38,191 @@ const followUp =
 
 // An injected provider echo establishes which boundary owns the text. A proper
 // reply then proves handling never substitutes the candidate's question for it.
-for (const streaming of [false, true]) {
-  for (const echo of [true, false]) {
-    test(`Two Sum ${streaming ? "streamed" : "generated"} ${echo ? "provider echo is traceable" : "follow-up survives parsing and persistence"}`, async () => {
-      const logs = [];
-      const originalFetch = globalThis.fetch;
-      const originalWindow = globalThis.window;
-      globalThis.window = { sessionStorage: storage() };
-      installLogger(
-        wrapLogger(
-          pino(
-            { level: "trace" },
-            { write: (line) => logs.push(JSON.parse(line)) },
-          ),
-        ),
-      );
-      const decision = {
-        stageId: "approach",
-        message: echo ? candidate.replace(/\s+/g, " ") : followUp,
-        stageComplete: false,
-        observations: [],
-      };
-      let request;
-      globalThis.fetch = async (url, init) => {
-        if (String(url).startsWith("/api/prompts/"))
-          return new Response(
-            readFileSync(
-              `content/prompts/${String(url).split("/").at(-1)}.md`,
-              "utf8",
+for (const candidate of [
+  bruteForce,
+  "I think we could use a hash map to avoid repeatedly scanning the array.",
+  "For each number I would check whether target minus that number is already in a map of earlier values to indices. Should I check before inserting the current element?",
+  "I will implement a single pass in Java: look up the complement, return the earlier index and current index if present, otherwise insert the current value and index.",
+]) {
+  for (const streaming of [false, true]) {
+    for (const echo of [true, false]) {
+      test(`Two Sum ${candidate === bruteForce ? "brute force" : candidate.includes("Should I") ? "candidate question" : candidate.startsWith("I will") ? "real implementation echo" : "hash map"} ${streaming ? "streamed" : "generated"} ${echo ? "provider echo is traceable" : "follow-up survives parsing and persistence"}`, async () => {
+        const logs = [];
+        const originalFetch = globalThis.fetch;
+        const originalWindow = globalThis.window;
+        globalThis.window = { sessionStorage: storage() };
+        installLogger(
+          wrapLogger(
+            pino(
+              { level: "trace" },
+              { write: (line) => logs.push(JSON.parse(line)) },
             ),
-          );
-        assert.ok(String(url).endsWith("/api/chat"));
-        request = JSON.parse(init.body);
-        const body = {
-          model: "test-model",
-          created_at: "2026-10-11T12:00:00Z",
-          done: true,
-          message: { role: "assistant", content: JSON.stringify(decision) },
-          done_reason: "stop",
-          prompt_eval_count: 10,
-          eval_count: 20,
+          ),
+        );
+        const decision = {
+          stageId: "approach",
+          message: echo ? candidate.replace(/\s+/g, " ") : followUp,
+          stageComplete: false,
+          observations: [],
         };
-        return new Response(JSON.stringify(body) + (streaming ? "\n" : ""), {
-          headers: {
-            "content-type": streaming
-              ? "application/x-ndjson"
-              : "application/json",
-          },
-        });
-      };
-      try {
-        const opening = applyInterviewTurn(
-          startInterview(problem, { definition }),
-          definition,
-          {
-            stageId: "approach",
-            message: "How would you approach this problem?",
-            stageComplete: false,
-            observations: [],
-          },
-        );
-        const interview = acceptCandidateMessage(opening, candidate);
-        const displayed = [];
-        const updated = await processCandidateMessage(
-          {
-            provider: "ollama",
+        let request;
+        globalThis.fetch = async (url, init) => {
+          if (String(url).startsWith("/api/prompts/"))
+            return new Response(
+              readFileSync(
+                `content/prompts/${String(url).split("/").at(-1)}.md`,
+                "utf8",
+              ),
+            );
+          assert.ok(String(url).endsWith("/api/chat"));
+          request = JSON.parse(init.body);
+          const body = {
             model: "test-model",
-            baseUrl: "http://localhost:11434",
-          },
-          interview,
-          problem,
-          definition,
-          undefined,
-          undefined,
-          streaming ? (message) => displayed.push(message) : undefined,
-          false,
-          undefined,
-          (committed) => saveInterviewSession({ interview: committed }),
-        );
-        assert.equal(request.stream, streaming);
-        assert.deepEqual(
-          request.messages.map(({ role }) => role),
-          ["system", "user", "assistant", "user"],
-        );
-        assert.equal(request.messages.at(-1).content, candidate);
-        assert.equal(
-          request.messages.at(-2).content,
-          opening.messages[0].content,
-        );
-        const system = request.messages[0].content;
-        assert.match(
-          system,
-          /output `message` is your\s+reply to the candidate/,
-        );
-        assert.match(system, /candidate asks a question/);
-        assert.ok(system.includes(definition.instructions));
-        const data = JSON.parse(
-          request.messages[1].content.split("\n").slice(1).join("\n"),
-        );
-        assert.equal(data.currentStage.current, "approach");
-        assert.deepEqual(data.interviewDefinition.stages, definition.stages);
-        assert.equal(updated.stage.current, "approach");
-        assert.equal(updated.messages.at(-2).role, "candidate");
-        assert.equal(updated.messages.at(-2).content, candidate);
-        assert.equal(updated.messages.at(-1).role, "interviewer");
-        assert.equal(updated.messages.at(-1).content, decision.message);
-        assert.equal(
-          readInterviewSession(updated.id).interview.messages.at(-1).content,
-          decision.message,
-        );
-        if (streaming) assert.deepEqual(displayed, [decision.message]);
-        await new Promise((resolve) => setImmediate(resolve));
-        const wire = JSON.parse(
-          logs.find(({ msg }) => msg === "HTTP_RESPONSE_BODY").body,
-        );
-        assert.equal(
-          JSON.parse(wire.message.content).message,
-          updated.messages.at(-1).content,
-        );
-        assert.deepEqual(
-          logs.find(({ msg }) => msg === "LLM_PARSED_RESPONSE").parsed,
-          decision,
-        );
-        assert.equal(
-          logs
-            .find(({ msg }) => msg === "INTERVIEW_STATE_AFTER")
-            .interview.messages.at(-1).content,
-          decision.message,
-        );
-        assert.ok(logs.some(({ msg }) => msg === "LLM_RAW_RESPONSE"));
-      } finally {
-        globalThis.fetch = originalFetch;
-        globalThis.window = originalWindow;
-        installLogger(undefined);
-      }
-    });
+            created_at: "2026-10-11T12:00:00Z",
+            done: true,
+            message: {
+              role: "assistant",
+              content: JSON.stringify(decision),
+              thinking: `Candidate text to consider, not to display: ${candidate}`,
+            },
+            done_reason: "stop",
+            prompt_eval_count: 10,
+            eval_count: 20,
+          };
+          return new Response(JSON.stringify(body) + (streaming ? "\n" : ""), {
+            headers: {
+              "content-type": streaming
+                ? "application/x-ndjson"
+                : "application/json",
+            },
+          });
+        };
+        try {
+          const opening = applyInterviewTurn(
+            startInterview(problem, { definition }),
+            definition,
+            {
+              stageId: "approach",
+              message: "How would you approach this problem?",
+              stageComplete: false,
+              observations: [],
+            },
+          );
+          const history =
+            candidate === bruteForce
+              ? opening
+              : applyInterviewTurn(
+                  acceptCandidateMessage(
+                    opening,
+                    "Two nested loops would cost O(n²) time.",
+                  ),
+                  definition,
+                  {
+                    stageId: "approach",
+                    message: "How could you reduce repeated lookups?",
+                    stageComplete: false,
+                    observations: [],
+                  },
+                );
+          const interview = acceptCandidateMessage(history, candidate);
+          const displayed = [];
+          const updated = await processCandidateMessage(
+            {
+              provider: "ollama",
+              model: "test-model",
+              baseUrl: "http://localhost:11434",
+            },
+            interview,
+            problem,
+            definition,
+            undefined,
+            undefined,
+            streaming ? (message) => displayed.push(message) : undefined,
+            false,
+            undefined,
+            (committed) => saveInterviewSession({ interview: committed }),
+          );
+          assert.equal(request.stream, streaming);
+          assert.deepEqual(
+            request.messages
+              .slice(2)
+              .map(({ role, content }) => ({ role, content })),
+            interview.messages.map(({ role, content }) => ({
+              role: role === "candidate" ? "user" : "assistant",
+              content,
+            })),
+          );
+          assert.deepEqual(
+            request.messages.slice(0, 2).map(({ role }) => role),
+            ["system", "user"],
+          );
+          assert.equal(request.messages.at(-1).content, candidate);
+          assert.equal(
+            request.messages.at(-2).content,
+            history.messages.at(-1).content,
+          );
+          assert.deepEqual(updated.messages.slice(0, -1), interview.messages);
+          const system = request.messages[0].content;
+          assert.match(
+            system,
+            /output `message` is your\s+reply to the candidate/,
+          );
+          assert.match(system, /candidate asks a question/);
+          assert.match(
+            system,
+            /JSON object representing your NEXT interviewer turn/,
+          );
+          assert.match(system, /Keep evidence in `observations`, separate/);
+          assert.match(
+            system,
+            /Set `stageComplete` to true when the current objective/,
+          );
+          assert.ok(system.includes(definition.instructions));
+          const data = JSON.parse(
+            request.messages[1].content.split("\n").slice(1).join("\n"),
+          );
+          assert.equal(data.currentStage.current, "approach");
+          assert.deepEqual(data.interviewDefinition.stages, definition.stages);
+          assert.equal(updated.stage.current, "approach");
+          assert.equal(updated.messages.at(-2).role, "candidate");
+          assert.equal(updated.messages.at(-2).content, candidate);
+          assert.equal(updated.messages.at(-1).role, "interviewer");
+          assert.equal(updated.messages.at(-1).content, decision.message);
+          assert.equal(
+            readInterviewSession(updated.id).interview.messages.at(-1).content,
+            decision.message,
+          );
+          if (streaming) assert.deepEqual(displayed, [decision.message]);
+          await new Promise((resolve) => setImmediate(resolve));
+          const wire = JSON.parse(
+            logs.find(({ msg }) => msg === "HTTP_RESPONSE_BODY").body,
+          );
+          assert.equal(
+            JSON.parse(wire.message.content).message,
+            updated.messages.at(-1).content,
+          );
+          assert.ok(wire.message.thinking.includes(candidate));
+          assert.notEqual(
+            updated.messages.at(-1).content,
+            wire.message.thinking,
+          );
+          assert.deepEqual(
+            logs.find(({ msg }) => msg === "LLM_PARSED_RESPONSE").parsed,
+            decision,
+          );
+          assert.equal(
+            logs
+              .find(({ msg }) => msg === "INTERVIEW_STATE_AFTER")
+              .interview.messages.at(-1).content,
+            decision.message,
+          );
+          assert.ok(logs.some(({ msg }) => msg === "LLM_RAW_RESPONSE"));
+        } finally {
+          globalThis.fetch = originalFetch;
+          globalThis.window = originalWindow;
+          installLogger(undefined);
+        }
+      });
+    }
   }
 }

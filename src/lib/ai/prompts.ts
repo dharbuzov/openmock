@@ -6,7 +6,15 @@ export async function interviewerSystemPrompt(
   context: InterviewContext,
   logContext: Record<string, unknown> = {},
 ): Promise<string> {
-  return `${await loadPrompt("interviewer", logContext)}\n\n${context.definition.instructions}`;
+  return `${await loadPrompt("interviewer", logContext)}\n\n${context.definition.instructions}
+
+Next turn task: Respond to the candidate as the interviewer, using the Flow for
+the active stage ${JSON.stringify(context.interview.stage.current)}. The engine's
+approved transition is ${JSON.stringify(context.transition ?? null)}.
+If there is no approved transition, ask within the active stage and do not
+announce another stage. If its objective is sufficiently explored, recommend
+readiness with stageComplete true; the engine will request the next stage's reply.
+Keep the candidate's answer and your evidence separate from your spoken message.`;
 }
 
 export function interviewContext(context: InterviewContext): string {
