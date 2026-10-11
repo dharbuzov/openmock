@@ -115,6 +115,7 @@ function browser(callback) {
 test("Practice links to Setup and rendering Setup never creates a session", async () => {
   const { default: Practice } = loadComponent("src/app/practice/page.tsx", {
     ...primitives,
+    "next/navigation": { useRouter: () => ({ push() {} }) },
     "@/lib/problems/loader": { getProblems: async () => [problem] },
     "@/lib/interview/definitions": {
       getInterviewDefinitions: async () => [definition],

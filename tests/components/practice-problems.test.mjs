@@ -8,6 +8,7 @@ import {
   findElement,
 } from "../helpers/components.mjs";
 const overrides = {
+  "next/navigation": { useRouter: () => ({ push() {} }) },
   "@/components/ui/combobox": Object.fromEntries(
     [
       "Combobox",
@@ -77,6 +78,103 @@ const problems = [
 const all = { interview: "", difficulty: "", company: "", search: "" };
 const ids = (filters) =>
   filterProblems(problems, { ...all, ...filters }).map(({ id }) => id);
+
+test("Pick Random uses the visible results for every filter combination", (t) => {
+  const hooks = hookHarness();
+  const navigations = [];
+  const { PracticeProblems } = loadComponent(
+    "src/components/practice-problems.tsx",
+    {
+      ...overrides,
+      react: hooks.react,
+      "next/navigation": {
+        useRouter: () => ({ push: (url) => navigations.push(url) }),
+      },
+    },
+  );
+  const props = {
+    problems,
+    interviewTypes: [
+      {
+        id: "system-design",
+        name: "System Design",
+        duration: { defaultMinutes: 60 },
+      },
+      { id: "dsa", name: "DSA", duration: { defaultMinutes: 45 } },
+    ],
+  };
+  const render = () => hooks.render(PracticeProblems, props);
+  const randomButton = (tree) =>
+    findElement(
+      tree,
+      (node) =>
+        node.type === "button" && node.props.children?.[1] === "Pick Random",
+    );
+  t.mock.method(Math, "random", () => 0);
+  for (let mask = 0; mask < 16; mask++) {
+    const filters = {
+      interview: mask & 1 ? "system-design" : "",
+      difficulty: mask & 2 ? "medium" : "",
+      company: mask & 4 ? "Revolut" : "",
+      search: mask & 8 ? "  PAYMENT  " : "",
+    };
+    let tree = render();
+    findElement(tree, (node) => node.type === "select").props.onValueChange(
+      filters.interview || "__all__",
+    );
+    findElement(
+      tree,
+      (node) => node.props["aria-labelledby"] === "practice-difficulty",
+    ).props.onValueChange([filters.difficulty || "__all__"]);
+    findElement(tree, (node) => node.type === "combobox").props.onValueChange({
+      value: filters.company,
+    });
+    findElement(
+      tree,
+      (node) => node.props.id === "practice-search",
+    ).props.onChange({ target: { value: filters.search } });
+    tree = render();
+    const expected = filterProblems(problems, filters, props.interviewTypes);
+    assert.equal(randomButton(tree).props.disabled, false);
+    for (let index = 0; index < expected.length; index++) {
+      const value =
+        index === expected.length - 1 ? 0.999999 : index / expected.length;
+      Math.random.mock.mockImplementation(() => value);
+      randomButton(tree).props.onClick();
+      const url = `/practice/${expected[index].id}/setup`;
+      assert.equal(navigations.at(-1), url);
+      assert.ok(
+        findElement(
+          tree,
+          (node) => node.type === "a" && node.props.href === url,
+        ),
+      );
+    }
+  }
+  findElement(
+    render(),
+    (node) => node.props.id === "practice-search",
+  ).props.onChange({ target: { value: "missing" } });
+  for (const emptyProps of [props, { ...props, problems: [] }]) {
+    const tree = hooks.render(PracticeProblems, emptyProps);
+    const button = randomButton(tree);
+    assert.equal(button.props.disabled, true);
+    const count = navigations.length;
+    button.props.onClick();
+    assert.equal(navigations.length, count);
+    assert.ok(
+      findElement(
+        tree,
+        (node) =>
+          node.type === "p" &&
+          node.props.children ===
+            (emptyProps.problems.length
+              ? "No problems match these filters."
+              : "No practice problems are available yet."),
+      ),
+    );
+  }
+});
 
 test("interview, difficulty, canonical company and search combine with AND semantics", () => {
   assert.deepEqual(

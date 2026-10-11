@@ -2,8 +2,9 @@
 
 import { resolveInterviewDuration } from "@/lib/interview/duration";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ChevronRight, LayoutGrid } from "lucide-react";
+import { ChevronRight, LayoutGrid, Shuffle } from "lucide-react";
 import { resolveIcon } from "./lucide-icon-registry";
 import type { InterviewTypeSummary } from "@/lib/interview/types";
 import { Button } from "@/components/ui/button";
@@ -97,6 +98,7 @@ export function PracticeProblems({
   problems: Problem[];
   interviewTypes: InterviewTypeSummary[];
 }) {
+  const router = useRouter();
   const [interview, setInterview] = useState("");
   const [search, setSearch] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("");
@@ -188,18 +190,34 @@ export function PracticeProblems({
           </Select>
         </Field>
         <FieldGroup className="gap-3">
-          <Field>
-            <FieldLabel htmlFor="practice-search" className="sr-only">
-              Search problems
-            </FieldLabel>
-            <Input
-              id="practice-search"
-              type="search"
-              placeholder="Search problems..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </Field>
+          <div className="flex items-center gap-2">
+            <Field className="min-w-0 flex-1">
+              <FieldLabel htmlFor="practice-search" className="sr-only">
+                Search problems
+              </FieldLabel>
+              <Input
+                id="practice-search"
+                type="search"
+                placeholder="Search problems..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </Field>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={visible.length === 0}
+              onClick={() => {
+                const problem =
+                  visible[Math.floor(Math.random() * visible.length)];
+                if (problem) router.push(`/practice/${problem.id}/setup`);
+              }}
+            >
+              <Shuffle data-icon="inline-start" />
+              Pick Random
+            </Button>
+          </div>
           <div className="flex flex-wrap items-end gap-4">
             <Field className="w-auto">
               <FieldLabel
