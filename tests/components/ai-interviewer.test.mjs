@@ -36,6 +36,7 @@ function conversation(fresh = false) {
           definition,
           {
             message: "Opening question.",
+            stageId: definition.stages[0].id,
             stageComplete: false,
             observations: [],
           },
@@ -118,7 +119,6 @@ function conversation(fresh = false) {
         commitOperation: operations.commit,
         endOperation: operations.end,
         isCurrentOperation: operations.isCurrent,
-        previewOperationStage: operations.previewStage,
       }),
       useCaptureWorkspace: () => () => ({ type: "none" }),
     },
@@ -156,6 +156,9 @@ function conversation(fresh = false) {
         snapshot,
         signal,
         onMessage,
+        _opening,
+        _turnContext,
+        onCommitted,
       ) =>
         new Promise((resolve, reject) =>
           requests.push({
@@ -163,14 +166,16 @@ function conversation(fresh = false) {
             snapshot,
             signal,
             onMessage,
-            resolve: (message = "Tell me more.") =>
-              resolve(
-                applyInterviewTurn(interview, definition, {
-                  message,
-                  stageComplete: false,
-                  observations: [],
-                }),
-              ),
+            resolve: (message = "Tell me more.") => {
+              const result = applyInterviewTurn(interview, definition, {
+                message,
+                stageId: interview.stage.current,
+                stageComplete: false,
+                observations: [],
+              });
+              onCommitted?.(result);
+              resolve(result);
+            },
             reject,
           }),
         ),

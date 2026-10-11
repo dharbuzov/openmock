@@ -202,6 +202,7 @@ export function interviewTiming(
 export function planInterviewTurn(
   interview: Interview,
   definition: InterviewDefinition,
+  recommendation?: Pick<InterviewTurn, "stageId" | "stageComplete">,
 ): {
   interview: Interview;
   transition?: StageTransition;
@@ -221,6 +222,17 @@ export function planInterviewTurn(
   const hasOpportunity =
     stageMessages.some(({ role }) => role === "interviewer") &&
     stageMessages.some(({ role }) => role === "candidate");
+  const next = definition.stages[timing.index + 1]?.id ?? null;
+  if (
+    recommendation &&
+    recommendation.stageId !== current &&
+    (!recommendation.stageComplete ||
+      recommendation.stageId !== next ||
+      !hasOpportunity)
+  )
+    throw new InterviewStateError(
+      "The response requested an unapproved stage transition.",
+    );
   const answeredTurns = stageMessages.filter(
     ({ role }) => role === "interviewer",
   ).length;
@@ -231,15 +243,15 @@ export function planInterviewTurn(
   };
   if (interview.messages.at(-1)?.role !== "candidate" || !hasOpportunity)
     return { interview: { ...interview, stage } };
-  const reason = stage.readyToAdvance
-    ? "ready"
-    : timing.stageElapsedMs >= timing.stageLimitMs
-      ? "time"
-      : answeredTurns >= 8
-        ? "follow-ups"
-        : undefined;
+  const reason =
+    stage.readyToAdvance || recommendation?.stageComplete
+      ? "ready"
+      : timing.stageElapsedMs >= timing.stageLimitMs
+        ? "time"
+        : answeredTurns >= 8
+          ? "follow-ups"
+          : undefined;
   if (!reason) return { interview: { ...interview, stage } };
-  const next = definition.stages[timing.index + 1]?.id ?? null;
   const transition: StageTransition = { from: current, to: next, reason };
   if (next === null) return { interview: { ...interview, stage }, transition };
   return {
@@ -279,6 +291,10 @@ export function applyInterviewTurn(
   if (stageIndex < 0) {
     throw new InterviewStateError(`Unknown current stage: ${currentStage}`);
   }
+  if (turn.stageId !== currentStage)
+    throw new InterviewStateError(
+      "The response stage does not match the engine's active stage.",
+    );
   const createdAt = now();
   const validCompetencies = new Set(
     definition.evaluation.competencies.map(({ id }) => id),

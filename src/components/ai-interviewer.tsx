@@ -20,7 +20,6 @@ import {
   MessageScrollerButton,
   useMessageScroller,
 } from "@/components/ui/message-scroller";
-import { saveInterviewSession } from "@/lib/interview/session-storage";
 import { acceptCandidateMessage } from "@/lib/interview/engine";
 import { Spinner } from "@/components/ui/spinner";
 import { RecordingControls } from "./recording-controls";
@@ -64,7 +63,6 @@ export function AIInterviewer() {
     commitOperation,
     endOperation,
     isCurrentOperation,
-    previewOperationStage,
   } = useInterviewSession();
   const { messages } = interview;
   const captureWorkspace = useCaptureWorkspace();
@@ -333,11 +331,9 @@ export function AIInterviewer() {
         },
         openingTurn,
         context,
-        (stage) => previewOperationStage(request, stage),
+        (updated) => commitOperation(request, updated),
       );
-      if (openingTurn && isCurrentOperation(request))
-        saveInterviewSession({ interview: result });
-      if (commitOperation(request, result)) {
+      if (isCurrentOperation(request)) {
         if (logger.isLevelEnabled("trace"))
           logger.trace(
             { ...context, interview: result, response: result.messages.at(-1) },

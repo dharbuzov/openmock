@@ -67,6 +67,8 @@ try {
             role: "assistant",
             content: JSON.stringify({
               message: "What would you clarify first?",
+              stageId: JSON.parse(route.request().postData()).format.properties
+                .stageId.enum[0],
               stageComplete: false,
               observations: [],
             }),

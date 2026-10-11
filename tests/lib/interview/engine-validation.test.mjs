@@ -95,6 +95,7 @@ test("unknown competency IDs are rejected instead of erased", () => {
     () =>
       applyInterviewTurn(start(), definition, {
         message: "Continue.",
+        stageId: "requirements",
         stageComplete: false,
         observations: [
           {

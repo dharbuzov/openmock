@@ -8,8 +8,8 @@ export function CurrentStageBadge({
 }: {
   numbered?: boolean;
 }) {
-  const { interview, definition, responseStage } = useInterviewSession();
-  const currentStage = responseStage ?? interview.stage.current;
+  const { interview, definition } = useInterviewSession();
+  const currentStage = interview.stage.current;
   if (currentStage === null)
     return (
       <Badge variant="secondary">

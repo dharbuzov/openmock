@@ -20,6 +20,8 @@ const { captureWorkspaceSnapshot } = load("../src/lib/interview/workspace.ts");
 function strictEvaluationFixture(text) {
   try {
     const output = JSON.parse(text);
+    if ("stageComplete" in output)
+      return JSON.stringify({ stageId: "approach", ...output });
     if (!Array.isArray(output.competencies)) return text;
     const evidence = (items) =>
       items?.map((item) => ({ messageId: null, stage: null, ...item }));
@@ -87,6 +89,7 @@ test("provider returns the shared structured InterviewTurn model", async () => {
     "I will use a hash map.",
   );
   const output = {
+    stageId: "approach",
     message: "What are the complexity costs?",
     stageComplete: true,
     observations: [
@@ -182,6 +185,7 @@ test("system design context includes the normalized diagram through the generic 
     "I will place a cache before the database.",
   );
   const output = {
+    stageId: "requirements",
     message: "What happens if the cache fails?",
     stageComplete: false,
     observations: [],
@@ -912,7 +916,7 @@ test("real structured streaming exposes message text and waits for the validated
   const updates = [];
   const context = streamingContext();
   const model = streamModel([
-    '{"message":"What',
+    '{"stageId":"approach","message":"What',
     " constraints matter?",
     '","stageComplete":false,"observations":[]}',
   ]);
@@ -926,6 +930,7 @@ test("real structured streaming exposes message text and waits for the validated
   assert.equal(updates[0], "What");
   assert.equal(updates.at(-1), "What constraints matter?");
   assert.deepEqual(turn, {
+    stageId: "approach",
     message: "What constraints matter?",
     stageComplete: false,
     observations: [],
@@ -949,6 +954,51 @@ test("streaming provider failures and invalid final output never become intervie
     assert.equal(context.interview.messages.length, 1);
     assert.equal(context.interview.stage.current, definition.stages[0].id);
   }
+});
+
+test("provider stage schema follows definition order and constrains an approved destination", async () => {
+  const context = streamingContext();
+  const model = new MockLanguageModelV3({
+    doGenerate: mockResult(
+      JSON.stringify({
+        stageId: "approach",
+        message: "Explain your approach.",
+        stageComplete: false,
+        observations: [],
+      }),
+    ),
+  });
+  await generateInterviewResponseWithModel(model, context);
+  assert.deepEqual(
+    model.doGenerateCalls[0].responseFormat.schema.properties.stageId.enum,
+    ["approach", "implementation"],
+  );
+  const destinationContext = {
+    ...context,
+    interview: {
+      ...context.interview,
+      stage: { ...context.interview.stage, current: "implementation" },
+    },
+    transition: { from: "approach", to: "implementation", reason: "ready" },
+  };
+  const invalid = new MockLanguageModelV3({
+    doGenerate: mockResult(
+      JSON.stringify({
+        stageId: "approach",
+        message: "Wrong stage.",
+        stageComplete: false,
+        observations: [],
+      }),
+    ),
+  });
+  await assert.rejects(
+    generateInterviewResponseWithModel(invalid, destinationContext),
+    AIProviderError,
+  );
+  assert.deepEqual(
+    invalid.doGenerateCalls[0].responseFormat.schema.properties.stageId.enum,
+    ["implementation"],
+  );
 });
 
 test("a model without streaming returns a complete validated response without synthetic chunks", async () => {

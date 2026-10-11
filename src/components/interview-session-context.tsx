@@ -31,7 +31,6 @@ type InterviewSession = {
   problem: Problem;
   definition: InterviewDefinition;
   operation: SessionState["operation"];
-  responseStage?: string;
   paused: boolean;
   elapsed: SessionOperations["elapsed"];
   toggleTimer: SessionOperations["toggleTimer"];
@@ -39,7 +38,6 @@ type InterviewSession = {
   commitOperation: SessionOperations["commit"];
   endOperation: SessionOperations["end"];
   isCurrentOperation: SessionOperations["isCurrent"];
-  previewOperationStage: SessionOperations["previewStage"];
 };
 
 const InterviewSessionContext = createContext<InterviewSession | null>(null);
@@ -96,7 +94,6 @@ export function InterviewSessionProvider({
       commitOperation: operations.commit,
       endOperation: operations.end,
       isCurrentOperation: operations.isCurrent,
-      previewOperationStage: operations.previewStage,
     }),
     [state, problem, definition, operations],
   );

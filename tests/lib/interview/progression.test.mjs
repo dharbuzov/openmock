@@ -1,8 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { load } from "../../register-typescript.mjs";
+import { load, storage } from "../../register-typescript.mjs";
 import { loadDefinition } from "../../content-fixtures.mjs";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { loadComponent } from "../../helpers/components.mjs";
 
 const engine = load("../src/lib/interview/engine.ts");
 const runner = load("../src/lib/interview/runner.ts");
@@ -13,7 +16,8 @@ const { SessionOperations } = load(
 const { interviewContext, interviewerSystemPrompt } = load(
   "../src/lib/ai/prompts.ts",
 );
-const turn = (stageComplete = false) => ({
+const turn = (stageComplete = false, stageId = "requirements") => ({
+  stageId,
   message: "A challenging follow-up?",
   stageComplete,
   observations: [],
@@ -28,7 +32,11 @@ function fixture(id = "system-design", minutes = 20) {
   return { definition, problem, interview };
 }
 const opening = (interview, definition) =>
-  engine.applyInterviewTurn(interview, definition, turn());
+  engine.applyInterviewTurn(
+    interview,
+    definition,
+    turn(false, interview.stage.current),
+  );
 const answer = (interview) =>
   engine.acceptCandidateMessage(interview, "Here is my reasoning.");
 
@@ -123,7 +131,11 @@ test("even overdue stages get a question and candidate opportunity before moving
     answer({ ...opening(interview, definition), elapsedMs: 21 * 60_000 }),
     definition,
   );
-  const entered = engine.applyInterviewTurn(plan.interview, definition, turn());
+  const entered = engine.applyInterviewTurn(
+    plan.interview,
+    definition,
+    turn(false, plan.interview.stage.current),
+  );
   assert.equal(entered.stage.current, "high-level-design");
   assert.equal(
     engine.planInterviewTurn(entered, definition).transition,
@@ -205,7 +217,7 @@ test("legacy sessions and custom Markdown definitions use the same generic polic
     const ready = engine.applyInterviewTurn(
       opening(f.interview, f.definition),
       f.definition,
-      turn(true),
+      turn(true, f.interview.stage.current),
     );
     assert.equal(
       engine.planInterviewTurn(answer(ready), f.definition).interview.stage
@@ -244,7 +256,7 @@ test("transition response uses destination context, preserves source evidence, a
       "We've clarified the scope. Let's move to High-Level Design. Please draw your architecture and walk me through the request flow.";
     onMessage?.(message);
     return {
-      ...turn(),
+      ...turn(false, context.interview.stage.current),
       message,
       observations: [
         {
@@ -266,7 +278,7 @@ test("transition response uses destination context, preserves source evidence, a
       undefined,
       false,
       undefined,
-      (stage) => previews.push(stage),
+      (updated) => previews.push(updated.stage.current),
     );
   try {
     await assert.rejects(run(), /offline/);
@@ -275,7 +287,7 @@ test("transition response uses destination context, preserves source evidence, a
     fail = false;
     const result = await run();
     assert.equal(calls, 2);
-    assert.deepEqual(previews, ["high-level-design", "high-level-design"]);
+    assert.deepEqual(previews, ["high-level-design"]);
     assert.equal(result.stage.current, "high-level-design");
     assert.deepEqual(result.stage.completed, ["requirements"]);
     assert.equal(result.messages.length, incoming.messages.length + 1);
@@ -290,20 +302,22 @@ test("transition response uses destination context, preserves source evidence, a
   }
 });
 
-test("stage preview synchronizes pending badges without saving a failed transition", () => {
+test("session stage changes only through a committed authoritative interview", () => {
   const { interview } = fixture();
   let state;
   const session = new SessionOperations(interview, (next) => {
     state = next;
   });
   const request = session.begin("send");
-  session.previewStage(request, "high-level-design");
-  assert.equal(state.responseStage, "high-level-design");
   assert.equal(state.interview.stage.current, "requirements");
+  session.commit(request, {
+    ...request.interview,
+    stage: { ...request.interview.stage, current: "high-level-design" },
+  });
+  assert.equal(state.interview.stage.current, "high-level-design");
   session.end(request);
-  assert.equal(state.responseStage, undefined);
-  session.previewStage(request, "deep-dive");
-  assert.equal(state.responseStage, undefined);
+  assert.equal(session.commit(request, interview), false);
+  assert.equal(state.interview.stage.current, "high-level-design");
 });
 
 test("aborted generation cannot commit a planned transition even if the provider returns a response", async () => {
@@ -342,14 +356,14 @@ test("a stage entry cannot recommend completion before its candidate activity", 
   const ready = engine.applyInterviewTurn(
     opening(interview, definition),
     definition,
-    turn(true),
+    turn(true, interview.stage.current),
   );
   const incoming = answer({ ...ready, elapsedMs: 60_000 });
   const original = provider.generateInterviewResponse;
   provider.generateInterviewResponse = async (_settings, context) => {
     assert.equal(context.interview.stage.current, "implementation");
     return {
-      ...turn(true),
+      ...turn(true, context.interview.stage.current),
       message:
         "Let's move to Implementation. Please write your solution and explain it as you work.",
     };
@@ -387,7 +401,7 @@ test("final-stage closure is planned before its response and does not skip unfin
       },
     },
     definition,
-    turn(true),
+    turn(true, current),
   );
   const plan = engine.planInterviewTurn(answer(state), definition);
   assert.equal(plan.transition.to, null);
@@ -396,7 +410,7 @@ test("final-stage closure is planned before its response and does not skip unfin
     plan.interview,
     definition,
     {
-      ...turn(),
+      ...turn(false, current),
       message:
         "The discussion is complete. Finish the interview to receive feedback.",
     },
@@ -456,5 +470,207 @@ test("runtime context and Markdown instructions expose pacing, activities, openi
     );
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+for (const id of ["dsa", "system-design", "behavioral", "sql"]) {
+  test(`${id}: same-turn recommendation commits the destination before publishing its introduction`, async () => {
+    let { definition, problem, interview } = fixture(id === "sql" ? "dsa" : id);
+    if (id === "sql") {
+      const { parseInterviewDefinitionDocument } = load(
+        "../src/lib/interview/definition-schema.ts",
+      );
+      definition = parseInterviewDefinitionDocument(
+        readFileSync("content/interviews/dsa.md", "utf8")
+          .replace("id: dsa", "id: sql")
+          .replace("name: Data Structures and Algorithms", "name: SQL")
+          .replace("  - approach", "  - clarify")
+          .replace("  - implementation", "  - query"),
+      );
+      problem = { ...problem, interview: "sql" };
+      interview = engine.startInterview(problem, { definition });
+    }
+    const original = provider.generateInterviewResponse;
+    const previousStorage = globalThis.sessionStorage;
+    globalThis.sessionStorage = storage();
+    const { saveInterviewSession, readInterviewSession } = load(
+      "../src/lib/interview/session-storage.ts",
+    );
+    let state,
+      calls = 0;
+    const session = new SessionOperations(
+      opening(interview, definition),
+      (next) => {
+        state = next;
+        saveInterviewSession({ interview: next.interview });
+      },
+      () => Date.parse(interview.startedAt) + 60_000,
+    );
+    const request = session.begin("send");
+    const incoming = answer(request.interview);
+    session.commit(request, incoming);
+    const destination = definition.stages[1].id;
+    const visible = [];
+    const { CurrentStageBadge } = loadComponent(
+      "src/components/current-stage-badge.tsx",
+      {
+        "./interview-session-context": {
+          useInterviewSession: () => ({ ...state, definition }),
+        },
+        "@/components/ui/badge": {
+          Badge: ({ variant, ...props }) => React.createElement("span", props),
+        },
+      },
+    );
+    provider.generateInterviewResponse = async (
+      _settings,
+      context,
+      _signal,
+      onMessage,
+    ) => {
+      calls++;
+      onMessage?.("This unvalidated draft must never be displayed or spoken.");
+      if (calls === 1) {
+        assert.equal(context.interview.stage.current, definition.stages[0].id);
+        assert.equal(state.interview.stage.current, definition.stages[0].id);
+        return {
+          ...turn(true, destination),
+          message: "Let's move to the next stage.",
+        };
+      }
+      assert.equal(calls, 2);
+      assert.equal(context.interview.stage.current, destination);
+      assert.equal(context.transition.to, destination);
+      const runtime = JSON.parse(interviewContext(context));
+      assert.equal(runtime.stagePosition, 2);
+      assert.equal(runtime.time.stageElapsedMinutes, 0);
+      assert.equal(runtime.time.totalMinutes, interview.durationMinutes);
+      return {
+        ...turn(false, destination),
+        message: `Let's move to ${destination}. Explain your work.`,
+      };
+    };
+    try {
+      const result = await runner.processCandidateMessage(
+        {},
+        incoming,
+        problem,
+        definition,
+        undefined,
+        request.controller.signal,
+        (text) => {
+          assert.equal(state.interview.stage.current, destination);
+          assert.equal(
+            readInterviewSession(interview.id).interview.stage.current,
+            destination,
+          );
+          const html = renderToStaticMarkup(
+            React.createElement(CurrentStageBadge, { numbered: true }),
+          );
+          assert.match(html, /Stage 2/);
+          visible.push(text);
+        },
+        false,
+        undefined,
+        (updated) => session.commit(request, updated),
+      );
+      assert.equal(result.stage.current, destination);
+      assert.deepEqual(result.stage.completed, [definition.stages[0].id]);
+      assert.equal(result.messages.at(-1).stage, destination);
+      assert.deepEqual(visible, [result.messages.at(-1).content]);
+      session.end(request);
+      assert.equal(
+        readInterviewSession(interview.id).interview.stage.current,
+        destination,
+      );
+    } finally {
+      provider.generateInterviewResponse = original;
+      globalThis.sessionStorage = previousStorage;
+    }
+  });
+}
+
+test("rejected stage requests never reach session state, transcript, voice, or the UI", async () => {
+  const { definition, problem, interview } = fixture("dsa");
+  const incoming = answer(opening(interview, definition));
+  const original = provider.generateInterviewResponse;
+  for (const invalid of [
+    turn(false, "implementation"),
+    turn(true, "analysis"),
+    turn(true, "invented"),
+  ]) {
+    const visible = [],
+      commits = [];
+    provider.generateInterviewResponse = async (
+      _settings,
+      _context,
+      _signal,
+      onMessage,
+    ) => {
+      onMessage?.("Let's move to implementation.");
+      return { ...invalid, message: "Let's move to implementation." };
+    };
+    try {
+      await assert.rejects(
+        runner.processCandidateMessage(
+          {},
+          incoming,
+          problem,
+          definition,
+          undefined,
+          undefined,
+          (text) => visible.push(text),
+          false,
+          undefined,
+          (updated) => commits.push(updated),
+        ),
+        /unapproved stage transition/,
+      );
+      assert.equal(incoming.stage.current, "approach");
+      assert.deepEqual(incoming.stage.completed, []);
+      assert.deepEqual(visible, []);
+      assert.deepEqual(commits, []);
+    } finally {
+      provider.generateInterviewResponse = original;
+    }
+  }
+});
+
+test("an invalid destination response or failed regeneration does not commit the proposed transition", async () => {
+  const { definition, problem, interview } = fixture("dsa");
+  const incoming = answer(opening(interview, definition));
+  const original = provider.generateInterviewResponse;
+  for (const failure of ["wrong-stage", "offline"]) {
+    let calls = 0;
+    const visible = [],
+      commits = [];
+    provider.generateInterviewResponse = async () => {
+      if (++calls === 1) return turn(true, "implementation");
+      if (failure === "offline") throw new Error("offline");
+      return turn(false, "approach");
+    };
+    try {
+      await assert.rejects(
+        runner.processCandidateMessage(
+          {},
+          incoming,
+          problem,
+          definition,
+          undefined,
+          undefined,
+          (text) => visible.push(text),
+          false,
+          undefined,
+          (updated) => commits.push(updated),
+        ),
+        /response stage|offline/,
+      );
+      assert.equal(calls, 2);
+      assert.equal(incoming.stage.current, "approach");
+      assert.deepEqual(visible, []);
+      assert.deepEqual(commits, []);
+    } finally {
+      provider.generateInterviewResponse = original;
+    }
   }
 });

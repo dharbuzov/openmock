@@ -17,8 +17,12 @@ TypeScript registration.
 Keep approximate pacing, natural transition expectations, and stage entry activities
 in the Markdown Flow sections. No YAML stage budgets are needed. The interviewer
 receives active elapsed time, remaining time, stage position, stage time, remaining
-stages, and any engine-planned transition. It recommends readiness; the engine
-advances at the next candidate-turn boundary before generating the next response.
+stages, and any engine-planned transition. It returns structured readiness and a
+response stage ID; the engine validates both at the current candidate-turn boundary.
+When a new recommendation is approved, the response is regenerated against the
+destination stage. Responses are held until validation and the authoritative
+interview state is committed, so neither text nor voice can announce an uncommitted
+transition. Both stage indicators read that same persisted interview state.
 
 The generic backstop allocates remaining time across remaining stages, permits up
 to 50% extension while reserving half a nominal share for later stages, and bounds

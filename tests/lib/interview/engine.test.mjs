@@ -31,6 +31,7 @@ const start = () =>
     mode: "practice",
   });
 const turn = (overrides = {}) => ({
+  stageId: "requirements",
   message: "Continue.",
   stageComplete: false,
   observations: [],
@@ -99,7 +100,7 @@ test("completing the final stage clears the active stage", () => {
   const updated = applyInterviewTurn(
     interview,
     definition,
-    turn({ stageComplete: true }),
+    turn({ stageComplete: true, stageId: "wrap-up" }),
     { from: "wrap-up", to: null, reason: "ready" },
   );
   assert.equal(updated.stage.current, null);

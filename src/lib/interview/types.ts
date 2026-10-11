@@ -153,6 +153,7 @@ export type InterviewContext = {
 };
 export type InterviewTurnObservation = Omit<InterviewObservation, "stage">;
 export type InterviewTurn = {
+  stageId: string;
   message: string;
   stageComplete: boolean;
   observations: InterviewTurnObservation[];

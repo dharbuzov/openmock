@@ -15,6 +15,7 @@ import { interviewerSystemPrompt, interviewContext } from "./prompts";
 import { interviewErrorMessage } from "./error";
 
 export const interviewTurnSchema = z.object({
+  stageId: z.string().trim().min(1),
   message: z.string().trim().min(1).max(1_200),
   stageComplete: z.boolean(),
   observations: z
@@ -82,6 +83,19 @@ export async function generateInterviewResponseWithModel(
   };
 
   try {
+    const currentStage = context.interview.stage.current;
+    if (currentStage === null)
+      throw new AIProviderError("No active interview stage.");
+    const index = context.definition.stages.findIndex(
+      ({ id }) => id === currentStage,
+    );
+    const nextStage = context.definition.stages[index + 1]?.id;
+    const allowedStages =
+      context.transition ||
+      context.interview.messages.length === 0 ||
+      !nextStage
+        ? [currentStage]
+        : [currentStage, nextStage];
     const messages = [
       {
         role: "user" as const,
@@ -100,7 +114,9 @@ export async function generateInterviewResponseWithModel(
       system: await interviewerSystemPrompt(context, metadata),
       messages,
       output: Output.object({
-        schema: interviewTurnSchema,
+        schema: interviewTurnSchema.extend({
+          stageId: z.enum(allowedStages),
+        }),
         name: "interview_turn",
         description:
           "One interviewer message, stage progress, and grounded observations.",
@@ -147,7 +163,8 @@ export async function generateInterviewResponseWithModel(
           ),
       });
       for await (const partial of result.partialOutputStream) {
-        // Partial text is UI-only. Stages and observations still require the final validated turn.
+        // Draft text is provisional. The runner holds it until stage validation
+        // and the authoritative session commit have both succeeded.
         if (
           !signal?.aborted &&
           typeof partial.message === "string" &&

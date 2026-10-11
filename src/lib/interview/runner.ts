@@ -27,7 +27,7 @@ export async function processCandidateMessage(
   onMessage?: (message: string) => void,
   opening = false,
   turnContext?: TurnContext,
-  onStage?: (stage: string) => void,
+  onCommitted?: (interview: Interview) => boolean | void,
 ): Promise<Interview> {
   if (
     interview.status !== "in-progress" ||
@@ -68,24 +68,49 @@ export async function processCandidateMessage(
     buildInterviewContext(interview, problem, definition, snapshot);
     if (!definition.stages.some(({ id }) => id === interview.stage.current))
       throw new InterviewStateError("Unknown current interview stage.");
-    const plan = opening
+    let plan = opening
       ? { interview }
       : planInterviewTurn(interview, definition);
-    const context = {
+    let context = {
       ...buildInterviewContext(plan.interview, problem, definition, snapshot),
       transition: plan.transition,
     };
     metadata.stageId = plan.interview.stage.current;
-    onStage?.(plan.interview.stage.current!);
     const { generateInterviewResponse } = await import("../ai/provider");
-    const turn = await generateInterviewResponse(
+    let turn = await generateInterviewResponse(
       settings,
       context,
       signal,
-      onMessage,
+      onMessage ? () => {} : undefined,
       metadata,
     );
     signal?.throwIfAborted();
+    // A same-turn readiness recommendation is approved before any response is
+    // displayed or spoken. Never derive domain state from conversational text.
+    if (!opening && !plan.transition) {
+      const proposed = planInterviewTurn(plan.interview, definition, turn);
+      if (proposed.transition) {
+        plan = proposed;
+        context = {
+          ...buildInterviewContext(
+            plan.interview,
+            problem,
+            definition,
+            snapshot,
+          ),
+          transition: plan.transition,
+        };
+        metadata.stageId = plan.interview.stage.current;
+        turn = await generateInterviewResponse(
+          settings,
+          context,
+          signal,
+          onMessage ? () => {} : undefined,
+          metadata,
+        );
+        signal?.throwIfAborted();
+      }
+    }
     logger.debug(metadata, "AI response received");
     const appliedTurn = opening
       ? { ...turn, stageComplete: false, observations: [] }
@@ -107,6 +132,11 @@ export async function processCandidateMessage(
       appliedTurn,
       plan.transition,
     );
+    if (onCommitted?.(updated) === false)
+      throw new InterviewStateError(
+        "The interview response is no longer current.",
+      );
+    onMessage?.(turn.message);
     logger.debug(metadata, "Interview turn applied");
     if (updated.stage.current !== interview.stage.current) {
       const transition = {

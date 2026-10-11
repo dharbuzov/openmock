@@ -29,6 +29,7 @@ const settings = {
 const transcript =
   "I brought both engineers together and asked them to agree on a shared goal.";
 const decision = {
+  stageId: "experience",
   message: "What changed after you brought both engineers together?",
   stageComplete: true,
   observations: [],
@@ -166,6 +167,7 @@ for (const streaming of [false, true])
         definition,
         {
           message: "Tell me about your experience.",
+          stageId: "introduction",
           stageComplete: true,
           observations: [],
         },

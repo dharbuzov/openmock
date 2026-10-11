@@ -118,6 +118,7 @@ test("raw invalid model output fails at the provider boundary before engine tran
           type: "text",
           text: JSON.stringify({
             message: "Next",
+            stageId: "introduction",
             stageComplete: "yes",
             observations: [],
           }),
@@ -173,6 +174,7 @@ test("opening uses definition, mode, problem and first stage without candidate e
     onMessage?.(message);
     return {
       message,
+      stageId: context.interview.stage.current,
       stageComplete: true,
       observations: [
         {
