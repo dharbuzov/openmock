@@ -86,16 +86,10 @@ export async function generateInterviewResponseWithModel(
     const currentStage = context.interview.stage.current;
     if (currentStage === null)
       throw new AIProviderError("No active interview stage.");
-    const index = context.definition.stages.findIndex(
-      ({ id }) => id === currentStage,
+    const competencyIds = context.definition.evaluation.competencies.map(
+      ({ id }) => id,
     );
-    const nextStage = context.definition.stages[index + 1]?.id;
-    const allowedStages =
-      context.transition ||
-      context.interview.messages.length === 0 ||
-      !nextStage
-        ? [currentStage]
-        : [currentStage, nextStage];
+    const messageIds = context.interview.messages.map(({ id }) => id);
     const messages = [
       {
         role: "user" as const,
@@ -115,7 +109,17 @@ export async function generateInterviewResponseWithModel(
       messages,
       output: Output.object({
         schema: interviewTurnSchema.extend({
-          stageId: z.enum(allowedStages),
+          stageId: z.enum([currentStage]),
+          observations: z
+            .array(
+              interviewTurnSchema.shape.observations.element.extend({
+                competencyId: z.enum(competencyIds).nullable(),
+                messageId: messageIds.length
+                  ? z.enum(messageIds).nullable()
+                  : z.null(),
+              }),
+            )
+            .max(8),
         }),
         name: "interview_turn",
         description:

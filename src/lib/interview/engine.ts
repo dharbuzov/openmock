@@ -223,13 +223,7 @@ export function planInterviewTurn(
     stageMessages.some(({ role }) => role === "interviewer") &&
     stageMessages.some(({ role }) => role === "candidate");
   const next = definition.stages[timing.index + 1]?.id ?? null;
-  if (
-    recommendation &&
-    recommendation.stageId !== current &&
-    (!recommendation.stageComplete ||
-      recommendation.stageId !== next ||
-      !hasOpportunity)
-  )
+  if (recommendation && recommendation.stageId !== current)
     throw new InterviewStateError(
       "The response requested an unapproved stage transition.",
     );

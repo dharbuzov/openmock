@@ -534,7 +534,7 @@ for (const id of ["dsa", "system-design", "behavioral", "sql"]) {
         assert.equal(context.interview.stage.current, definition.stages[0].id);
         assert.equal(state.interview.stage.current, definition.stages[0].id);
         return {
-          ...turn(true, destination),
+          ...turn(true, context.interview.stage.current),
           message: "Let's move to the next stage.",
         };
       }
@@ -645,7 +645,7 @@ test("an invalid destination response or failed regeneration does not commit the
     const visible = [],
       commits = [];
     provider.generateInterviewResponse = async () => {
-      if (++calls === 1) return turn(true, "implementation");
+      if (++calls === 1) return turn(true, "approach");
       if (failure === "offline") throw new Error("offline");
       return turn(false, "approach");
     };

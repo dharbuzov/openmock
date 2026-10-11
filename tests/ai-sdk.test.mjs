@@ -129,6 +129,15 @@ test("provider returns the shared structured InterviewTurn model", async () => {
   const schema = model.doGenerateCalls[0].responseFormat.schema;
   const observationSchema = schema.properties.observations.items;
   assert.deepEqual(
+    observationSchema.properties.competencyId.anyOf.find((item) => item.enum)
+      .enum,
+    definition.evaluation.competencies.map(({ id }) => id),
+  );
+  assert.deepEqual(
+    observationSchema.properties.messageId.anyOf.find((item) => item.enum).enum,
+    interview.messages.map(({ id }) => id),
+  );
+  assert.deepEqual(
     [...observationSchema.required].sort(),
     Object.keys(observationSchema.properties).sort(),
   );
@@ -161,6 +170,72 @@ test("provider normalizes required nullable observation references", async () =>
   assert.deepEqual(turn.observations, [
     { id: "", observation: "Candidate is starting." },
   ]);
+});
+
+test("interviewer observations use only definition competencies and supplied message IDs", async () => {
+  const systemDefinition = loadDefinition("system-design");
+  const systemProblem = { ...problem, interview: systemDefinition.id };
+  const interview = acceptCandidateMessage(
+    startInterview(systemProblem, { definition: systemDefinition }),
+    "I would use stateless services, a URL mapping database and Redis to cache redirects.",
+  );
+  const context = {
+    interview,
+    problem: systemProblem,
+    definition: systemDefinition,
+    workspace: { type: "diagram", diagram: { nodes: [], edges: [] } },
+  };
+  const output = {
+    stageId: "requirements",
+    message: "How would you invalidate cached mappings?",
+    stageComplete: false,
+    observations: [
+      {
+        id: "",
+        competencyId: "scalability",
+        observation: "Candidate proposed caching to reduce database load.",
+        messageId: interview.messages[0].id,
+      },
+    ],
+  };
+  const valid = await generateInterviewResponseWithModel(
+    new MockLanguageModelV3({ doGenerate: mockResult(JSON.stringify(output)) }),
+    context,
+  );
+  assert.equal(valid.observations[0].competencyId, "scalability");
+  for (const invalid of [
+    { competencyId: "cache-strategy" },
+    { competencyId: "scalability:" },
+    { messageId: "invented-message-id" },
+  ]) {
+    await assert.rejects(
+      generateInterviewResponseWithModel(
+        new MockLanguageModelV3({
+          doGenerate: mockResult(
+            JSON.stringify({
+              ...output,
+              observations: [{ ...output.observations[0], ...invalid }],
+            }),
+          ),
+        }),
+        context,
+      ),
+      AIProviderError,
+    );
+  }
+  const openingContext = {
+    ...context,
+    interview: startInterview(systemProblem, { definition: systemDefinition }),
+  };
+  const model = new MockLanguageModelV3({
+    doGenerate: mockResult(JSON.stringify({ ...output, observations: [] })),
+  });
+  await generateInterviewResponseWithModel(model, openingContext);
+  assert.deepEqual(
+    model.doGenerateCalls[0].responseFormat.schema.properties.observations.items
+      .properties.messageId,
+    { type: "null" },
+  );
 });
 
 test("system design context includes the normalized diagram through the generic workspace", async () => {
@@ -956,7 +1031,7 @@ test("streaming provider failures and invalid final output never become intervie
   }
 });
 
-test("provider stage schema follows definition order and constrains an approved destination", async () => {
+test("provider stage ID always matches the engine, independently of readiness", async () => {
   const context = streamingContext();
   const model = new MockLanguageModelV3({
     doGenerate: mockResult(
@@ -971,8 +1046,40 @@ test("provider stage schema follows definition order and constrains an approved 
   await generateInterviewResponseWithModel(model, context);
   assert.deepEqual(
     model.doGenerateCalls[0].responseFormat.schema.properties.stageId.enum,
-    ["approach", "implementation"],
+    ["approach"],
   );
+  for (const stageComplete of [false, true]) {
+    const readiness = new MockLanguageModelV3({
+      doGenerate: mockResult(
+        JSON.stringify({
+          stageId: "approach",
+          message: "Discuss the approach.",
+          stageComplete,
+          observations: [],
+        }),
+      ),
+    });
+    const response = await generateInterviewResponseWithModel(
+      readiness,
+      context,
+    );
+    assert.equal(response.stageId, "approach");
+    assert.equal(response.stageComplete, stageComplete);
+    const premature = new MockLanguageModelV3({
+      doGenerate: mockResult(
+        JSON.stringify({
+          stageId: "implementation",
+          message: "Let's move to implementation.",
+          stageComplete,
+          observations: [],
+        }),
+      ),
+    });
+    await assert.rejects(
+      generateInterviewResponseWithModel(premature, context),
+      AIProviderError,
+    );
+  }
   const destinationContext = {
     ...context,
     interview: {
