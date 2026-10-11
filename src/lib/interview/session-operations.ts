@@ -4,6 +4,7 @@ import type { Interview } from "./types";
 export type SessionState = {
   interview: Interview;
   operation: "opening" | "send" | "finish" | "evaluate" | null;
+  responseStage?: string;
 };
 export type SessionRequest = {
   controller: AbortController;
@@ -81,10 +82,16 @@ export class SessionOperations {
   isCurrent = (request: SessionRequest): boolean =>
     this.request === request && !request.controller.signal.aborted;
 
+  previewStage = (request: SessionRequest, stage: string): void => {
+    if (!this.isCurrent(request)) return;
+    this.state = { ...this.state, responseStage: stage };
+    this.onChange(this.state);
+  };
+
   commit = (request: SessionRequest, interview: Interview): boolean => {
     if (!this.isCurrent(request)) return false;
     if (interview.status === "completed") this.timer.pause();
-    this.state = { ...this.state, interview };
+    this.state = { ...this.state, interview, responseStage: undefined };
     this.checkpoint();
     return true;
   };
@@ -92,7 +99,7 @@ export class SessionOperations {
   end = (request: SessionRequest): void => {
     if (this.request !== request) return;
     this.request = null;
-    this.state = { ...this.state, operation: null };
+    this.state = { ...this.state, operation: null, responseStage: undefined };
     this.checkpoint();
   };
 

@@ -1,5 +1,5 @@
 import type { InterviewContext } from "../interview/types";
-import { resolveInterviewDuration } from "../interview/duration";
+import { interviewTiming } from "../interview/engine";
 import { loadPrompt } from "./prompt-loader";
 
 export async function interviewerSystemPrompt(
@@ -10,21 +10,7 @@ export async function interviewerSystemPrompt(
 }
 
 export function interviewContext(context: InterviewContext): string {
-  const elapsedMinutes = Math.max(
-    0,
-    Math.floor(
-      (context.interview.elapsedMs ??
-        Date.now() - Date.parse(context.interview.startedAt)) / 60_000,
-    ),
-  );
-  const remainingMinutes = Math.max(
-    0,
-    resolveInterviewDuration(
-      context.problem,
-      context.definition,
-      context.interview.durationMinutes,
-    ) - elapsedMinutes,
-  );
+  const timing = interviewTiming(context.interview, context.definition);
   return JSON.stringify({
     interviewDefinition: {
       id: context.definition.id,
@@ -36,7 +22,18 @@ export function interviewContext(context: InterviewContext): string {
     targetLevel: context.interview.targetLevel,
     mode: context.interview.mode,
     currentStage: context.interview.stage,
-    time: { elapsedMinutes, remainingMinutes },
+    transition: context.transition,
+    stagePosition: timing.index + 1,
+    totalStageCount: context.definition.stages.length,
+    remainingStages: context.definition.stages.slice(timing.index + 1),
+    time: {
+      totalMinutes: timing.durationMs / 60_000,
+      elapsedMinutes: timing.elapsedMs / 60_000,
+      remainingMinutes: timing.remainingMs / 60_000,
+      stageElapsedMinutes: timing.stageElapsedMs / 60_000,
+      stageAllowanceMinutes: timing.allowanceMs / 60_000,
+      stageLimitMinutes: timing.stageLimitMs / 60_000,
+    },
     problem: {
       id: context.problem.id,
       title: context.problem.title,

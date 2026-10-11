@@ -64,6 +64,7 @@ export function AIInterviewer() {
     commitOperation,
     endOperation,
     isCurrentOperation,
+    previewOperationStage,
   } = useInterviewSession();
   const { messages } = interview;
   const captureWorkspace = useCaptureWorkspace();
@@ -332,6 +333,7 @@ export function AIInterviewer() {
         },
         openingTurn,
         context,
+        (stage) => previewOperationStage(request, stage),
       );
       if (openingTurn && isCurrentOperation(request))
         saveInterviewSession({ interview: result });

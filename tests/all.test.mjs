@@ -4,6 +4,7 @@ import "./lib/logging/trace-pipeline.test.mjs";
 import "./lib/problems/loader.test.mjs";
 import "./lib/diagram/normalize-excalidraw.test.mjs";
 import "./lib/interview/engine.test.mjs";
+import "./lib/interview/progression.test.mjs";
 import "./lib/interview/definition-schema.test.mjs";
 import "./lib/interview/definitions.test.mjs";
 import "./lib/interview/engine-validation.test.mjs";

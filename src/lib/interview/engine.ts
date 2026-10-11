@@ -8,6 +8,7 @@ import type {
   InterviewLevelId,
   InterviewMode,
   InterviewTurn,
+  StageTransition,
   WorkspaceSnapshot,
   WorkspaceType,
 } from "./types";
@@ -79,6 +80,7 @@ export function startInterview(
   if (!mode || !definition.modes.includes(mode))
     throw new InterviewOptionsError("Unsupported interview mode.");
   const startedAt = now();
+  const durationMinutes = resolveInterviewDuration(problem, definition);
 
   return {
     id: newId(),
@@ -91,11 +93,17 @@ export function startInterview(
     targetLevel,
     mode,
     status: "in-progress",
-    stage: { current: firstStage, completed: [], startedAt },
+    stage: {
+      current: firstStage,
+      completed: [],
+      startedAt,
+      startedElapsedMs: 0,
+      allowanceMs: (durationMinutes * 60_000) / definition.stages.length,
+    },
     messages: [],
     observations: [],
     startedAt,
-    durationMinutes: resolveInterviewDuration(problem, definition),
+    durationMinutes,
     timer: { elapsedMs: 0, runningSince: Date.parse(startedAt) },
   };
 }
@@ -140,10 +148,122 @@ export function buildInterviewContext(
   };
 }
 
+export function interviewTiming(
+  interview: Interview,
+  definition: InterviewDefinition,
+) {
+  // SessionOperations supplies a clock snapshot at every request boundary.
+  const elapsedMs = Math.max(
+    0,
+    interview.elapsedMs ??
+      new InterviewTimer(
+        Date.now,
+        interview.timer ?? {
+          elapsedMs: 0,
+          runningSince: Date.parse(interview.startedAt),
+        },
+      ).elapsed(),
+  );
+  const durationMs = interview.durationMinutes * 60_000;
+  const index = definition.stages.findIndex(
+    ({ id }) => id === interview.stage.current,
+  );
+  // The first stage starts at zero. Later legacy stages have no historical active
+  // offset: give them a fresh baseline rather than accidentally counting pauses.
+  const startedElapsedMs =
+    interview.stage.startedElapsedMs ?? (index === 0 ? 0 : elapsedMs);
+  const remainingStageCount = Math.max(1, definition.stages.length - index);
+  const allowanceMs =
+    interview.stage.allowanceMs ??
+    Math.max(0, durationMs - startedElapsedMs) / remainingStageCount;
+  const stageElapsedMs = Math.max(0, elapsedMs - startedElapsedMs);
+  const remainingMs = Math.max(0, durationMs - elapsedMs);
+  // Equal shares are a generous generic backstop, not the definition's semantic pacing.
+  // Permit 50% extension, provided half a nominal share remains for each later stage.
+  const protectedMs =
+    (durationMs / definition.stages.length / 2) * (remainingStageCount - 1);
+  const stageLimitMs = Math.max(
+    0,
+    Math.min(allowanceMs * 1.5, durationMs - startedElapsedMs - protectedMs),
+  );
+  return {
+    durationMs,
+    elapsedMs,
+    remainingMs,
+    startedElapsedMs,
+    stageElapsedMs,
+    allowanceMs,
+    stageLimitMs,
+    index,
+  };
+}
+
+// Plan only at a candidate-turn boundary. Nothing is persisted until its response succeeds.
+export function planInterviewTurn(
+  interview: Interview,
+  definition: InterviewDefinition,
+): {
+  interview: Interview;
+  transition?: StageTransition;
+} {
+  assertDefinition(interview, definition);
+  const current = interview.stage.current;
+  const timing = interviewTiming(interview, definition);
+  if (
+    current === null ||
+    timing.index < 0 ||
+    interview.status !== "in-progress"
+  )
+    throw new InterviewStateError("No valid active interview stage.");
+  const stageMessages = interview.messages.filter(
+    ({ stage }) => stage === current,
+  );
+  const hasOpportunity =
+    stageMessages.some(({ role }) => role === "interviewer") &&
+    stageMessages.some(({ role }) => role === "candidate");
+  const answeredTurns = stageMessages.filter(
+    ({ role }) => role === "interviewer",
+  ).length;
+  const stage = {
+    ...interview.stage,
+    startedElapsedMs: timing.startedElapsedMs,
+    allowanceMs: timing.allowanceMs,
+  };
+  if (interview.messages.at(-1)?.role !== "candidate" || !hasOpportunity)
+    return { interview: { ...interview, stage } };
+  const reason = stage.readyToAdvance
+    ? "ready"
+    : timing.stageElapsedMs >= timing.stageLimitMs
+      ? "time"
+      : answeredTurns >= 8
+        ? "follow-ups"
+        : undefined;
+  if (!reason) return { interview: { ...interview, stage } };
+  const next = definition.stages[timing.index + 1]?.id ?? null;
+  const transition: StageTransition = { from: current, to: next, reason };
+  if (next === null) return { interview: { ...interview, stage }, transition };
+  return {
+    transition,
+    interview: {
+      ...interview,
+      stage: {
+        current: next,
+        completed: [...new Set([...stage.completed, current])],
+        startedAt: now(),
+        startedElapsedMs: timing.elapsedMs,
+        allowanceMs:
+          timing.remainingMs / (definition.stages.length - timing.index - 1),
+        readyToAdvance: false,
+      },
+    },
+  };
+}
+
 export function applyInterviewTurn(
   interview: Interview,
   definition: InterviewDefinition,
   turn: InterviewTurn,
+  transition?: StageTransition,
 ): Interview {
   assertDefinition(interview, definition);
   if (interview.status !== "in-progress")
@@ -173,15 +293,23 @@ export function applyInterviewTurn(
     return {
       ...observation,
       id: observation.id || newId(),
-      stage: currentStage,
+      stage:
+        interview.messages.find(({ id }) => id === observation.messageId)
+          ?.stage ??
+        interview.messages.findLast(({ role }) => role === "candidate")
+          ?.stage ??
+        currentStage,
     };
   });
-  const completed = turn.stageComplete
-    ? [...new Set([...interview.stage.completed, currentStage])]
-    : interview.stage.completed;
-  const nextStage = turn.stageComplete
-    ? (definition.stages[stageIndex + 1]?.id ?? null)
-    : currentStage;
+  const closing = transition?.to === null;
+  if (
+    closing &&
+    (transition.from !== currentStage ||
+      stageIndex !== definition.stages.length - 1)
+  )
+    throw new InterviewStateError(
+      "Only the final stage can close the interview flow.",
+    );
   return {
     ...interview,
     messages: [
@@ -196,12 +324,12 @@ export function applyInterviewTurn(
     ],
     observations: [...interview.observations, ...observations],
     stage: {
-      current: nextStage,
-      completed,
-      startedAt:
-        nextStage === interview.stage.current
-          ? interview.stage.startedAt
-          : createdAt,
+      ...interview.stage,
+      current: closing ? null : currentStage,
+      completed: closing
+        ? [...new Set([...interview.stage.completed, currentStage])]
+        : interview.stage.completed,
+      readyToAdvance: turn.stageComplete,
     },
   };
 }

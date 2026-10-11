@@ -83,15 +83,23 @@ test("AI time context uses active interview time rather than paused wall time", 
       interview: {
         startedAt: new Date(0).toISOString(),
         elapsedMs: 120000,
-        stage: { current: "intro" },
+        durationMinutes: 45,
+        stage: {
+          current: "intro",
+          startedElapsedMs: 0,
+          allowanceMs: 45 * 60_000,
+        },
       },
       definition: {
         duration: { defaultMinutes: 45 },
+        stages: [{ id: "intro" }],
         evaluation: { competencies: [] },
       },
     }),
   );
-  assert.deepEqual(data.time, { elapsedMinutes: 2, remainingMinutes: 43 });
+  assert.equal(data.time.elapsedMinutes, 2);
+  assert.equal(data.time.remainingMinutes, 43);
+  assert.equal(data.time.stageElapsedMinutes, 2);
 });
 
 test("header input hint reads the shared recording state and returns to idle after transcription", () => {

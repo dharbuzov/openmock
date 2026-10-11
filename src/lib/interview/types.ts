@@ -78,6 +78,15 @@ export type InterviewStageState = {
   current: string | null;
   completed: string[];
   startedAt: string;
+  // Active clock offsets survive pause/resume and reload; legacy sessions omit them.
+  startedElapsedMs?: number;
+  allowanceMs?: number;
+  readyToAdvance?: boolean;
+};
+export type StageTransition = {
+  from: string;
+  to: string | null;
+  reason: "ready" | "time" | "follow-ups";
 };
 export type InterviewMessageRole = "candidate" | "interviewer";
 export type InterviewMessage = {
@@ -140,6 +149,7 @@ export type InterviewContext = {
   problem: Problem;
   definition: InterviewDefinition;
   workspace: WorkspaceSnapshot;
+  transition?: StageTransition;
 };
 export type InterviewTurnObservation = Omit<InterviewObservation, "stage">;
 export type InterviewTurn = {

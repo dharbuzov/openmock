@@ -118,6 +118,7 @@ function conversation(fresh = false) {
         commitOperation: operations.commit,
         endOperation: operations.end,
         isCurrentOperation: operations.isCurrent,
+        previewOperationStage: operations.previewStage,
       }),
       useCaptureWorkspace: () => () => ({ type: "none" }),
     },

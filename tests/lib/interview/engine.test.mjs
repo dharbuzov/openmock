@@ -9,6 +9,7 @@ const {
   startInterview,
   completeInterview,
   InterviewStateError,
+  planInterviewTurn,
 } = load("../src/lib/interview/engine.ts");
 
 const problem = {
@@ -52,14 +53,21 @@ test("stageComplete false keeps the current stage", () => {
   assert.deepEqual(updated.stage.completed, []);
 });
 
-test("stageComplete true advances exactly one definition stage", () => {
+test("stageComplete true recommends advancement at the next candidate boundary", () => {
   const updated = applyInterviewTurn(
     start(),
     definition,
     turn({ stageComplete: true }),
   );
-  assert.equal(updated.stage.current, "high-level-design");
-  assert.deepEqual(updated.stage.completed, ["requirements"]);
+  assert.equal(updated.stage.current, "requirements");
+  assert.deepEqual(updated.stage.completed, []);
+  const plan = planInterviewTurn(
+    acceptCandidateMessage(updated, "Ready."),
+    definition,
+  );
+  assert.equal(plan.interview.stage.current, "high-level-design");
+  assert.deepEqual(plan.interview.stage.completed, ["requirements"]);
+  assert.equal(plan.transition.reason, "ready");
 });
 
 test("completed stages are recorded once", () => {
@@ -92,6 +100,7 @@ test("completing the final stage clears the active stage", () => {
     interview,
     definition,
     turn({ stageComplete: true }),
+    { from: "wrap-up", to: null, reason: "ready" },
   );
   assert.equal(updated.stage.current, null);
   assert.deepEqual(

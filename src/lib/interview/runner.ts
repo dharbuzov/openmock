@@ -8,6 +8,7 @@ import {
   buildInterviewContext,
   completeInterview,
   InterviewStateError,
+  planInterviewTurn,
 } from "./engine";
 import type {
   FinishedInterview,
@@ -26,6 +27,7 @@ export async function processCandidateMessage(
   onMessage?: (message: string) => void,
   opening = false,
   turnContext?: TurnContext,
+  onStage?: (stage: string) => void,
 ): Promise<Interview> {
   if (
     interview.status !== "in-progress" ||
@@ -60,16 +62,21 @@ export async function processCandidateMessage(
   );
   // The provider's Output.object Zod schema validates raw output before returning.
   try {
+    signal?.throwIfAborted();
     if (interview.stage.current === null)
       throw new InterviewStateError("No active interview stage.");
-    const context = buildInterviewContext(
-      interview,
-      problem,
-      definition,
-      snapshot,
-    );
+    buildInterviewContext(interview, problem, definition, snapshot);
     if (!definition.stages.some(({ id }) => id === interview.stage.current))
       throw new InterviewStateError("Unknown current interview stage.");
+    const plan = opening
+      ? { interview }
+      : planInterviewTurn(interview, definition);
+    const context = {
+      ...buildInterviewContext(plan.interview, problem, definition, snapshot),
+      transition: plan.transition,
+    };
+    metadata.stageId = plan.interview.stage.current;
+    onStage?.(plan.interview.stage.current!);
     const { generateInterviewResponse } = await import("../ai/provider");
     const turn = await generateInterviewResponse(
       settings,
@@ -78,22 +85,27 @@ export async function processCandidateMessage(
       onMessage,
       metadata,
     );
+    signal?.throwIfAborted();
     logger.debug(metadata, "AI response received");
+    const appliedTurn = opening
+      ? { ...turn, stageComplete: false, observations: [] }
+      : plan.transition?.to
+        ? { ...turn, stageComplete: false }
+        : turn;
     if (logger.isLevelEnabled("trace"))
       logger.trace(
         {
           ...metadata,
           decision: turn,
-          appliedDecision: opening
-            ? { ...turn, stageComplete: false, observations: [] }
-            : turn,
+          appliedDecision: appliedTurn,
         },
         "INTERVIEW_DECISION",
       );
     const updated = applyInterviewTurn(
-      interview,
+      plan.interview,
       definition,
-      opening ? { ...turn, stageComplete: false, observations: [] } : turn,
+      appliedTurn,
+      plan.transition,
     );
     logger.debug(metadata, "Interview turn applied");
     if (updated.stage.current !== interview.stage.current) {
@@ -101,6 +113,7 @@ export async function processCandidateMessage(
         ...metadata,
         previousStage: interview.stage.current,
         nextStage: updated.stage.current,
+        reason: plan.transition?.reason,
       };
       logger.debug(transition, "STAGE_TRANSITION");
       logger.info(transition, "Stage transitioned");

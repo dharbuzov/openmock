@@ -59,9 +59,14 @@ test("candidate panel renders title, badges, description and example without hid
       definition: {
         id: "system-design",
         duration: { defaultMinutes: 45 },
+        stages: [{ id: "requirements" }],
         evaluation: { competencies: [] },
       },
-      interview: { startedAt: new Date().toISOString() },
+      interview: {
+        startedAt: new Date().toISOString(),
+        durationMinutes: 45,
+        stage: { current: "requirements", startedAt: new Date().toISOString() },
+      },
     }),
   );
   assert.match(context.problem.content, /Functional Requirements/);

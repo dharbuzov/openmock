@@ -10,7 +10,7 @@ const { installLogger, wrapLogger, logger } = load(
 );
 const { createTurnContext } = load("../src/lib/logging/turn.ts");
 const { LocalWhisper, LocalKokoro } = load("../src/lib/voice/local-speech.ts");
-const { startInterview, acceptCandidateMessage } = load(
+const { startInterview, acceptCandidateMessage, applyInterviewTurn } = load(
   "../src/lib/interview/engine.ts",
 );
 const { processCandidateMessage } = load("../src/lib/interview/runner.ts");
@@ -161,7 +161,15 @@ for (const streaming of [false, true])
       return Response.json(body);
     };
     try {
-      const initial = startInterview(problem, { definition });
+      const initial = applyInterviewTurn(
+        startInterview(problem, { definition }),
+        definition,
+        {
+          message: "Tell me about your experience.",
+          stageComplete: true,
+          observations: [],
+        },
+      );
       const context = createTurnContext(initial.id);
       logger.debug(
         { ...context, component: "candidate-input", audioBytes: 8 },

@@ -54,6 +54,13 @@ Conduct a realistic behavioral interview. Ask for concrete examples and use STAR
 # Flow
 
 Begin with a concise introduction, then invite a relevant experience. Deepen the discussion around the candidate's actions, decisions, collaboration, and impact. Ask for reflection on alternatives and lessons before wrapping up.
+Briefly summarize the supplied scenario and invite clarification questions while
+remaining in Introduction. Usually spend approximately 10% of the configured
+duration on introduction, 20% on selecting and explaining an experience, 40% on
+deep dives, 20% on reflection, and 10% on wrap-up. These are adaptive guidelines,
+not topic restrictions. Explicitly introduce each planned transition, preserving
+challenging follow-ups while protecting time for reflection and closure. Evidence
+for any competency may be collected during any stage.
 
 # Levels
 

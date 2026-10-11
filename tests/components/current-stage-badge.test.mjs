@@ -55,6 +55,17 @@ test("both header badges follow the active stage and definition order without se
   assert.equal(render(true), "");
 });
 
+test("both badges preview the destination during a response and revert after a failure", () => {
+  session.interview.stage.current = "discover";
+  session.responseStage = "explore-options";
+  assert.match(render(false), /Explore Options/);
+  assert.match(render(true), /Stage 2 · Explore Options/);
+  assert.equal(session.interview.stage.current, "discover");
+  delete session.responseStage;
+  assert.match(render(false), /Discover the Problem/);
+  assert.match(render(true), /Stage 1 · Discover the Problem/);
+});
+
 test("terminal stage explicitly displays stages complete", () => {
   session.interview.stage.current = null;
   assert.match(render(false), /Stages complete/);
