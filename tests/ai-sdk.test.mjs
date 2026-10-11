@@ -383,6 +383,73 @@ test("evaluation is qualitative, holistic, and preserves not-assessed", async ()
   assert.equal(result.interviewId, interview.id);
 });
 
+test("evaluation discards non-gap expectations and preserves gap expectations", async () => {
+  const interview = acceptCandidateMessage(
+    startInterview(problem, {
+      definition,
+      targetLevel: "senior",
+      mode: "practice",
+    }),
+    "I will use a hash map.",
+  );
+  for (const rating of [
+    "strong-positive",
+    "positive",
+    "not-assessed",
+    "mixed",
+    "negative",
+    "strong-negative",
+    "not-demonstrated",
+  ]) {
+    const expectation =
+      "Explain the complexity trade-offs required by the rubric.";
+    const output = {
+      recommendation: "no-hire",
+      competencies: definition.evaluation.competencies.map(({ id }, index) => ({
+        competencyId: id,
+        rating: index === 0 ? rating : "positive",
+        summary: "Assessment based on the supplied interview.",
+        expectation: index === 0 ? expectation : null,
+        evidence:
+          index === 0 && rating === "not-assessed"
+            ? []
+            : [
+                {
+                  observation: "Candidate proposed a hash map.",
+                  messageId: interview.messages[0].id,
+                },
+              ],
+      })),
+      strengths: [],
+      concerns: [],
+      keyMoments: [],
+      summary: "The candidate proposed a hash map.",
+      finalAssessment: "More evidence is needed to meet the selected level.",
+    };
+    const model = new MockLanguageModelV3({
+      doGenerate: mockResult(JSON.stringify(output)),
+    });
+    const result = await evaluateInterviewWithModel(model, {
+      interview,
+      problem,
+      definition,
+      workspace: {
+        type: "code",
+        language: "Java",
+        filename: "Solution.java",
+        code: "",
+      },
+    });
+    const competency = result.competencies[0];
+    assert.equal(competency.rating, rating);
+    if (["strong-positive", "positive", "not-assessed"].includes(rating)) {
+      assert.equal("expectation" in competency, false);
+    } else {
+      assert.equal(competency.expectation, expectation);
+    }
+  }
+});
+
 test("generic evaluator accepts competencies loaded from the behavioral definition", async () => {
   const behavioralDefinition = loadDefinition("behavioral");
   const behavioralProblem = {

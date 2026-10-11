@@ -187,7 +187,10 @@ export async function evaluateInterviewWithModel(
             expectation:
               evaluatorOutputSchema.shape.competencies.element.shape.expectation
                 .unwrap()
-                .nullable(),
+                .nullable()
+                .describe(
+                  "Additional evidence expected for a competency gap. Must be null for strong-positive, positive, and not-assessed ratings.",
+                ),
             evidence: evidence.max(8),
           }),
         )
@@ -254,7 +257,13 @@ export async function evaluateInterviewWithModel(
       competencies: rawOutput.competencies.map(
         ({ expectation, evidence, ...item }) => ({
           ...item,
-          ...(expectation === null ? {} : { expectation }),
+          // Models may fill every field even when it does not apply to the rating.
+          ...(expectation !== null &&
+          ["mixed", "negative", "strong-negative", "not-demonstrated"].includes(
+            item.rating,
+          )
+            ? { expectation }
+            : {}),
           evidence: normalizeEvidence(evidence),
         }),
       ),
