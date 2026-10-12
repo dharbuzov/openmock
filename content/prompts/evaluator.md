@@ -1,4 +1,32 @@
 Evaluate the interview holistically using only supplied evidence and the definition's rubric.
+Separate solution correctness from evidence of competency at the selected target level.
+Before choosing ratings, identify the selected level's expectations in the supplied
+definition and ask which candidate actions actually establish those expectations.
+Performance ratings (including positive and strong-positive) are relative to that
+level, not the intrinsic correctness of an isolated answer. A competent basic
+answer may provide affirmative correctness evidence while leaving the definition's
+depth or judgment expectations unassessed. Do not rate those expectations positive
+just because no error occurred or because a familiar optimal solution was produced.
+A correct solution proves only what the candidate actually demonstrated. Basic knowledge
+does not establish advanced judgment, scope, or depth described in the definition's Levels.
+Problem difficulty alone must neither upgrade nor downgrade the candidate: a simple
+problem may still elicit substantial level-specific evidence through reasoning and discussion.
+If the task or process did not elicit that evidence, describe the assessment limitation;
+do not invent advanced competency or label limited assessment opportunity as poor performance.
+For example, if a candidate solves the task correctly but the definition expects
+sustained judgment under changed assumptions, and no such discussion was offered,
+correctness may be positive while the relevant depth competency is not-assessed.
+If that discussion was offered and the candidate gave no substantive response,
+the relevant competency is not-demonstrated. If the candidate's actual reasoning
+reveals a flaw, rate the demonstrated weakness and cite it. These three situations
+must produce different explanations even when all three limit hiring confidence.
+Strong Hire requires substantial, relevant, affirmative evidence against the selected level
+and positive or strong-positive ratings for every required competency. Required competencies
+that are mixed, negative, not-demonstrated, or not-assessed preclude a confident Strong Hire.
+This is a confidence requirement, not a numeric scoring formula. Incomplete evidence can
+warrant mixed without implying demonstrated weakness; explain that distinction explicitly.
+Before returning, check that the recommendation, competency ratings, finalAssessment,
+and summary agree. Do not describe missing evidence as a demonstrated technical failure.
 Competency evidence can come from any stage. Stage labels record where evidence
 was collected; they do not restrict which competency it can support. A completed
 stage is a scheduling fact, not proof of competence or even of an assessment

@@ -90,6 +90,13 @@ export async function processCandidateMessage(
     if (!opening && !plan.transition) {
       const proposed = planInterviewTurn(plan.interview, definition, turn);
       if (proposed.transition) {
+        // Preserve source-stage evidence from the unpublished readiness reply.
+        // This remains provisional until destination generation and commit succeed.
+        proposed.interview = {
+          ...proposed.interview,
+          observations: applyInterviewTurn(plan.interview, definition, turn)
+            .observations,
+        };
         plan = proposed;
         context = {
           ...buildInterviewContext(

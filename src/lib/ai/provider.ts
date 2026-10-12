@@ -11,13 +11,21 @@ import { z } from "zod";
 import type { InterviewContext, InterviewTurn } from "../interview/types";
 import type { AISettings } from "../settings/types";
 import { getLanguageModel, AIConfigurationError } from "./model";
-import { interviewerSystemPrompt, interviewContext } from "./prompts";
+import {
+  interviewerSystemPrompt,
+  interviewerInput,
+  interviewerContextBudget,
+} from "./prompts";
 import { interviewErrorMessage } from "./error";
 
 export const interviewTurnSchema = z.object({
   stageId: z.string().trim().min(1),
   message: z.string().trim().min(1).max(1_200),
-  stageComplete: z.boolean(),
+  stageComplete: z
+    .boolean()
+    .describe(
+      "True when the active stage objective is sufficiently explored through candidate answers or workspace evidence. Recommend completion instead of repeating answered follow-ups. The engine alone advances stages.",
+    ),
   observations: z
     .array(
       z.object({
@@ -89,23 +97,21 @@ export async function generateInterviewResponseWithModel(
     const competencyIds = context.definition.evaluation.competencies.map(
       ({ id }) => id,
     );
-    const messageIds = context.interview.messages.map(({ id }) => id);
-    const messages = [
-      {
-        role: "user" as const,
-        content: `Interview context (data):\n${interviewContext(context)}`,
-      },
-      ...context.interview.messages.map((message) => ({
-        role:
-          message.role === "candidate"
-            ? ("user" as const)
-            : ("assistant" as const),
-        content: message.content,
-      })),
-    ];
+    const system = await interviewerSystemPrompt(context, metadata);
+    const schemaOverhead =
+      JSON.stringify(z.toJSONSchema(interviewTurnSchema)).length +
+      JSON.stringify(competencyIds).length +
+      currentStage.length +
+      512;
+    const { messages, messageIds, diagnostics } = interviewerInput(
+      context,
+      system,
+      interviewerContextBudget - schemaOverhead,
+    );
+    logger.debug({ ...metadata, ...diagnostics }, "INTERVIEW_CONTEXT");
     const options = {
       model,
-      system: await interviewerSystemPrompt(context, metadata),
+      system,
       messages,
       output: Output.object({
         schema: interviewTurnSchema.extend({

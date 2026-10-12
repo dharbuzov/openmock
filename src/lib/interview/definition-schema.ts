@@ -29,6 +29,9 @@ const metadataSchema = z
     workspace: z.enum(workspaceTypes),
     duration: z.object({ defaultMinutes: z.number().int().positive() }),
     stages: z.array(slugSchema).min(1),
+    stagePacing: z
+      .record(slugSchema, z.number().positive().finite())
+      .optional(),
     defaultLevel: z.enum(interviewLevelIds),
     levels: z.array(z.enum(interviewLevelIds)).min(1),
     defaultMode: z.enum(interviewModes),
@@ -47,6 +50,14 @@ const metadataSchema = z
     }),
   })
   .superRefine((value, context) => {
+    for (const id of Object.keys(value.stagePacing ?? {})) {
+      if (!value.stages.includes(id))
+        context.addIssue({
+          code: "custom",
+          path: ["stagePacing", id],
+          message: "Unknown stage",
+        });
+    }
     const unique = (
       values: string[],
       path: (string | number)[],
@@ -110,11 +121,14 @@ export function parseInterviewDefinitionDocument(
         .join("; "),
     );
   }
-  const metadata = parsed.data;
+  const { stagePacing, ...metadata } = parsed.data;
   return {
     ...metadata,
     revision: createHash("sha256").update(normalized).digest("hex"),
-    stages: metadata.stages.map((id) => ({ id })),
+    stages: metadata.stages.map((id) => ({
+      id,
+      ...(stagePacing?.[id] === undefined ? {} : { weight: stagePacing[id] }),
+    })),
     levels: metadata.levels.map((id) => ({
       id,
       name: `${id[0].toUpperCase()}${id.slice(1)}`,

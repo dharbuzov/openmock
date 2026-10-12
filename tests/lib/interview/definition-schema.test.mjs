@@ -30,6 +30,29 @@ function document(
   return `---\n${JSON.stringify(metadata)}\n---\n\n${instructions}\n`;
 }
 
+test("stage pacing is optional definition metadata, validated and normalized without domain rules", () => {
+  const paced = parseInterviewDefinitionDocument(
+    document({ stagePacing: { introduction: 1, "wrap-up": 3 } }),
+  );
+  assert.deepEqual(paced.stages, [
+    { id: "introduction", weight: 1 },
+    { id: "wrap-up", weight: 3 },
+  ]);
+  assert.throws(
+    () =>
+      parseInterviewDefinitionDocument(
+        document({ stagePacing: { missing: 2 } }),
+      ),
+    /Unknown stage/,
+  );
+  for (const weight of [0, -1, "large"])
+    assert.throws(() =>
+      parseInterviewDefinitionDocument(
+        document({ stagePacing: { introduction: weight } }),
+      ),
+    );
+});
+
 test("parses frontmatter, preserves instructions, and generates a deterministic revision", () => {
   const source = document();
   const first = parseInterviewDefinitionDocument(source);

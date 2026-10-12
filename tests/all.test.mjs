@@ -40,3 +40,6 @@ import "./lib/voice/speech-stream.test.mjs";
 
 import "./lib/interview/evaluation-error.test.mjs";
 import "./lib/ai/ollama.test.mjs";
+import "./lib/ai/context.test.mjs";
+import "./lib/ai/model-options.test.mjs";
+import "./lib/interview/calibration.test.mjs";

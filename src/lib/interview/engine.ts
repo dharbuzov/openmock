@@ -16,6 +16,13 @@ import type {
 const newId = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
 
+function stageShare(definition: InterviewDefinition, index: number): number {
+  const weights = definition.stages
+    .slice(index)
+    .map(({ weight }) => weight ?? 1);
+  return (weights[0] ?? 1) / weights.reduce((sum, weight) => sum + weight, 0);
+}
+
 function assertDefinition(
   interview: Interview,
   definition: InterviewDefinition,
@@ -98,7 +105,7 @@ export function startInterview(
       completed: [],
       startedAt,
       startedElapsedMs: 0,
-      allowanceMs: (durationMinutes * 60_000) / definition.stages.length,
+      allowanceMs: durationMinutes * 60_000 * stageShare(definition, 0),
     },
     messages: [],
     observations: [],
@@ -172,16 +179,17 @@ export function interviewTiming(
   // offset: give them a fresh baseline rather than accidentally counting pauses.
   const startedElapsedMs =
     interview.stage.startedElapsedMs ?? (index === 0 ? 0 : elapsedMs);
-  const remainingStageCount = Math.max(1, definition.stages.length - index);
   const allowanceMs =
     interview.stage.allowanceMs ??
-    Math.max(0, durationMs - startedElapsedMs) / remainingStageCount;
+    Math.max(0, durationMs - startedElapsedMs) *
+      stageShare(definition, Math.max(0, index));
   const stageElapsedMs = Math.max(0, elapsedMs - startedElapsedMs);
   const remainingMs = Math.max(0, durationMs - elapsedMs);
-  // Equal shares are a generous generic backstop, not the definition's semantic pacing.
-  // Permit 50% extension, provided half a nominal share remains for each later stage.
+  // Permit 50% extension while protecting half the remaining stages' weighted budget.
   const protectedMs =
-    (durationMs / definition.stages.length / 2) * (remainingStageCount - 1);
+    (Math.max(0, durationMs - startedElapsedMs) *
+      (1 - stageShare(definition, Math.max(0, index)))) /
+    2;
   const stageLimitMs = Math.max(
     0,
     Math.min(allowanceMs * 1.5, durationMs - startedElapsedMs - protectedMs),
@@ -258,7 +266,7 @@ export function planInterviewTurn(
         startedAt: now(),
         startedElapsedMs: timing.elapsedMs,
         allowanceMs:
-          timing.remainingMs / (definition.stages.length - timing.index - 1),
+          timing.remainingMs * stageShare(definition, timing.index + 1),
         readyToAdvance: false,
       },
     },

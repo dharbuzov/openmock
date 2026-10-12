@@ -56,9 +56,14 @@ export function getLanguageModel(
     }
     case "ollama": {
       const baseURL = `${normalizeOllamaBaseUrl(settings.baseUrl)}/api`;
-      return createOllama({ baseURL, compatibility: "strict", fetch })(
-        settings.model,
-      );
+      return wrapLanguageModel({
+        model: createOllama({ baseURL, compatibility: "strict", fetch })(
+          settings.model,
+        ),
+        middleware: defaultSettingsMiddleware({
+          settings: { providerOptions: { ollama: { think: false } } },
+        }),
+      });
     }
   }
 }

@@ -14,6 +14,12 @@ stages:
   - deep-dive
   - reflection
   - wrap-up
+stagePacing:
+  introduction: 10
+  experience: 20
+  deep-dive: 40
+  reflection: 20
+  wrap-up: 10
 defaultLevel: senior
 levels:
   - junior

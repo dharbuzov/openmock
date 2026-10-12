@@ -28,7 +28,7 @@ export const competencyRatings = [
 ] as const;
 
 export type WorkspaceType = (typeof workspaceTypes)[number];
-export type InterviewStage = { id: string; name?: string };
+export type InterviewStage = { id: string; name?: string; weight?: number };
 export type InterviewLevelId = (typeof interviewLevelIds)[number];
 export type InterviewLevel = { id: InterviewLevelId; name: string };
 export type InterviewMode = (typeof interviewModes)[number];

@@ -25,7 +25,7 @@ assert.ok(
 const count = Number(args.turns ?? 10);
 const { defaultOllamaSettings } = load("../src/lib/settings/types.ts");
 const baseUrl = args.endpoint ?? defaultOllamaSettings.baseUrl;
-const model = "qwen3:8b";
+const model = args.model ?? "qwen3:8b";
 const output = resolve(
   "logs",
   `ollama-${args.label ?? "live"}-think-${think}-${Date.now()}`,
@@ -188,6 +188,11 @@ try {
     }
     const input = i < 0 ? null : candidates[i];
     if (input && !replay) interview = acceptCandidateMessage(interview, input);
+    if (!replay && i >= 0 && args["active-minutes-per-turn"])
+      interview = {
+        ...interview,
+        elapsedMs: i * Number(args["active-minutes-per-turn"]) * 60_000,
+      };
     const before = records.length;
     const started = Date.now();
     const stageBefore = interview.stage.current;
@@ -211,6 +216,14 @@ try {
       );
       const reply = interview.messages.at(-1);
       assert.equal(reply.role, "interviewer");
+      if (
+        args["require-complete"] === "true" &&
+        interview.stage.current === null
+      )
+        assert.ok(
+          !reply.content.includes("?"),
+          "The final closure must not ask another question",
+        );
       const normalize = (text) =>
         text.toLowerCase().replace(/\s+/g, " ").trim();
       const sentences =
@@ -292,3 +305,14 @@ console.log(
   }),
 );
 if (summary.turns.some((t) => !t.success)) process.exitCode = 1;
+if (args["require-complete"] === "true") {
+  assert.equal(
+    interview.stage.current,
+    null,
+    "The real interview must close every defined stage",
+  );
+  assert.deepEqual(
+    interview.stage.completed,
+    definition.stages.map(({ id }) => id),
+  );
+}

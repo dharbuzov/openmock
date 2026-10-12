@@ -40,6 +40,86 @@ const opening = (interview, definition) =>
 const answer = (interview) =>
   engine.acceptCandidateMessage(interview, "Here is my reasoning.");
 
+test("DSA timing follows definition weights and a short interview offers every core stage", () => {
+  const { definition, interview } = fixture("dsa", 2);
+  assert.equal(interview.stage.allowanceMs, 24_000);
+  assert.equal(
+    definition.stages.find(({ id }) => id === "implementation").weight,
+    45,
+  );
+  let state = opening({ ...interview, elapsedMs: 0 }, definition);
+  const visited = [state.stage.current];
+  for (let i = 0; state.stage.current !== null && i < 10; i++) {
+    const incoming = answer({ ...state, elapsedMs: 180_000 });
+    const plan = engine.planInterviewTurn(incoming, definition);
+    assert.ok(plan.transition);
+    state = engine.applyInterviewTurn(
+      plan.interview,
+      definition,
+      turn(false, plan.interview.stage.current),
+      plan.transition,
+    );
+    if (state.stage.current) {
+      visited.push(state.stage.current);
+      assert.equal(
+        engine.planInterviewTurn(state, definition).transition,
+        undefined,
+      );
+    }
+  }
+  assert.deepEqual(visited, [
+    "approach",
+    "implementation",
+    "analysis",
+    "wrap-up",
+  ]);
+  assert.equal(state.stage.current, null);
+});
+
+test("readiness regeneration retains source observations only when the destination commits", async () => {
+  const { definition, problem, interview } = fixture("dsa");
+  const incoming = answer({
+    ...opening(interview, definition),
+    elapsedMs: 1000,
+  });
+  const original = provider.generateInterviewResponse;
+  for (const fail of [true, false]) {
+    let calls = 0;
+    provider.generateInterviewResponse = async (_settings, context) => {
+      if (++calls === 1)
+        return {
+          ...turn(true, "approach"),
+          observations: [
+            {
+              id: "source-evidence",
+              competencyId: "problem-solving",
+              observation: "Candidate explained reasoning.",
+              messageId: incoming.messages.at(-1).id,
+            },
+          ],
+        };
+      assert.equal(context.interview.observations[0].id, "source-evidence");
+      assert.equal(context.interview.observations[0].stage, "approach");
+      if (fail) throw new Error("destination failed");
+      return turn(false, "implementation");
+    };
+    try {
+      const run = () =>
+        runner.processCandidateMessage({}, incoming, problem, definition);
+      if (fail) await assert.rejects(run(), /destination failed/);
+      else {
+        const result = await run();
+        assert.equal(result.observations[0].id, "source-evidence");
+        assert.equal(result.stage.current, "implementation");
+      }
+      assert.deepEqual(incoming.observations, []);
+      assert.equal(incoming.stage.current, "approach");
+    } finally {
+      provider.generateInterviewResponse = original;
+    }
+  }
+});
+
 for (const minutes of [20, 30, 45, 60]) {
   test(`${minutes}-minute interviews bound repeated false recommendations and reserve later stages`, () => {
     const { definition, interview } = fixture("system-design", minutes);
@@ -84,7 +164,10 @@ test("early semantic readiness redistributes unused time but never changes the c
     to: "high-level-design",
     reason: "ready",
   });
-  assert.equal(plan.interview.stage.allowanceMs, (19 * 60_000) / 5);
+  assert.ok(
+    Math.abs(plan.interview.stage.allowanceMs - (19 * 60_000 * 25) / 85) <
+      0.001,
+  );
   assert.equal(ready.stage.current, "requirements");
 });
 
@@ -196,7 +279,9 @@ test("legacy sessions and custom Markdown definitions use the same generic polic
     .replace("id: dsa", "id: sql")
     .replace("name: Data Structures and Algorithms", "name: SQL")
     .replace("  - approach", "  - clarify")
-    .replace("  - implementation", "  - query");
+    .replace("  approach:", "  clarify:")
+    .replace("  - implementation", "  - query")
+    .replace("  implementation:", "  query:");
   const definition = parseInterviewDefinitionDocument(source);
   let interview = engine.startInterview(
     { id: "query", interview: "sql" },
@@ -485,7 +570,9 @@ for (const id of ["dsa", "system-design", "behavioral", "sql"]) {
           .replace("id: dsa", "id: sql")
           .replace("name: Data Structures and Algorithms", "name: SQL")
           .replace("  - approach", "  - clarify")
-          .replace("  - implementation", "  - query"),
+          .replace("  approach:", "  clarify:")
+          .replace("  - implementation", "  - query")
+          .replace("  implementation:", "  query:"),
       );
       problem = { ...problem, interview: "sql" };
       interview = engine.startInterview(problem, { definition });

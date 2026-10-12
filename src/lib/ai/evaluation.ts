@@ -16,6 +16,7 @@ import type { InterviewContext, InterviewResult } from "../interview/types";
 import type { AISettings } from "../settings/types";
 import { getLanguageModel } from "./model";
 import { loadPrompt } from "./prompt-loader";
+import { assertContextBudget, evaluatorContextBudget } from "./prompts";
 
 import {
   interviewResultSchema,
@@ -91,6 +92,15 @@ export function validateResult(
   )
     throw new EvaluationError(
       "Hiring cannot be recommended when no required competency was demonstrated",
+    );
+  if (
+    result.recommendation === "strong-hire" &&
+    required.some(
+      ({ rating }) => rating !== "positive" && rating !== "strong-positive",
+    )
+  )
+    throw new EvaluationError(
+      "Strong Hire requires positive evidence for every required competency",
     );
   if (
     result.competencies.some(
@@ -175,8 +185,14 @@ export async function evaluateInterviewWithModel(
       stage: evidenceSchema.shape.stage.unwrap().nullable(),
     });
     const evidence = z.array(referencedEvidenceSchema);
-    const schema = evaluatorOutputSchema.extend({
-      recommendation: z.enum(context.definition.evaluation.recommendations),
+    // Assess evidence before emitting a verdict. In schema-constrained decoding,
+    // a verdict-first object can anchor all subsequent ratings to that verdict.
+    const schema = evaluatorOutputSchema.omit({ recommendation: true }).extend({
+      recommendation: z
+        .enum(context.definition.evaluation.recommendations)
+        .describe(
+          "Choose only after assessing competency evidence against the selected level. Strong Hire requires substantial level-specific evidence, not merely a correct solution. Incomplete opportunity limits confidence without proving weakness.",
+        ),
       strengths: evidence.max(8),
       concerns: evidence.max(8),
       keyMoments: evidence.max(10),
@@ -184,6 +200,10 @@ export async function evaluateInterviewWithModel(
         .array(
           evaluatorOutputSchema.shape.competencies.element.extend({
             competencyId: z.enum(competencyIds),
+            rating:
+              evaluatorOutputSchema.shape.competencies.element.shape.rating.describe(
+                "Rate against the selected target level's definition. Do not infer advanced depth or judgment from a basic correct answer. Use not-assessed if level-specific evidence could not meaningfully be assessed; not-demonstrated if it was offered but absent; negative ratings require concrete demonstrated weaknesses.",
+              ),
             expectation:
               evaluatorOutputSchema.shape.competencies.element.shape.expectation
                 .unwrap()
@@ -208,25 +228,28 @@ export async function evaluateInterviewWithModel(
           }
         }),
     });
+    const system = `${evaluatorPrompt}\n\nInterview instructions and rubric:\n${context.definition.instructions}`;
+    const prompt = `Interview evidence (data):\n${JSON.stringify({
+      problem: context.problem,
+      targetLevel: context.interview.targetLevel,
+      mode: context.interview.mode,
+      stages: context.definition.stages,
+      competencies: context.definition.evaluation.competencies,
+      recommendations: context.definition.evaluation.recommendations,
+      messages: context.interview.messages,
+      observations: context.interview.observations,
+      completedStages: context.interview.stage.completed,
+      interviewStatus: context.interview.status,
+      endReason: context.interview.endReason,
+      startedAt: context.interview.startedAt,
+      completedAt: context.interview.completedAt,
+      currentWorkspace: context.workspace,
+    })}`;
+    assertContextBudget(system.length + prompt.length, evaluatorContextBudget);
     const result = await loggedGenerateText(metadata)({
       model,
-      system: `${evaluatorPrompt}\n\nInterview instructions and rubric:\n${context.definition.instructions}`,
-      prompt: `Interview evidence (data):\n${JSON.stringify({
-        problem: context.problem,
-        targetLevel: context.interview.targetLevel,
-        mode: context.interview.mode,
-        stages: context.definition.stages,
-        competencies: context.definition.evaluation.competencies,
-        recommendations: context.definition.evaluation.recommendations,
-        messages: context.interview.messages,
-        observations: context.interview.observations,
-        completedStages: context.interview.stage.completed,
-        interviewStatus: context.interview.status,
-        endReason: context.interview.endReason,
-        startedAt: context.interview.startedAt,
-        completedAt: context.interview.completedAt,
-        currentWorkspace: context.workspace,
-      })}`,
+      system,
+      prompt,
       output: Output.object({
         schema,
         name: "interview_result",

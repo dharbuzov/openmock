@@ -15,6 +15,13 @@ stages:
   - failure-scenarios
   - trade-offs
   - wrap-up
+stagePacing:
+  requirements: 15
+  high-level-design: 25
+  deep-dive: 25
+  failure-scenarios: 15
+  trade-offs: 12
+  wrap-up: 8
 defaultLevel: senior
 levels:
   - junior

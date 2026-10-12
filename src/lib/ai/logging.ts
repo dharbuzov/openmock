@@ -6,6 +6,31 @@ import {
 } from "ai";
 import { logger } from "../logging/logger";
 import { ownValue, protectCredentials } from "../logging/sanitize";
+import {
+  assertContextBudget,
+  interviewerContextBudget,
+  evaluatorContextBudget,
+} from "./prompts";
+
+function logContextSize(
+  request: unknown,
+  context: Record<string, unknown>,
+): void {
+  const inputCharacters = JSON.stringify(request).length;
+  logger.debug(
+    {
+      ...context,
+      inputCharacters,
+      estimatedInputTokens: Math.ceil(inputCharacters / 4),
+      tokenEstimateMethod: "characters/4 (approximate; includes schema)",
+    },
+    "LLM_CONTEXT_SIZE",
+  );
+  if (context.operation === "interviewer-turn")
+    assertContextBudget(inputCharacters, interviewerContextBudget);
+  if (context.operation === "evaluation")
+    assertContextBudget(inputCharacters, evaluatorContextBudget);
+}
 
 // Observe SDK parsing without replacing its parser, schema, or partial-output behavior.
 export function loggedOutput<O extends Output.Output>(
@@ -73,6 +98,7 @@ export function loggedLanguageModel(
       wrapGenerate: async ({ doGenerate, params }) => {
         const { abortSignal, ...providerRequest } = params;
         void abortSignal;
+        logContextSize(providerRequest, context);
         if (logger.isLevelEnabled("trace"))
           logger.trace(
             { ...context, request: { ...payload, providerRequest } },
@@ -103,6 +129,7 @@ export function loggedLanguageModel(
       wrapStream: async ({ doStream, params }) => {
         const { abortSignal, ...providerRequest } = params;
         void abortSignal;
+        logContextSize(providerRequest, context);
         if (logger.isLevelEnabled("trace"))
           logger.trace(
             { ...context, request: { ...payload, providerRequest } },

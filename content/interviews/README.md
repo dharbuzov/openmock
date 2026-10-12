@@ -15,7 +15,10 @@ field. Adding a definition that uses an existing workspace capability requires n
 TypeScript registration.
 
 Keep approximate pacing, natural transition expectations, and stage entry activities
-in the Markdown Flow sections. No YAML stage budgets are needed. The interviewer
+in the Markdown Flow sections. Optional YAML `stagePacing` maps stage IDs to
+positive relative weights; omitted weights default to 1. For example, a four-stage
+definition can use weights 20, 45, 25, and 10 to reserve more time for its core
+activity. Keep these weights consistent with the Flow guidance. The interviewer
 receives active elapsed time, remaining time, stage position, stage time, remaining
 stages, and any engine-planned transition. It returns structured readiness and a
 response stage ID; the engine validates both at the current candidate-turn boundary.
@@ -25,13 +28,18 @@ interview state is committed, so neither text nor voice can announce an uncommit
 transition. Both stage indicators read that same persisted interview state.
 
 The generic backstop allocates remaining time across remaining stages, permits up
-to 50% extension while reserving half a nominal share for later stages, and bounds
+to 50% extension while reserving half the weighted remaining budget for later stages, and bounds
 one stage to eight answered interviewer turns. Each stage must first offer a
 question and receive a candidate response; time alone never silently skips it.
 Pauses do not consume active time. These safeguards are deliberately independent
-of interview type and are not the definition's preferred pacing. Definitions can
+of interview type. Weights guide scheduling without requiring stages to consume
+their entire allowance. Definitions can
 ask for earlier advancement through their Flow guidance. Always explicitly offer
 workspace activities such as drawing, coding, or querying in the appropriate stage.
+
+Define target-level expectations in the Markdown Levels section. Merely listing
+supported level IDs cannot establish an evaluation bar. Express expectations as
+observable reasoning and behavior, without a separate level-by-competency matrix.
 
 Practice navigation uses each definition's `name`, optional `description`, Lucide
 `icon` identifier, and integer `order`. Lower orders appear first; definitions
