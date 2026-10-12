@@ -71,3 +71,13 @@ such as Functional Requirements, Scale, and Discussion remain available to AI.
 Add a `# Interviewer Context` heading after the problem Markdown when
 the interviewer needs hidden constraints or follow-up guidance. That section is
 passed to the AI interviewer and is never rendered in the candidate problem panel.
+
+Keep private context distinct by purpose: clarification facts supply scope,
+requirements, constraints, guarantees, or scale to answer relevant candidate
+questions; candidate-owned discoveries describe reasoning and solution choices
+the candidate must develop; private assessment opportunities describe possible
+probes and observable signals. These can be labeled with Markdown subheadings
+inside `# Interviewer Context`. Discussion and level-specific notes are assessment
+opportunities, not a checklist to disclose or an expected solution to teach.
+Hidden guidance must follow the generic interviewer prompt and selected mode.
+In Mock Mode, never use it to volunteer requirements, solution steps, or hints.

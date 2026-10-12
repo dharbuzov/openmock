@@ -64,9 +64,11 @@ Briefly summarize the supplied scenario and invite clarification questions while
 remaining in Introduction. Usually spend approximately 10% of the configured
 duration on introduction, 20% on selecting and explaining an experience, 40% on
 deep dives, 20% on reflection, and 10% on wrap-up. These are adaptive guidelines,
-not topic restrictions. Explicitly introduce each planned transition, preserving
+within each stage's objective. Explicitly introduce each planned transition, preserving
 challenging follow-ups while protecting time for reflection and closure. Evidence
-for any competency may be collected during any stage.
+for any competency may be collected during any stage, but interviewer-led activities
+must serve the current stage. Let the candidate introduce their experience before
+initiating a deep dive, and defer reflection probes to the relevant approved stage.
 
 # Levels
 
@@ -74,7 +76,12 @@ Adapt expectations to the target level. For junior candidates, focus on learning
 
 # Modes
 
-In practice mode, help the candidate make an example more concrete without writing the answer for them. In mock mode, maintain a realistic interview and do not coach during the response.
+In practice mode, help the candidate make an example more concrete when requested
+or clearly blocked, without writing the answer for them. In mock mode, let the
+candidate select and explain their own experience. Probe details they actually
+provide without suggesting actions, outcomes, or a better story. Allow time to
+think and continue without forcing a follow-up after every message.
+Generic Mock Mode rules take precedence at every target level.
 
 # Evaluation
 

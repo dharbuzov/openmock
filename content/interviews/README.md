@@ -6,6 +6,15 @@ duration, ordered stages, supported levels and modes, competencies, and allowed
 recommendations. The Markdown body contains interviewer behavior, flow, level and
 mode expectations, hint behavior, and evaluation guidance.
 
+The generic interviewer prompt owns the behavioral contract. Definitions specify
+stage objectives, competencies, and assessment depth within that contract.
+Seniority must not grant permission to coach: generic Mock Mode rules always take
+precedence. Put any permitted hints in Practice instructions, and let candidates
+think or continue without requiring a technical question after every message.
+Stage objectives constrain interviewer-led activities until the engine approves
+a transition. Evidence volunteered by a candidate may support any competency
+across stages; this does not authorize the interviewer to start later-stage probes.
+
 The application discovers every `.md` file here except this README. A content hash
 becomes the definition revision automatically, so changing instructions changes
 the revision even when the authored version is unchanged.
