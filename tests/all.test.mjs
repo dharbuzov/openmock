@@ -3,6 +3,7 @@ import "./lib/logging/logging.test.mjs";
 import "./lib/logging/trace-pipeline.test.mjs";
 import "./lib/problems/loader.test.mjs";
 import "./lib/problems/curated-dsa.test.mjs";
+import "./lib/problems/curated-system-design.test.mjs";
 import "./lib/diagram/normalize-excalidraw.test.mjs";
 import "./lib/interview/engine.test.mjs";
 import "./lib/interview/progression.test.mjs";
