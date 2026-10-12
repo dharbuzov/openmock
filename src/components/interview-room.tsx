@@ -59,17 +59,6 @@ export function InterviewRoom({
                     <Badge variant="level">
                       {level?.name ?? interview.targetLevel}
                     </Badge>
-                    <Badge
-                      variant="secondary"
-                      className="text-muted-foreground"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="size-1 shrink-0 rounded-full bg-success"
-                      />
-                      {interview.mode.charAt(0).toUpperCase() +
-                        interview.mode.slice(1)}
-                    </Badge>
                   </div>
                 </div>
                 <InterviewControls />

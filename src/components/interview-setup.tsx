@@ -27,7 +27,6 @@ import { saveInterviewSession } from "@/lib/interview/session-storage";
 import type {
   InterviewDefinition,
   InterviewLevelId,
-  InterviewMode,
 } from "@/lib/interview/types";
 import type { Problem } from "@/lib/problems/types";
 
@@ -50,9 +49,6 @@ function SetupForm({
   const router = useRouter();
   const levels = definition.levels;
   const [level, setLevel] = useState<InterviewLevelId>(definition.defaultLevel);
-  const [interviewMode, setInterviewMode] = useState<InterviewMode>(
-    definition.defaultMode,
-  );
   const openSettings = useOpenSettings();
   const snapshot = useSyncExternalStore(
     subscribeSettings,
@@ -86,7 +82,7 @@ function SetupForm({
       const interview = startInterview(problem, {
         definition,
         targetLevel: level,
-        mode: interviewMode,
+        mode: "mock",
       });
       saveInterviewSession({ interview });
       router.push(`/interview/${problem.id}?session=${interview.id}`);
@@ -168,35 +164,6 @@ function SetupForm({
             </ToggleGroup>
             <FieldDescription>
               Choose the level you want to be evaluated against.
-            </FieldDescription>
-          </Field>
-
-          <Field>
-            <FieldLabel id="interview-mode-label">Interview mode</FieldLabel>
-            <ToggleGroup
-              aria-labelledby="interview-mode-label"
-              value={[interviewMode]}
-              onValueChange={(values) => {
-                const next = definition.modes.find(
-                  (value) => value === values[0],
-                );
-                if (next) setInterviewMode(next);
-              }}
-              variant="outline"
-              size="sm"
-              spacing={0}
-              className="flex-wrap"
-            >
-              {definition.modes.map((value) => (
-                <ToggleGroupItem key={value} value={value}>
-                  {value === "practice" ? "Practice" : "Mock"}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-            <FieldDescription>
-              {interviewMode === "practice"
-                ? "Practice with guidance and hints."
-                : "Simulate a real interview with limited guidance."}
             </FieldDescription>
           </Field>
 

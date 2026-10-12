@@ -491,7 +491,7 @@ test("shared inline AI form preserves saved-key masking and Remember API key beh
     );
   }));
 
-test("Setup reads default level and interview mode from the definition", () =>
+test("Setup reads the default level and always starts in Mock mode", () =>
   browser(() => {
     saveSettings({
       provider: "ollama",
@@ -501,7 +501,7 @@ test("Setup reads default level and interview mode from the definition", () =>
     const configured = {
       ...definition,
       defaultLevel: "junior",
-      defaultMode: "mock",
+      defaultMode: "practice",
     };
     const harness = setupHarness(configured);
     const tree = harness.render();
@@ -514,64 +514,21 @@ test("Setup reads default level and interview mode from the definition", () =>
     assert.equal(stored.interview.mode, "mock");
   }));
 
-test("Setup selects the definition interview mode without another interaction choice", () =>
+test("Setup has no interview mode selector or mode guidance", () =>
   browser(() => {
-    saveSettings({
-      provider: "ollama",
-      model: "qwen3:8b",
-      baseUrl: "http://localhost:11434",
-    });
-    const harness = setupHarness();
-    let tree = harness.render();
-    const modeGroup = (tree) =>
+    const tree = setupHarness().render();
+    assert.equal(
       findElement(
         tree,
         (node) => node.props["aria-labelledby"] === "interview-mode-label",
-      );
-    assert.deepEqual(modeGroup(tree).props.value, [definition.defaultMode]);
-    assert.deepEqual(
-      modeGroup(tree).props.children.map((item) => item.props.value),
-      definition.modes,
-    );
-    modeGroup(tree).props.onValueChange(["mock"]);
-    tree = harness.render();
-    assert.deepEqual(modeGroup(tree).props.value, ["mock"]);
-    assert.equal(
-      findElement(tree, (node) => node.type === "interaction-control"),
+      ),
       null,
     );
-    modeGroup(tree).props.onValueChange([]);
-    tree = harness.render();
-    assert.deepEqual(modeGroup(tree).props.value, ["mock"]);
-    button(tree).props.onClick();
-    const stored = readInterviewSession(harness.urls[0].split("session=")[1]);
-    assert.equal(stored.interview.mode, "mock");
-    assert.equal(Object.hasOwn(stored, "interactionMode"), false);
+    const html = renderToStaticMarkup(tree);
+    assert.ok(!html.includes("Interview mode"));
+    assert.ok(!html.includes("Practice with guidance"));
+    assert.ok(!html.includes("Simulate a real interview"));
   }));
-
-test("Setup renders only definition-supported interview modes and ignores unsupported choices", () =>
-  browser(() => {
-    const configured = {
-      ...definition,
-      modes: ["practice"],
-      defaultMode: "practice",
-    };
-    const harness = setupHarness(configured);
-    const modeGroup = (tree) =>
-      findElement(
-        tree,
-        (node) => node.props["aria-labelledby"] === "interview-mode-label",
-      );
-    let tree = harness.render();
-    assert.deepEqual(
-      modeGroup(tree).props.children.map((item) => item.props.value),
-      ["practice"],
-    );
-    modeGroup(tree).props.onValueChange(["mock"]);
-    tree = harness.render();
-    assert.deepEqual(modeGroup(tree).props.value, ["practice"]);
-  }));
-
 test("Setup shows resolved Duration after Difficulty once and captures it on Start", () =>
   browser(() => {
     saveSettings({
