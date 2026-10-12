@@ -332,3 +332,169 @@ test("Speech capability errors and AI failures are independent, and model change
     h.dispose();
   }
 });
+
+function modelSelect(tree) {
+  return findElement(
+    tree,
+    (node) =>
+      node.type === "Select" &&
+      node.props.items?.some((item) => item.value === "qwen3:8b"),
+  );
+}
+
+test("Ollama automatically discovers multiple models, refreshes, and preserves selection", async () => {
+  let models = ["first", "qwen3:8b", "third"];
+  let calls = 0;
+  const h = harness(async () => {
+    calls++;
+    return models;
+  });
+  try {
+    h.render();
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    let tree = h.render();
+    assert.equal(calls, 1);
+    assert.deepEqual(
+      modelSelect(tree).props.items.map((item) => item.value),
+      models,
+    );
+    assert.equal(modelSelect(tree).props.value, "qwen3:8b");
+    models = ["fourth", "qwen3:8b"];
+    await h.connection(tree, "provider").props.onTest();
+    tree = h.render();
+    assert.equal(calls, 2);
+    assert.deepEqual(
+      modelSelect(tree).props.items.map((item) => item.value),
+      models,
+    );
+    assert.equal(modelSelect(tree).props.value, "qwen3:8b");
+    models = [];
+    await h.connection(tree, "provider").props.onTest();
+    tree = h.render();
+    const select = findElement(
+      tree,
+      (node) => node.type === "Select" && node.props.disabled === true,
+    );
+    assert.deepEqual(select.props.items, []);
+    assert.equal(select.props.value, "");
+    assert.equal(h.connection(tree, "provider").props.state, "connected");
+  } finally {
+    h.dispose();
+  }
+});
+
+test("Ollama URL changes ignore stale discovery and automatically load the new endpoint", async () => {
+  let resolve;
+  const calls = [];
+  const h = harness((settings) => {
+    calls.push(settings.baseUrl);
+    return new Promise((done) => {
+      resolve = done;
+    });
+  });
+  try {
+    let tree = h.render();
+    const pending = h.connection(tree, "provider").props.onTest();
+    await new Promise((done) => setImmediate(done));
+    findElement(
+      tree,
+      (node) => node.props.id === "settings-ollama-url",
+    ).props.onChange({ target: { value: "http://localhost:11435" } });
+    resolve(["stale"]);
+    await pending;
+    tree = h.render();
+    await new Promise((done) => setTimeout(done, 350));
+    resolve(["qwen3:8b", "new"]);
+    await new Promise((done) => setImmediate(done));
+    tree = h.render();
+    assert.deepEqual(calls, [
+      "http://localhost:11434",
+      "http://localhost:11435",
+    ]);
+    assert.deepEqual(
+      modelSelect(tree).props.items.map((item) => item.value),
+      ["qwen3:8b", "new"],
+    );
+  } finally {
+    h.dispose();
+  }
+});
+
+test(
+  "real local Ollama discovery reaches dropdown and preserves selected model on refresh",
+  { skip: !process.env.OPENMOCK_TEST_LIVE_OLLAMA },
+  async () => {
+    const { load } = await import("../register-typescript.mjs");
+    const { listOllamaModels } = load("../src/lib/ai/ollama.ts");
+    const tags = await (await fetch("http://localhost:11434/api/tags")).json();
+    const expected = tags.models
+      .filter((model) => model.capabilities.includes("completion"))
+      .map((model) => model.name);
+    const h = harness(listOllamaModels);
+    try {
+      h.render();
+      await new Promise((done) => setTimeout(done, 350));
+      // Wait for the real network request to complete, without substituting transport.
+      for (
+        let i = 0;
+        i < 100 &&
+        h.connection(h.render(), "provider").props.state === "testing";
+        i++
+      )
+        await new Promise((done) => setTimeout(done, 100));
+      let tree = h.render();
+      assert.equal(h.connection(tree, "provider").props.state, "connected");
+      assert.deepEqual(
+        modelSelect(tree).props.items.map((item) => item.value),
+        expected,
+      );
+      await h.connection(tree, "provider").props.onTest();
+      tree = h.render();
+      assert.deepEqual(
+        modelSelect(tree).props.items.map((item) => item.value),
+        expected,
+      );
+      assert.equal(modelSelect(tree).props.value, "qwen3:8b");
+      console.log(
+        JSON.stringify({
+          endpoint: "http://localhost:11434",
+          returned: expected,
+          displayed: modelSelect(tree).props.items,
+          selected: modelSelect(tree).props.value,
+        }),
+      );
+    } finally {
+      h.dispose();
+    }
+  },
+);
+
+test("Ollama refresh chooses an installed replacement and keeps the last list on failure", async () => {
+  let fail = false;
+  const h = harness(async () => {
+    if (fail) throw new Error("offline");
+    return ["replacement", "another"];
+  });
+  try {
+    await h.connection(h.render(), "provider").props.onTest();
+    let tree = h.render();
+    const select = findElement(
+      tree,
+      (node) => node.type === "Select" && node.props.value === "replacement",
+    );
+    assert.ok(select);
+    fail = true;
+    await h.connection(tree, "provider").props.onTest();
+    tree = h.render();
+    assert.equal(h.connection(tree, "provider").props.state, "error");
+    assert.deepEqual(
+      findElement(
+        tree,
+        (node) => node.type === "Select" && node.props.value === "replacement",
+      ).props.items,
+      select.props.items,
+    );
+  } finally {
+    h.dispose();
+  }
+});

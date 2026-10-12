@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { CircleAlert, CircleCheck, PlayIcon } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -372,6 +372,16 @@ export function AISettingsForm({
     }
   }
 
+  const discoverModels = useEffectEvent(() => void testConnection());
+  const ollamaBaseUrl =
+    settings.provider === "ollama" ? settings.baseUrl : null;
+  useEffect(() => {
+    if (!ollamaBaseUrl?.trim()) return;
+    // Debounce URL edits and refresh each time the settings form opens.
+    const timer = setTimeout(discoverModels, 300);
+    return () => clearTimeout(timer);
+  }, [ollamaBaseUrl]);
+
   function save() {
     try {
       speechUrl(speech.baseUrl, "/health");
@@ -690,7 +700,13 @@ export function AISettingsForm({
                         }}
                       >
                         <SelectTrigger id="settings-model" size="sm">
-                          <SelectValue placeholder="Test connection to load models" />
+                          <SelectValue
+                            placeholder={
+                              testing
+                                ? "Loading models…"
+                                : "No models available"
+                            }
+                          />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectGroup>

@@ -39,3 +39,4 @@ import "./lib/voice/local-speech.test.mjs";
 import "./lib/voice/speech-stream.test.mjs";
 
 import "./lib/interview/evaluation-error.test.mjs";
+import "./lib/ai/ollama.test.mjs";

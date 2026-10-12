@@ -35,18 +35,22 @@ export async function listOllamaModels(
     operation: "connection-test",
     requestId: crypto.randomUUID(),
   };
+  const requestSignal = AbortSignal.any([
+    ...(signal ? [signal] : []),
+    AbortSignal.timeout(10_000),
+  ]);
+  const providerFetch = loggedProviderFetch(metadata, []);
   try {
-    const response = await loggedProviderFetch(metadata, [])(
-      `${baseUrl}/api/tags`,
-      {
-        signal,
-        redirect: "error",
-      },
-    );
+    const response = await providerFetch(`${baseUrl}/api/tags`, {
+      signal: requestSignal,
+      cache: "no-store",
+      redirect: "error",
+    });
     if (!response.ok) throw new Error("Ollama request failed");
     const body = (await response.json()) as {
-      models?: Array<{ name?: unknown }>;
+      models?: Array<{ name?: unknown; capabilities?: unknown }>;
     };
+    if (!Array.isArray(body.models)) throw new Error("Invalid model list");
     logger.info(
       {
         ...metadata,
@@ -55,9 +59,31 @@ export async function listOllamaModels(
       },
       "Ollama connection tested",
     );
-    return (body.models ?? [])
-      .map((model) => (typeof model.name === "string" ? model.name.trim() : ""))
-      .filter((name): name is string => Boolean(name));
+    const models = await Promise.all(
+      body.models.map(async (model) => {
+        if (!model || typeof model.name !== "string" || !model.name.trim())
+          throw new Error("Invalid model entry");
+        const name = model.name.trim();
+        let capabilities = model.capabilities;
+        // Older Ollama versions expose capabilities only through /api/show.
+        if (capabilities === undefined) {
+          const details = await providerFetch(`${baseUrl}/api/show`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model: name }),
+            signal: requestSignal,
+            cache: "no-store",
+            redirect: "error",
+          });
+          if (!details.ok) throw new Error("Model capability request failed");
+          capabilities = (await details.json()).capabilities;
+        }
+        if (!Array.isArray(capabilities))
+          throw new Error("Invalid capabilities");
+        return capabilities.includes("completion") ? name : null;
+      }),
+    );
+    return [...new Set(models.filter((name): name is string => name !== null))];
   } catch (error) {
     logger.warn(
       { ...metadata, endpoint: `${baseUrl}/api/tags`, err: error },
