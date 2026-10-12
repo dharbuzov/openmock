@@ -21,9 +21,7 @@ async function loadDefinition(filename: string): Promise<InterviewDefinition> {
   }
 }
 
-export async function getInterviewDefinitions({
-  includeDisabled = false,
-} = {}): Promise<InterviewDefinition[]> {
+async function loadDefinitions(): Promise<InterviewDefinition[]> {
   const directory = path.join(process.cwd(), "content", "interviews");
   const entries = await readdir(directory, { withFileTypes: true });
   const files = entries
@@ -44,17 +42,30 @@ export async function getInterviewDefinitions({
       throw new Error(`Duplicate interview definition id: ${definition.id}`);
     ids.add(definition.id);
   }
-  return definitions
-    .filter(
-      (definition) =>
-        includeDisabled || !config.interviews.disabled.includes(definition.id),
-    )
-    .sort(
-      (a, b) =>
-        (a.order ?? Infinity) - (b.order ?? Infinity) ||
-        a.name.localeCompare(b.name) ||
-        a.id.localeCompare(b.id),
-    );
+  return definitions.sort(
+    (a, b) =>
+      (a.order ?? Infinity) - (b.order ?? Infinity) ||
+      a.name.localeCompare(b.name) ||
+      a.id.localeCompare(b.id),
+  );
+}
+
+let catalog: Promise<InterviewDefinition[]> | undefined;
+
+export async function getInterviewDefinitions({
+  includeDisabled = false,
+} = {}): Promise<InterviewDefinition[]> {
+  // Share validated content across lookups, but never retain a failed load.
+  const definitions = await (process.env.NODE_ENV === "development"
+    ? loadDefinitions()
+    : (catalog ??= loadDefinitions().catch((error: unknown) => {
+        catalog = undefined;
+        throw error;
+      })));
+  return definitions.filter(
+    (definition) =>
+      includeDisabled || !config.interviews.disabled.includes(definition.id),
+  );
 }
 
 export async function getInterviewDefinition(

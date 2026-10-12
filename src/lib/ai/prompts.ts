@@ -6,30 +6,21 @@ export async function interviewerSystemPrompt(
   context: InterviewContext,
   logContext: Record<string, unknown> = {},
 ): Promise<string> {
-  const task =
-    context.transition?.to === null
-      ? `Next turn task: The engine has approved closure of the final stage ${JSON.stringify(context.interview.stage.current)}.
-The approved transition is ${JSON.stringify(context.transition)}.
-The discussion is OVER. Return a brief closing statement telling the candidate
-to finish for feedback. Do not ask any question, introduce another activity,
-continue the last technical discussion, score the candidate, or give a verdict.
-Return stageComplete false and the current stageId. This closure task takes
-precedence over the stage Flow and normal follow-up instructions.`
-      : `Next turn task: Respond to the candidate as the interviewer, using the Flow for
-the active stage ${JSON.stringify(context.interview.stage.current)}. The engine's
-approved transition is ${JSON.stringify(context.transition ?? null)}.
-If there is no approved transition, ask within the active stage and do not
-announce another stage. If its objective is sufficiently explored, recommend
-readiness with stageComplete true; the engine will request the next stage's reply.
-Do not announce a move within the source-stage message. If the current workspace
-already contains the stage's deliverable, discuss that work instead of asking the
-candidate to recreate it. Judge readiness from actual participation and evidence,
-not from the number of questions asked.
-Keep the candidate's answer and your evidence separate from your spoken message.`;
-  return `${await loadPrompt("interviewer", logContext)}\n\n${context.definition.instructions}
-\n${task}`;
+  return `${await loadPrompt("interviewer", logContext)}\n\n${context.definition.instructions}\n\n${interviewerTask(context)}`;
 }
 
+function interviewerTask(context: InterviewContext): string {
+  return `Engine state (data):\n${JSON.stringify({
+    task:
+      context.transition?.to === null
+        ? "closing"
+        : !context.transition && context.interview.messages?.length === 0
+          ? "opening"
+          : "follow-up",
+    currentStageId: context.interview.stage.current,
+    transition: context.transition ?? null,
+  })}`;
+}
 export function interviewContext(context: InterviewContext): string {
   const timing = interviewTiming(context.interview, context.definition);
   return JSON.stringify({
@@ -95,7 +86,7 @@ export function interviewerInput(
     includedMessages: 0,
     totalObservations: observations.length,
     includedObservations: 0,
-    note: "Reduced interviewer context is not the complete assessment record. Omission is not negative evidence. Evaluation receives the full stored transcript and observations.",
+    completeTranscript: false,
   };
   const selectedMessages = new Set<number>();
   const selectedObservations: typeof observations = [];
@@ -121,8 +112,7 @@ export function interviewerInput(
         ? [
             {
               role: "user" as const,
-              content:
-                "Engine task: The final-stage closure has been approved. The last candidate question is now historical evidence, not a request for another discussion. Return only a brief closing statement inviting the candidate to finish for feedback. Ask no question and set stageComplete false.",
+              content: interviewerTask(context),
             },
           ]
         : []),

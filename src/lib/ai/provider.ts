@@ -71,6 +71,19 @@ export async function generateInterviewResponseWithModel(
   onMessage?: (message: string) => void,
   turnContext?: TurnContext,
 ): Promise<InterviewTurn> {
+  if (!context.transition && context.interview.messages.length === 0) {
+    signal?.throwIfAborted();
+    const stageId = context.interview.stage.current;
+    if (stageId === null)
+      throw new AIProviderError("No active interview stage.");
+    // The opening hands control to the candidate; assessment starts after their reply.
+    const introduction = context.problem.title
+      ? `We'll work on “${context.problem.title}”.`
+      : "Let's work on the problem shown here.";
+    const message = `${introduction} How would you like to approach it?`;
+    onMessage?.(message);
+    return { stageId, message, stageComplete: false, observations: [] };
+  }
   const started = performance.now();
   let streamError: unknown;
   const metadata = {

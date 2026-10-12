@@ -11,7 +11,7 @@ topics:
   - consistency
   - availability
   - scalability
-companies: []
+companies: [ ]
 ---
 
 ## Description
@@ -67,8 +67,10 @@ or storage product. Choose one or two deep dives from the proposed design.
 
 - Middle: coherent decision API, policy/state model, request flow, and explicit unavailable-service behavior.
 - Senior: reason about concurrent updates, hot tenants, failover resets, latency budgets, and measurable overshoot.
-- Staff: compare regional and global enforcement and explain a safe rollout from existing local limits, including client compatibility and operational ownership.
-- Principal: examine different guarantees for protection and contractual quotas, cross-region failure consequences, and how policy and cost evolve with tenant growth.
+- Staff: compare regional and global enforcement and explain a safe rollout from existing local limits, including client
+  compatibility and operational ownership.
+- Principal: examine different guarantees for protection and contractual quotas, cross-region failure consequences, and
+  how policy and cost evolve with tenant growth.
 
 Useful deep dives are atomic decisions for one tenant or policy propagation under
 load. Introduce a state-store failure or partition only when those components exist

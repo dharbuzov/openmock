@@ -10,7 +10,7 @@ const { getProblems, validateProblemDefinitions } = load(
 );
 const { getInterviewDefinitions } = load("../src/lib/interview/definitions.ts");
 
-function catalog(documents, disabled = []) {
+function catalog(documents, disabled = [], io = { reads: 0 }) {
   return loadComponent("src/lib/problems/loader.ts", {
     "node:fs/promises": {
       readdir: async (directory) => {
@@ -36,13 +36,15 @@ function catalog(documents, disabled = []) {
           isFile: () => !directory,
         }));
       },
-      readFile: async (filename) =>
-        documents[
+      readFile: async (filename) => {
+        io.reads++;
+        return documents[
           path
             .relative(path.join(process.cwd(), "content", "problems"), filename)
             .split(path.sep)
             .join("/")
-        ],
+        ];
+      },
     },
     "../interview/definitions": {
       getInterviewDefinitions: async (options) =>
@@ -58,6 +60,53 @@ function catalog(documents, disabled = []) {
 
 const document = (interview, extra = "", id = "example") =>
   `---\nid: ${id}\ntitle: Example\ninterview: ${interview}\ndifficulty: medium\n${extra}---\n## Description\nPrompt`;
+
+test("production catalog loads once across concurrent calls and single-problem lookups; failures retry and development stays fresh", async () => {
+  const previous = process.env.NODE_ENV;
+  try {
+    process.env.NODE_ENV = "production";
+    const documents = { "dsa/example.md": document("dsa") };
+    const io = { reads: 0 };
+    const loader = catalog(documents, [], io);
+    const results = await Promise.all([
+      loader.getProblems(),
+      loader.getProblem("example"),
+      loader.getProblems(),
+    ]);
+    assert.equal(io.reads, 1);
+    assert.equal(results[1].id, "example");
+    results[0].pop();
+    assert.equal((await loader.getProblems()).length, 1);
+    assert.equal(await loader.getProblem("missing"), undefined);
+    assert.equal(io.reads, 1);
+
+    const invalid = { "dsa/example.md": document("dsa", "topics: wrong\n") };
+    const retryIo = { reads: 0 };
+    const retryLoader = catalog(invalid, [], retryIo);
+    await assert.rejects(retryLoader.getProblems(), /topics/);
+    invalid["dsa/example.md"] = document("dsa");
+    assert.equal((await retryLoader.getProblems()).length, 1);
+    assert.equal(retryIo.reads, 2);
+    await retryLoader.getProblems();
+    assert.equal(retryIo.reads, 2);
+
+    process.env.NODE_ENV = "development";
+    const devIo = { reads: 0 };
+    const devLoader = catalog(documents, [], devIo);
+    await devLoader.getProblems();
+    documents["dsa/example.md"] = document("dsa").replace(
+      "title: Example",
+      "title: Updated",
+    );
+    assert.equal((await devLoader.getProblem("example")).title, "Updated");
+    documents["dsa/example.md"] = document("dsa", "topics: wrong\n");
+    await assert.rejects(devLoader.getProblems(), /topics/);
+    assert.equal(devIo.reads, 3);
+  } finally {
+    if (previous === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previous;
+  }
+});
 
 test("valid catalogs retain recursive discovery, sorting, lookup and disabled filtering", async () => {
   const loader = catalog({

@@ -144,7 +144,10 @@ test("provider returns the shared structured InterviewTurn model", async () => {
 });
 
 test("provider normalizes required nullable observation references", async () => {
-  const interview = startInterview(problem, { definition });
+  const interview = acceptCandidateMessage(
+    startInterview(problem, { definition }),
+    "I would first inspect the input.",
+  );
   const model = new MockLanguageModelV3({
     doGenerate: mockResult(
       JSON.stringify({
@@ -155,7 +158,7 @@ test("provider normalizes required nullable observation references", async () =>
             id: "",
             competencyId: null,
             messageId: null,
-            observation: "Candidate is starting.",
+            observation: "Candidate proposed inspecting the input.",
           },
         ],
       }),
@@ -168,7 +171,7 @@ test("provider normalizes required nullable observation references", async () =>
     workspace: { type: "none" },
   });
   assert.deepEqual(turn.observations, [
-    { id: "", observation: "Candidate is starting." },
+    { id: "", observation: "Candidate proposed inspecting the input." },
   ]);
 });
 
@@ -230,12 +233,13 @@ test("interviewer observations use only definition competencies and supplied mes
   const model = new MockLanguageModelV3({
     doGenerate: mockResult(JSON.stringify({ ...output, observations: [] })),
   });
-  await generateInterviewResponseWithModel(model, openingContext);
-  assert.deepEqual(
-    model.doGenerateCalls[0].responseFormat.schema.properties.observations.items
-      .properties.messageId,
-    { type: "null" },
+  const opening = await generateInterviewResponseWithModel(
+    model,
+    openingContext,
   );
+  assert.deepEqual(opening.observations, []);
+  assert.equal(opening.stageComplete, false);
+  assert.equal(model.doGenerateCalls.length, 0);
 });
 
 test("system design context includes the normalized diagram through the generic workspace", async () => {

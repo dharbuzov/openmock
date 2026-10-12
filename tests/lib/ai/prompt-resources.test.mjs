@@ -8,7 +8,82 @@ import { loadDefinition } from "../../content-fixtures.mjs";
 
 const { readPromptResource } = load("../src/lib/ai/prompt-resources.ts");
 const { interviewerSystemPrompt } = load("../src/lib/ai/prompts.ts");
+const { startInterview, buildInterviewContext, acceptCandidateMessage } = load(
+  "../src/lib/interview/engine.ts",
+);
 
+function engineState(prompt) {
+  return JSON.parse(prompt.split("Engine state (data):\n").at(-1));
+}
+
+test("Markdown owns behavior while runtime tasks preserve definitions and engine state across interview types", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(await readPromptResource("interviewer"));
+  try {
+    const globalPrompt = await readPromptResource("interviewer");
+    for (const id of ["dsa", "system-design", "sql", "behavioral"]) {
+      const definition =
+        id === "sql"
+          ? { ...loadDefinition("dsa"), id: "sql", name: "SQL" }
+          : loadDefinition(id);
+      const problem = { id: "example", interview: id, title: "Example" };
+      const before = structuredClone(definition);
+      for (const mode of definition.modes) {
+        const interview = startInterview(problem, { definition, mode });
+        const context = buildInterviewContext(interview, problem, definition);
+        const prompt = await interviewerSystemPrompt(context);
+        assert.ok(prompt.startsWith(globalPrompt));
+        assert.ok(prompt.includes(definition.instructions));
+        assert.deepEqual(engineState(prompt), {
+          task: "opening",
+          currentStageId: definition.stages[0].id,
+          transition: null,
+        });
+        const reply = acceptCandidateMessage(
+          interview,
+          "Can I clarify the requirements?",
+        );
+        assert.equal(
+          engineState(
+            await interviewerSystemPrompt(
+              buildInterviewContext(reply, problem, definition),
+            ),
+          ).task,
+          "follow-up",
+        );
+        const transition = {
+          from: definition.stages[0].id,
+          to: definition.stages[1].id,
+          reason: "ready",
+        };
+        const destination = await interviewerSystemPrompt({
+          ...context,
+          transition,
+          interview: {
+            ...interview,
+            stage: { ...interview.stage, current: transition.to },
+          },
+        });
+        assert.deepEqual(engineState(destination), {
+          task: "follow-up",
+          currentStageId: transition.to,
+          transition,
+        });
+        const closing = await interviewerSystemPrompt({
+          ...context,
+          transition: { ...transition, to: null },
+        });
+        assert.equal(engineState(closing).task, "closing");
+        assert.equal(interview.stage.current, definition.stages[0].id);
+        assert.deepEqual(interview.messages, []);
+      }
+      assert.deepEqual(definition, before);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 test("loads required global prompts from content/prompts resources", async () => {
   assert.match(
     await readPromptResource("interviewer"),
@@ -58,9 +133,12 @@ test("interviewer prompt composes the global resource before interview instructi
     const definitionIndex = composed.indexOf("# Behavioral Interview");
     assert.ok(globalIndex >= 0);
     assert.ok(definitionIndex > globalIndex);
-    assert.ok(composed.indexOf("Next turn task:") > definitionIndex);
-    assert.match(composed, /active stage "introduction"/);
-    assert.match(composed, /approved transition is null/);
+    assert.ok(composed.indexOf("Engine state (data):") > definitionIndex);
+    assert.deepEqual(engineState(composed), {
+      task: "follow-up",
+      currentStageId: "introduction",
+      transition: null,
+    });
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -69,6 +147,14 @@ test("interviewer prompt composes the global resource before interview instructi
 test("production prompt composition no longer exports the hardcoded constant", () => {
   const prompts = load("node:fs").readFileSync("src/lib/ai/prompts.ts", "utf8");
   assert.ok(!prompts.includes("BASE_INTERVIEWER_SYSTEM_PROMPT"));
+  for (const instruction of [
+    "Ask exactly one",
+    "Return a brief closing",
+    "Judge readiness",
+    "The discussion is OVER",
+    "Do not announce",
+  ])
+    assert.ok(!prompts.includes(instruction), instruction);
 });
 
 test("next-turn instructions follow the engine's approved destination without changing the definition", async () => {
@@ -88,7 +174,7 @@ test("next-turn instructions follow the engine's approved destination without ch
       interview: { stage: { current: transition.to } },
       transition,
     });
-    assert.match(composed, /active stage "high-level-design"/);
+    assert.equal(engineState(composed).currentStageId, "high-level-design");
     assert.ok(composed.includes(JSON.stringify(transition)));
     assert.ok(composed.includes(definition.instructions));
     assert.deepEqual(definition, before);

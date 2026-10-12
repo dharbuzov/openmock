@@ -66,7 +66,7 @@ async function loadProblem(filename: string): Promise<Problem> {
   }
 }
 
-export async function getProblems(): Promise<Problem[]> {
+async function loadProblems(): Promise<Problem[]> {
   const files = await discoverFiles(
     path.join(process.cwd(), "content", "problems"),
   );
@@ -89,12 +89,23 @@ export async function getProblems(): Promise<Problem[]> {
     definitions,
     files.map((filename) => path.relative(process.cwd(), filename)),
   );
+  return problems.sort((a, b) => a.title.localeCompare(b.title));
+}
+
+let catalog: Promise<Problem[]> | undefined;
+
+export async function getProblems(): Promise<Problem[]> {
+  // Production content is deployed with the server; development edits stay live.
+  const problems = await (process.env.NODE_ENV === "development"
+    ? loadProblems()
+    : (catalog ??= loadProblems().catch((error: unknown) => {
+        catalog = undefined;
+        throw error;
+      })));
   const available = new Set(
     (await getInterviewDefinitions()).map(({ id }) => id),
   );
-  return problems
-    .filter((problem) => available.has(problem.interview))
-    .sort((a, b) => a.title.localeCompare(b.title));
+  return problems.filter((problem) => available.has(problem.interview));
 }
 
 export async function getProblem(id: string): Promise<Problem | undefined> {

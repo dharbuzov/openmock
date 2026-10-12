@@ -14,6 +14,58 @@ const { interviewerInput, assertContextBudget } = load(
 const { generateInterviewResponseWithModel } = load(
   "../src/lib/ai/provider.ts",
 );
+
+test("opening publishes one candidate-led question without sending problem guidance to a model", async () => {
+  for (const id of ["dsa", "system-design", "sql"]) {
+    const base = loadDefinition(id === "sql" ? "dsa" : id);
+    const definition = { ...base, id };
+    const problem = {
+      id: "opening-example",
+      interview: id,
+      title: "Example Problem",
+      content:
+        "A retry after a timeout may charge twice. Consider idempotency and edge cases.",
+      interviewerContext:
+        "Probe requirements, constraints and scale before design.",
+    };
+    const interview = startInterview(problem, { definition });
+    const context = buildInterviewContext(interview, problem, definition);
+    const before = structuredClone(context);
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => {
+        throw new Error("Opening must not call the model");
+      },
+      doStream: async () => {
+        throw new Error("Opening must not stream from the model");
+      },
+    });
+    for (const streaming of [false, true]) {
+      const displayed = [];
+      const turn = await generateInterviewResponseWithModel(
+        model,
+        context,
+        undefined,
+        streaming ? (message) => displayed.push(message) : undefined,
+      );
+      assert.equal(
+        turn.message,
+        "We'll work on “Example Problem”. How would you like to approach it?",
+      );
+      assert.equal((turn.message.match(/\?/g) ?? []).length, 1);
+      assert.equal(turn.stageId, definition.stages[0].id);
+      assert.equal(turn.stageComplete, false);
+      assert.deepEqual(turn.observations, []);
+      assert.deepEqual(displayed, streaming ? [turn.message] : []);
+      assert.deepEqual(context, before);
+    }
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(
+      generateInterviewResponseWithModel(model, context, controller.signal),
+      { name: "AbortError" },
+    );
+  }
+});
 function fixture(count = 300) {
   const definition = loadDefinition("dsa");
   const problem = {
@@ -110,11 +162,12 @@ test("approved final closure ends the input with the engine task after historica
   context.interview.stage.current = "wrap-up";
   context.transition = { from: "wrap-up", to: null, reason: "time" };
   const input = interviewerInput(context, "system");
-  assert.match(
-    input.messages.at(-1).content,
-    /Engine task: The final-stage closure/,
+  const task = JSON.parse(
+    input.messages.at(-1).content.split("\n").slice(1).join("\n"),
   );
-  assert.match(input.messages.at(-1).content, /Ask no question/);
+  assert.equal(task.task, "closing");
+  assert.equal(task.currentStageId, "wrap-up");
+  assert.deepEqual(task.transition, context.transition);
   assert.ok(input.messageIds.includes(context.interview.messages.at(-1).id));
 });
 
