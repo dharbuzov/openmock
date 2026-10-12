@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { Database, Landmark, CircleHelp } from "lucide-react";
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { load } from "../register-typescript.mjs";
 import {
   loadComponent,
   hookHarness,
@@ -78,6 +79,110 @@ const problems = [
 const all = { interview: "", difficulty: "", company: "", search: "" };
 const ids = (filters) =>
   filterProblems(problems, { ...all, ...filters }).map(({ id }) => id);
+
+test("expanded DSA catalog filters by canonical category, difficulty and every topic", async () => {
+  const { getProblems } = load("../src/lib/problems/loader.ts");
+  const catalog = await getProblems();
+  const dsa = catalog.filter(({ interview }) => interview === "dsa");
+  for (const topic of new Set(dsa.flatMap(({ topics }) => topics))) {
+    for (const difficulty of ["", "easy", "medium", "hard"]) {
+      const result = filterProblems(catalog, {
+        ...all,
+        interview: "dsa",
+        category: "algorithms",
+        topic,
+        difficulty,
+      });
+      const expected = dsa.filter(
+        (problem) =>
+          problem.topics.includes(topic) &&
+          (!difficulty || problem.difficulty === difficulty),
+      );
+      assert.deepEqual(
+        result.map(({ id }) => id),
+        expected.map(({ id }) => id),
+      );
+    }
+  }
+  assert.deepEqual(
+    filterProblems(catalog, {
+      ...all,
+      interview: "dsa",
+      category: "distributed-systems",
+    }),
+    [],
+  );
+});
+
+test("Pick Random respects selected filters with the expanded real DSA catalog", async (t) => {
+  const { getProblems } = load("../src/lib/problems/loader.ts");
+  const { getInterviewDefinitions } = load(
+    "../src/lib/interview/definitions.ts",
+  );
+  const props = {
+    problems: await getProblems(),
+    interviewTypes: await getInterviewDefinitions(),
+  };
+  const hooks = hookHarness();
+  const navigations = [];
+  const { PracticeProblems } = loadComponent(
+    "src/components/practice-problems.tsx",
+    {
+      ...overrides,
+      react: hooks.react,
+      "next/navigation": {
+        useRouter: () => ({ push: (url) => navigations.push(url) }),
+      },
+    },
+  );
+  const render = () => hooks.render(PracticeProblems, props);
+  t.mock.method(Math, "random", () => 0);
+  for (const difficulty of ["", "easy", "medium", "hard"]) {
+    for (const search of [
+      "",
+      "two pointers",
+      "dynamic programming",
+      "trees",
+      "blind 75",
+      "nonexistent-problem",
+    ]) {
+      const tree = render();
+      findElement(tree, (node) => node.type === "select").props.onValueChange(
+        "dsa",
+      );
+      findElement(
+        tree,
+        (node) => node.props["aria-labelledby"] === "practice-difficulty",
+      ).props.onValueChange([difficulty || "__all__"]);
+      findElement(
+        tree,
+        (node) => node.props.id === "practice-search",
+      ).props.onChange({ target: { value: search } });
+      const filtered = render();
+      const button = findElement(
+        filtered,
+        (node) =>
+          node.type === "button" && node.props.children?.[1] === "Pick Random",
+      );
+      const expected = filterProblems(
+        props.problems,
+        { ...all, interview: "dsa", difficulty, search },
+        props.interviewTypes,
+      );
+      assert.equal(button.props.disabled, expected.length === 0);
+      const previous = navigations.length;
+      if (!expected.length) {
+        button.props.onClick();
+        assert.equal(navigations.length, previous);
+      }
+      for (let i = 0; i < expected.length; i++) {
+        Math.random.mock.mockImplementation(() => (i + 0.5) / expected.length);
+        button.props.onClick();
+        assert.equal(navigations.at(-1), `/practice/${expected[i].id}/setup`);
+      }
+    }
+  }
+});
 
 test("Pick Random uses the visible results for every filter combination", (t) => {
   const hooks = hookHarness();
