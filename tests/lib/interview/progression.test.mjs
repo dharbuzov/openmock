@@ -542,11 +542,23 @@ test("runtime context and Markdown instructions expose pacing, activities, openi
       /explicitly introduce the destination stage naturally by name/,
     );
     assert.match(prompt, /including its entry[\s\S]*activity/);
-    assert.match(prompt, /10–15%/);
-    assert.match(
-      loadDefinition("dsa").instructions,
-      /dedicated[\s\S]*coding time/,
-    );
+    for (const id of ["dsa", "system-design", "behavioral"]) {
+      const current = fixture(id);
+      const currentContext = engine.buildInterviewContext(
+        current.interview,
+        current.problem,
+        current.definition,
+      );
+      const currentPrompt = await interviewerSystemPrompt(currentContext);
+      assert.ok(
+        currentPrompt.includes(current.definition.instructions),
+        `${id}: prompt preserves the catalog definition's current instructions`,
+      );
+      assert.deepEqual(
+        JSON.parse(interviewContext(currentContext)).interviewDefinition.stages,
+        current.definition.stages,
+      );
+    }
     const evaluator = readFileSync("content/prompts/evaluator.md", "utf8");
     assert.match(evaluator, /Competency evidence can come from any stage/);
     assert.match(

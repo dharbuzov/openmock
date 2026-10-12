@@ -9,17 +9,29 @@ import type { InterviewDefinition } from "../interview/types";
 export function validateProblemDefinitions(
   problems: Problem[],
   definitions: InterviewDefinition[],
+  filenames?: string[],
 ): void {
-  const definitionIds = new Set(definitions.map(({ id }) => id));
-  for (const problem of problems) {
-    if (!definitionIds.has(problem.interview)) {
+  const definitionsById = new Map(
+    definitions.map((definition) => [definition.id, definition]),
+  );
+  for (const [index, problem] of problems.entries()) {
+    const location = filenames?.[index] ?? problem.id;
+    const definition = definitionsById.get(problem.interview);
+    if (!definition) {
       logger.warn(
         { problemId: problem.id, definitionId: problem.interview },
         "Problem references unknown interview definition",
       );
       throw new Error(
-        `Problem ${problem.id} references unknown interview definition: ${problem.interview}`,
+        `Invalid problem ${location}: interview references unknown interview definition: ${problem.interview}`,
       );
+    }
+    for (const field of ["language", "starterCode"] as const) {
+      if (problem[field] !== undefined && definition.workspace !== "code") {
+        throw new Error(
+          `Invalid problem ${location}: ${field} requires an interview definition with a code workspace`,
+        );
+      }
     }
   }
 }
@@ -61,14 +73,22 @@ export async function getProblems(): Promise<Problem[]> {
   logger.debug({ count: files.length }, "Problems discovered");
   const problems = await Promise.all(files.map(loadProblem));
   logger.debug({ count: problems.length }, "Problems loaded");
-  const ids = new Set<string>();
-  for (const problem of problems) {
-    if (ids.has(problem.id))
-      throw new Error(`Duplicate problem id: ${problem.id}`);
-    ids.add(problem.id);
+  const ids = new Map<string, string>();
+  for (const [index, problem] of problems.entries()) {
+    const filename = path.relative(process.cwd(), files[index]);
+    const previous = ids.get(problem.id);
+    if (previous !== undefined)
+      throw new Error(
+        `Invalid problem ${filename}: Duplicate problem id: ${problem.id} (already defined in ${previous})`,
+      );
+    ids.set(problem.id, filename);
   }
   const definitions = await getInterviewDefinitions({ includeDisabled: true });
-  validateProblemDefinitions(problems, definitions);
+  validateProblemDefinitions(
+    problems,
+    definitions,
+    files.map((filename) => path.relative(process.cwd(), filename)),
+  );
   const available = new Set(
     (await getInterviewDefinitions()).map(({ id }) => id),
   );

@@ -11,7 +11,7 @@ const slugSchema = z
 const nonEmptyString = z.string().trim().min(1);
 const stringList = z.array(slugSchema).default([]);
 
-const companySchema = z.object({
+const companySchema = z.strictObject({
   id: nonEmptyString,
   relation: z.enum(["reported", "similar", "relevant"]),
   source: nonEmptyString.optional(),
@@ -38,7 +38,10 @@ const normalizedMetadataSchema = z.strictObject({
     .default([]),
   interviewerContext: nonEmptyString.optional(),
   language: nonEmptyString.optional(),
-  starterCode: nonEmptyString.optional(),
+  starterCode: z
+    .string()
+    .refine((value) => value.trim().length > 0, "must not be empty")
+    .optional(),
 });
 
 export function parseProblemMetadata(value: unknown): ProblemMetadata {

@@ -24,7 +24,8 @@ companies: []
 Then write the problem using Markdown and open a pull request.
 
 The application recursively discovers `.md` files here, excluding `README.md`.
-Each file must have a unique lowercase, hyphen-separated `id`, a non-empty
+DSA, System Design, and other interview types share the same metadata schema.
+Each file must have a globally unique lowercase, hyphen-separated `id`, a non-empty
 `title`, an interview definition id, a `difficulty` of `easy`, `medium`, or
 `hard`, and a non-empty Markdown body. `categories`, `topics`, and `companies`
 are optional and default to empty arrays. Categories are broad classifications;
@@ -49,9 +50,18 @@ The Catalog and Setup show this resolved duration. Starting an interview capture
 it for that session and starts the countdown automatically. Pause/resume and
 reload preserve the session's clock; later content edits do not change its duration.
 
-Problems used with a `code` workspace may optionally provide `language` and a
+Only problems whose interview definition uses a `code` workspace may optionally provide `language` and a
 `starterCode: |` YAML block. The current coding workspace uses that source as
-its initial buffer. Code execution is not implemented.
+its initial buffer, preserving indentation and newlines. Both fields must be
+non-empty strings when supplied; neither is required. Code execution is not implemented.
+Other workspace types have no additional metadata requirements: problem-specific
+requirements and evaluation expectations belong in Markdown.
+
+Company objects require a non-empty `id` and a `relation` of `reported`, `similar`,
+or `relevant`; optional `source` must be a non-empty string. Company names are
+normalized to objects with relation `relevant`. Unknown company fields are rejected.
+Validation runs before disabled interview types are excluded. Duplicate ID errors
+identify both files, and invalid metadata errors identify the file and field.
 
 Author the candidate statement, examples, and given constraints inside
 `## Description`, using `###` headings for subsections. The panel shows only
